@@ -20,13 +20,10 @@ import (
 type signEDDSAOperation struct {
 	signOperation
 	savedData eddsaKeygen.LocalPartySaveData
-	name      string
 }
 
 func NewSignEDDSAOperation() _interface.Operation {
-	return &signEDDSAOperation{
-		name: "eddsaSign",
-	}
+	return &signEDDSAOperation{}
 }
 
 func (s *signEDDSAOperation) Init(rosenTss _interface.RosenTss) error {
@@ -170,7 +167,7 @@ func (s *signEDDSAOperation) PartyUpdate(partyMsg models.PartyMessage) error {
 			return nil
 		}
 		models.Logger.Infof("updating party state")
-		err := s.sharedPartyUpdater(s.LocalTssData.Party, partyMsg)
+		err := s.SharedPartyUpdater(s.LocalTssData.Party, partyMsg)
 		if err != nil {
 			models.Logger.Error(err)
 			return err
@@ -184,7 +181,7 @@ func (s *signEDDSAOperation) PartyUpdate(partyMsg models.PartyMessage) error {
 		}
 		if s.LocalTssData.PartyID.Index == dest[0].Index {
 			models.Logger.Infof("updating party state p2p")
-			err := s.sharedPartyUpdater(s.LocalTssData.Party, partyMsg)
+			err := s.SharedPartyUpdater(s.LocalTssData.Party, partyMsg)
 			if err != nil {
 				models.Logger.Error(err)
 				return err
@@ -243,7 +240,7 @@ func (s *signEDDSAOperation) GossipMessageHandler(rosenTss _interface.RosenTss, 
 	for {
 		select {
 		case partyMsg := <-outCh:
-			msgHex, err := s.signPartyMessageHandler(partyMsg)
+			msgHex, err := s.PartyMessageHandler(partyMsg)
 			if err != nil {
 				models.Logger.Error(err)
 				return err
@@ -274,5 +271,5 @@ func (s *signEDDSAOperation) GossipMessageHandler(rosenTss _interface.RosenTss, 
 }
 
 func (s *signEDDSAOperation) GetClassName() string {
-	return s.name
+	return "eddsaSign"
 }
