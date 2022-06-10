@@ -43,38 +43,57 @@ func NewRosenTss(connection network.Connection, storage storage.Storage, homeAdd
 
 // StartNewSign starts sign scenario for app based on given protocol.
 func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
-	models.Logger.Info("Starting New Sign process")
+	log.Printf("Starting New Sign process")
 	err := r.SetMetaData()
 	if err != nil {
 		return err
 	}
 
-	messageCh := make(chan models.Message, 100)
-
 	msgBytes, _ := hex.DecodeString(signMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	signDtaHash := hex.EncodeToString(signDataBytes[:])
-	r.ChannelMap[signDtaHash] = messageCh
+	log.Printf("signDtaHash: %v", signDtaHash)
+
+	if _, ok := r.ChannelMap[signDtaHash]; !ok {
+		messageCh := make(chan models.Message, 100)
+		r.ChannelMap[signDtaHash] = messageCh
+		models.Logger.Infof("creating new channel in StartNewSign: %v", signDtaHash)
+
+	}
 
 	// read loop function
 	if signMessage.Crypto == "ecdsa" {
 		// TODO: implement this
 
 	} else if signMessage.Crypto == "eddsa" {
-		EDDSAOperation := sign.NewSignEDDSAOperation()
-		err := EDDSAOperation.Init(r)
+		EDDSAOperation := sign.NewSignEDDSAOperation(signData)
+		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err
 		}
 		go func() {
-			err := EDDSAOperation.Loop(r, messageCh, signData)
+			models.Logger.Info("calling loop")
+			err := EDDSAOperation.Loop(r, r.ChannelMap[signDtaHash], signData)
 			if err != nil {
 				models.Logger.Error(err)
+				//TODO: handle error
 			}
+			models.Logger.Info("end of  loop")
 		}()
 	}
 	return nil
+}
+
+func (r *rosenTss) MessageHandler(message models.Message) {
+
+	models.Logger.Infof("new message: %v", message)
+	if _, ok := r.ChannelMap[message.Message.MessageId]; !ok {
+		models.Logger.Infof("creating new channel in MessageHandler: %v", message.Message.MessageId)
+		messageCh := make(chan models.Message, 100)
+		r.ChannelMap[message.Message.MessageId] = messageCh
+	}
+	r.ChannelMap[message.Message.MessageId] <- message
 }
 
 func (r *rosenTss) GetStorage() storage.Storage {
@@ -105,7 +124,6 @@ func (r *rosenTss) SetPeerHome(homeAddress string) error {
 	}
 
 	if err := os.MkdirAll(r.peerHome, os.ModePerm); err != nil {
-		models.Logger.Error(err)
 		return err
 	}
 	return nil
@@ -131,7 +149,7 @@ func (r *rosenTss) SetMetaData() error {
 		}
 	}
 	filePath := filepath.Join(rootFolder, configFile)
-	log.Infof("File: %v", filePath)
+	models.Logger.Infof("File: %v", filePath)
 
 	// reading file
 	bz, err := ioutil.ReadFile(filePath)
@@ -152,19 +170,16 @@ func (r *rosenTss) GetMetaData() models.MetaData {
 	return r.metaData
 }
 
-// NewMessage cretes messages for app rounds
-func (r *rosenTss) NewMessage(id string, message string, messageId string, name string) []byte {
+// NewMessage creates messages for app rounds
+func (r *rosenTss) NewMessage(receiverId string, senderId string, message string, messageId string, name string) models.GossipMessage {
 
 	m := models.GossipMessage{
-		Message:   message,
-		MessageId: messageId,
-		SenderID:  id,
-		Name:      name,
+		Message:    message,
+		MessageId:  messageId,
+		SenderId:   senderId,
+		ReceiverId: receiverId,
+		Name:       name,
 	}
-	msgBytes, err := json.Marshal(m)
-	if err != nil {
-		panic(err)
-	}
-	// TODO: create message struct
-	return msgBytes
+
+	return m
 }

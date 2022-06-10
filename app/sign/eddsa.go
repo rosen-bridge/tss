@@ -8,7 +8,6 @@ import (
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	eddsaSigning "github.com/binance-chain/tss-lib/eddsa/signing"
 	"github.com/binance-chain/tss-lib/tss"
-	"go.uber.org/zap"
 	"golang.org/x/crypto/blake2b"
 	"math/big"
 	"rosen-bridge/tss/app/interface"
@@ -22,13 +21,15 @@ type signEDDSAOperation struct {
 	savedData eddsaKeygen.LocalPartySaveData
 }
 
-func NewSignEDDSAOperation() _interface.Operation {
-	return &signEDDSAOperation{}
+func NewSignEDDSAOperation(signData *big.Int) _interface.Operation {
+	return &signEDDSAOperation{
+		signOperation: signOperation{signData: signData},
+	}
 }
 
-func (s *signEDDSAOperation) Init(rosenTss _interface.RosenTss) error {
+func (s *signEDDSAOperation) Init(rosenTss _interface.RosenTss, receiverId string) error {
 
-	models.Logger.Info("setupPeers called")
+	models.Logger.Info("Init called")
 
 	if s.LocalTssData.PartyID == nil {
 		data, pID, err := rosenTss.GetStorage().LoadEDDSAKeygen(rosenTss.GetPeerHome())
@@ -44,9 +45,9 @@ func (s *signEDDSAOperation) Init(rosenTss _interface.RosenTss) error {
 		s.LocalTssData.PartyID = pID
 	}
 	message := fmt.Sprintf("%s,%s,%d,%s", s.LocalTssData.PartyID.Id, s.LocalTssData.PartyID.Moniker, s.LocalTssData.PartyID.KeyInt(), "fromSign")
-	messageBytes := blake2b.Sum256([]byte(message))
-	messageId := hex.EncodeToString(messageBytes[:])
-	jsonMessage := rosenTss.NewMessage(s.LocalTssData.PartyID.Id, message, messageId, "partyId")
+	signDataBytes := blake2b.Sum256(s.signData.Bytes())
+	messageId := hex.EncodeToString(signDataBytes[:])
+	jsonMessage := rosenTss.NewMessage(receiverId, s.LocalTssData.PartyID.Id, message, messageId, "partyId")
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err
@@ -55,6 +56,8 @@ func (s *signEDDSAOperation) Init(rosenTss _interface.RosenTss) error {
 }
 
 func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message, signData *big.Int) error {
+
+	models.Logger.Infof("channel", messageCh)
 
 	for {
 		select {
@@ -72,28 +75,25 @@ func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				}
 			case "partyMsg":
 				models.Logger.Info("received party message:",
-					fmt.Sprintf("from: %s", msg.SenderID))
+					fmt.Sprintf("from: %s", msg.SenderId))
 				msgBytes, err := hex.DecodeString(msg.Message)
 				if err != nil {
-					models.Logger.Error("failed to decode message", zap.Error(err))
 					return err
 				}
 				partyMsg := models.PartyMessage{}
 				err = json.Unmarshal(msgBytes, &partyMsg)
 				if err != nil {
-					models.Logger.Error(err)
 					return err
 				}
 				err = s.PartyUpdate(partyMsg)
 				if err != nil {
-					models.Logger.Error(err)
 					return err
 				}
 			case "sign":
 				models.Logger.Info("received sign message: ",
-					fmt.Sprintf("from: %s", msg.SenderID))
-				outCh := make(chan tss.Message, len(s.LocalTssData.Parties))
-				endCh := make(chan common.SignatureData, len(s.LocalTssData.Parties))
+					fmt.Sprintf("from: %s", msg.SenderId))
+				outCh := make(chan tss.Message, len(s.LocalTssData.PartyIds))
+				endCh := make(chan common.SignatureData, len(s.LocalTssData.PartyIds))
 				for {
 					if s.LocalTssData.Params == nil {
 						time.Sleep(time.Second)
@@ -107,7 +107,6 @@ func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan m
 					signMessage, _ := new(big.Int).SetString(msg.Message, 10)
 					s.LocalTssData.Party = eddsaSigning.NewLocalParty(signMessage, s.LocalTssData.Params, s.savedData, outCh, endCh)
 					if err := s.LocalTssData.Party.Start(); err != nil {
-						models.Logger.Errorf("an error occurred while starting the party: {%v}", err)
 						return err
 					}
 					models.Logger.Info("party started")
@@ -115,6 +114,8 @@ func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan m
 						err := s.GossipMessageHandler(rosenTss, outCh, endCh, signData)
 						if err != nil {
 							models.Logger.Error(err)
+							//TODO: handle error
+							return
 						}
 					}()
 				}
@@ -123,37 +124,53 @@ func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan m
 	}
 }
 
+func isExist(newPartyId *tss.PartyID, partyIds tss.SortedPartyIDs) bool {
+	for _, partyId := range partyIds {
+		if partyId.Id == newPartyId.Id {
+			return true
+		}
+	}
+	return false
+}
+
 // PartyIdMessageHandler handles get message from channel and cals initial function
 func (s *signEDDSAOperation) PartyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage, signData *big.Int) error {
-	models.Logger.Info("received partyId message ",
-		fmt.Sprintf("from: %s", gossipMessage.SenderID))
-	partyIdParams := strings.Split(gossipMessage.Message, ",")
-	models.Logger.Infof("partyIdParams: %v", partyIdParams)
-	key, _ := new(big.Int).SetString(partyIdParams[2], 10)
-	newParty := tss.NewPartyID(partyIdParams[0], partyIdParams[1], key)
 
-	meta := rosenTss.GetMetaData()
+	if gossipMessage.SenderId != s.LocalTssData.PartyID.Id &&
+		(gossipMessage.ReceiverId == "" || gossipMessage.ReceiverId == s.LocalTssData.PartyID.Id) {
 
-	switch partyIdParams[3] {
+		models.Logger.Info("received partyId message ",
+			fmt.Sprintf("from: %s", gossipMessage.SenderId))
+		partyIdParams := strings.Split(gossipMessage.Message, ",")
+		models.Logger.Infof("partyIdParams: %v", partyIdParams)
+		key, _ := new(big.Int).SetString(partyIdParams[2], 10)
+		newParty := tss.NewPartyID(partyIdParams[0], partyIdParams[1], key)
 
-	case "fromSign":
-		s.LocalTssData.Parties = tss.SortPartyIDs(
-			append(s.LocalTssData.Parties.ToUnSorted(), newParty))
+		meta := rosenTss.GetMetaData()
 
-		// TODO: send partyId to sender message.
-		if len(s.LocalTssData.Parties) < meta.Threshold {
-			err := s.Init(rosenTss)
-			if err != nil {
-				return err
+		switch partyIdParams[3] {
+
+		case "fromSign":
+			if !isExist(newParty, s.LocalTssData.PartyIds) {
+				s.LocalTssData.PartyIds = tss.SortPartyIDs(
+					append(s.LocalTssData.PartyIds.ToUnSorted(), newParty))
+
+				if len(s.LocalTssData.PartyIds) < meta.Threshold {
+					err := s.Init(rosenTss, newParty.Id)
+					if err != nil {
+						return err
+					}
+				} else {
+					err := s.Setup(rosenTss, signData)
+					if err != nil {
+						return err
+					}
+				}
 			}
-		} else {
-			err := s.Setup(rosenTss, signData)
-			if err != nil {
-				return err
-			}
+
+		default:
+			return fmt.Errorf("wrong message")
 		}
-	default:
-		return fmt.Errorf("wrong message")
 	}
 	return nil
 }
@@ -169,21 +186,18 @@ func (s *signEDDSAOperation) PartyUpdate(partyMsg models.PartyMessage) error {
 		models.Logger.Infof("updating party state")
 		err := s.SharedPartyUpdater(s.LocalTssData.Party, partyMsg)
 		if err != nil {
-			models.Logger.Error(err)
 			return err
 		}
 
 	} else { // point-to-point!
 		if dest[0].Index == partyMsg.GetFrom.Index {
 			err := fmt.Errorf("party %d tried to send a message to itself (%d)", dest[0].Index, partyMsg.GetFrom.Index)
-			models.Logger.Error(err)
 			return err
 		}
 		if s.LocalTssData.PartyID.Index == dest[0].Index {
 			models.Logger.Infof("updating party state p2p")
 			err := s.SharedPartyUpdater(s.LocalTssData.Party, partyMsg)
 			if err != nil {
-				models.Logger.Error(err)
 				return err
 			}
 			return nil
@@ -196,36 +210,39 @@ func (s *signEDDSAOperation) PartyUpdate(partyMsg models.PartyMessage) error {
 // It initializes siging scenario in eddsa. And gathering all parties.
 func (s *signEDDSAOperation) Setup(rosenTss _interface.RosenTss, signMsg *big.Int) error {
 	meta := rosenTss.GetMetaData()
-	for {
-		if len(s.LocalTssData.Parties) >= meta.Threshold {
-			break
-		}
-		time.Sleep(time.Millisecond * 100)
+
+	models.Logger.Infof("meta %+v", meta)
+
+	if len(s.LocalTssData.PartyIds) < meta.Threshold {
+		return fmt.Errorf("not eanough partyId")
 	}
 
-	s.LocalTssData.Parties = tss.SortPartyIDs(
-		append(s.LocalTssData.Parties.ToUnSorted(), s.LocalTssData.PartyID))
+	s.LocalTssData.PartyIds = tss.SortPartyIDs(
+		append(s.LocalTssData.PartyIds.ToUnSorted(), s.LocalTssData.PartyID))
 
-	for _, partyId := range s.LocalTssData.Parties {
+	models.Logger.Infof("partyIds {%+v}", s.LocalTssData.PartyIds)
+	models.Logger.Infof("partyIds count {%+v}", len(s.LocalTssData.PartyIds))
+	for _, partyId := range s.LocalTssData.PartyIds {
+		models.Logger.Infof("partyId id:%v, index: %v", partyId.Id, partyId.Index)
 		if partyId.Id == s.LocalTssData.PartyID.Id {
 			s.LocalTssData.PartyID = partyId
 			break
 		}
 	}
 
-	ctx := tss.NewPeerContext(s.LocalTssData.Parties)
+	ctx := tss.NewPeerContext(s.LocalTssData.PartyIds)
 	models.Logger.Info("creating params")
 	models.Logger.Infof("PartyID: %d, peerId: %s", s.LocalTssData.PartyID.Index, s.LocalTssData.PartyID.Id)
 
 	s.LocalTssData.Params = tss.NewParameters(
-		tss.Edwards(), ctx, s.LocalTssData.PartyID, len(s.LocalTssData.Parties), meta.Threshold)
+		tss.Edwards(), ctx, s.LocalTssData.PartyID, len(s.LocalTssData.PartyIds), meta.Threshold)
 
 	models.Logger.Infof("params created: %v", s.LocalTssData.Params.EC().Params().N)
 	models.Logger.Infof("localEDDSAData params: %v\n", *s.LocalTssData.Params)
 
 	messageBytes := blake2b.Sum256(signMsg.Bytes())
 	messageId := hex.EncodeToString(messageBytes[:])
-	jsonMessage := rosenTss.NewMessage(s.LocalTssData.PartyID.Id, signMsg.String(), messageId, "sign")
+	jsonMessage := rosenTss.NewMessage("", s.LocalTssData.PartyID.Id, signMsg.String(), messageId, "sign")
 
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
@@ -242,12 +259,11 @@ func (s *signEDDSAOperation) GossipMessageHandler(rosenTss _interface.RosenTss, 
 		case partyMsg := <-outCh:
 			msgHex, err := s.PartyMessageHandler(partyMsg)
 			if err != nil {
-				models.Logger.Error(err)
 				return err
 			}
 			messageBytes := blake2b.Sum256(signData.Bytes())
 			messageId := hex.EncodeToString(messageBytes[:])
-			jsonMessage := rosenTss.NewMessage(s.LocalTssData.PartyID.Id, msgHex, messageId, "partyMsg")
+			jsonMessage := rosenTss.NewMessage("", s.LocalTssData.PartyID.Id, msgHex, messageId, "partyMsg")
 			err = rosenTss.GetConnection().Publish(jsonMessage)
 			if err != nil {
 				return err

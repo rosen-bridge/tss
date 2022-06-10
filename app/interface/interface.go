@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/binance-chain/tss-lib/common"
 	"github.com/binance-chain/tss-lib/tss"
-	"go.uber.org/zap"
 	"math/big"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
@@ -14,7 +13,7 @@ import (
 
 type Operation interface {
 	// first initial of tss Operation (sign, keygen , regroup for ecdsa and eddsa)
-	Init(RosenTss) error
+	Init(RosenTss, string) error
 	Loop(RosenTss, chan models.Message, *big.Int) error
 	PartyIdMessageHandler(rosenTss RosenTss, gossipMessage models.GossipMessage, signData *big.Int) error
 	PartyUpdate(models.PartyMessage) error
@@ -30,9 +29,10 @@ type Operation interface {
 
 // RosenTss Interface of a app
 type RosenTss interface {
-	NewMessage(id string, message string, messageId string, name string) []byte
+	NewMessage(receiverId string, senderId string, message string, messageId string, name string) models.GossipMessage
 
 	StartNewSign(models.SignMessage) error
+	MessageHandler(models.Message)
 
 	GetStorage() storage.Storage
 	GetConnection() network.Connection
@@ -51,7 +51,6 @@ type OperationHandler struct {
 func (o *OperationHandler) PartyMessageHandler(partyMsg tss.Message) (string, error) {
 	msgBytes, _, err := partyMsg.WireBytes()
 	if err != nil {
-		models.Logger.Error(err)
 		return "", err
 	}
 	models.Logger.Infof("outch string: {%s}", partyMsg.String())
@@ -66,7 +65,6 @@ func (o *OperationHandler) PartyMessageHandler(partyMsg tss.Message) (string, er
 
 	partyMessageBytes, err := json.Marshal(partyMessage)
 	if err != nil {
-		models.Logger.Error("failed to marshal message", zap.Error(err))
 		return "", err
 	}
 	return hex.EncodeToString(partyMessageBytes), nil

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/viper"
+	_ "github.com/swaggo/echo-swagger/example/docs"
 	"rosen-bridge/tss/api"
 	"rosen-bridge/tss/app"
 	"rosen-bridge/tss/models"
@@ -16,17 +17,16 @@ var (
 )
 
 func main() {
-	//args := os.Args[1:]
+	e := echo.New()
 
 	err := initConfig()
 	if err != nil {
-		panic(err)
+		e.Logger.Fatal(err)
 	}
 
 	homeAddress := viper.GetString("HOME_ADDRESS")
 	port := viper.GetString("PORT")
 
-	e := echo.New()
 	conn := network.InitConnection()
 	localStorage := storage.NewStorage()
 
@@ -34,13 +34,13 @@ func main() {
 
 	err = tss.SetPeerHome(homeAddress)
 	if err != nil {
-		panic(err)
+		e.Logger.Fatal(err)
 	}
 
 	// subscribe to p2p
 	err = tss.GetConnection().Subscribe()
 	if err != nil {
-		panic(err)
+		e.Logger.Fatal(err)
 	}
 
 	tssController := api.NewTssController(tss)
@@ -69,7 +69,6 @@ func initConfig() error {
 	if err := viper.ReadInConfig(); err == nil {
 		models.Logger.Info("Using config file:", viper.ConfigFileUsed())
 	} else {
-		models.Logger.Error("Error using config file:", err.Error())
 		return fmt.Errorf("error using config file: %s", err.Error())
 	}
 	return nil

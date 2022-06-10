@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"github.com/labstack/echo/v4"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -51,7 +50,7 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 		if err := c.Bind(&data); err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
-		log.Printf("sign data: %+v ", data)
+		c.Logger().Info("sign data: %+v ", data)
 
 		err := tssController.rosenTss.StartNewSign(data)
 		if err != nil {
@@ -73,7 +72,19 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 //Message returns echo handler
 func (tssController *tssController) Message() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		// TODO: implement this
+		c.Logger().Info("message called")
+
+		var data models.Message
+
+		if err := c.Bind(&data); err != nil {
+			return c.String(http.StatusInternalServerError, err.Error())
+		}
+		c.Logger().Info("sign data: %+v ", data)
+
+		c.Logger().Infof("message data: %+v ", data)
+
+		tssController.rosenTss.MessageHandler(data)
+
 		return c.String(http.StatusOK, "success")
 	}
 }
@@ -89,7 +100,7 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 		if err := c.Bind(&response); err != nil {
 			return c.String(http.StatusInternalServerError, err.Error())
 		}
-		log.Printf("import data: %+v ", response)
+		c.Logger().Info("import data: %+v ", response)
 
 		// TODO: implement ImportPrivate
 		//tssController.tssUseCase.ImportPrivate(response.Private, response.Crypto)
@@ -105,9 +116,9 @@ func (tssController *tssController) Export() echo.HandlerFunc {
 
 		out, err := exec.Command("zip", "-r", "-D", "/tmp/app.zip", projectHome).Output()
 		if err != nil {
-			models.Logger.Errorf("%s", err)
+			c.Logger().Errorf("%s", err)
 		}
-		models.Logger.Info("zipping file was successful.")
+		c.Logger().Info("zipping file was successful.")
 		output := string(out[:])
 		fmt.Println(output)
 		return c.Attachment("/tmp/app.zip", "app.txt")

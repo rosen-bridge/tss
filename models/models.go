@@ -13,17 +13,18 @@ type SignMessage struct {
 }
 
 type Message struct {
-	Message  GossipMessage
-	Receiver string
-	topic    string
+	Message GossipMessage `json:"message"`
+	Sender  string        `json:"sender"`
+	Topic   string        `json:"channel"`
 }
 
 type GossipMessage struct {
-	Crypto    string `json:"crypto"`
-	MessageId string `json:"messageId"` // keygen or sign or regroup
-	Name      string `json:"name"`
-	Message   string `json:"message"`
-	SenderID  string `json:"senderId"`
+	Crypto     string `json:"crypto"`
+	MessageId  string `json:"messageId"` // keygen or sign or regroup
+	Name       string `json:"name"`
+	Message    string `json:"message"`
+	SenderId   string `json:"senderId"`
+	ReceiverId string `json:"receiverId"`
 }
 
 type MetaData struct {
@@ -37,10 +38,10 @@ type Private struct {
 }
 
 type TssData struct {
-	PartyID *tss.PartyID
-	Params  *tss.Parameters
-	Parties tss.SortedPartyIDs
-	Party   tss.Party
+	PartyID  *tss.PartyID
+	Params   *tss.Parameters
+	PartyIds tss.SortedPartyIDs
+	Party    tss.Party
 }
 
 type TssRegroupData struct {

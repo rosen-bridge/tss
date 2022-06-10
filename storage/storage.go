@@ -6,7 +6,7 @@ import (
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/pkg/errors"
-	"github.com/segmentio/ksuid"
+	"github.com/rs/xid"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -45,24 +45,18 @@ func (f *storage) WriteData(data interface{}, peerHome string, topicName string,
 	fi, err := os.Stat(f.filePath)
 	if !(err == nil && !fi.IsDir()) {
 		fd, err := os.OpenFile(f.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-		defer func(fd *os.File) {
-			err := fd.Close()
-			if err != nil {
-				models.Logger.Error(err.Error())
-			}
-		}(fd)
+		defer fd.Close()
+
 		if err != nil {
-			models.Logger.Errorf("unable to open File %s for writing", f.filePath)
-			return err
+			return fmt.Errorf("unable to open File %s for writing, err:{%v}", f.filePath, err)
 		}
 		bz, err := json.MarshalIndent(&data, "", "    ")
 		if err != nil {
-			models.Logger.Errorf("unable to marshal save data for File %s", f.filePath)
-			return err
+			return fmt.Errorf("unable to marshal save data for File %s, err:{%v}", f.filePath, err)
 		}
 		_, err = fd.Write(bz)
 		if err != nil {
-			models.Logger.Errorf("unable to write to File %s", f.filePath)
+			return fmt.Errorf("unable to write to File %s", f.filePath)
 		}
 		models.Logger.Infof("Saved a File: %s", f.filePath)
 		return nil
@@ -79,7 +73,6 @@ func (f *storage) LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveDa
 	rootFolder := filepath.Join(peerHome, "eddsa")
 	files, err := ioutil.ReadDir(rootFolder)
 	if err != nil {
-		models.Logger.Error(err)
 		return eddsaKeygen.LocalPartySaveData{}, nil, err
 	}
 	if len(files) == 0 {
@@ -110,7 +103,7 @@ func (f *storage) LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveDa
 		kbxj.SetCurve(tss.Edwards())
 	}
 	key.EDDSAPub.SetCurve(tss.Edwards())
-	id := ksuid.New()
+	id := xid.New()
 	pMoniker := fmt.Sprintf("tssPeer/%s", id.String())
 	partyID := tss.NewPartyID(id.String(), pMoniker, key.ShareID)
 	var parties tss.UnSortedPartyIDs
