@@ -104,8 +104,8 @@ func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				}
 
 				if s.LocalTssData.Party == nil {
-					signMessage, _ := new(big.Int).SetString(msg.Message, 10)
-					s.LocalTssData.Party = eddsaSigning.NewLocalParty(signMessage, s.LocalTssData.Params, s.savedData, outCh, endCh)
+					//signMessage, _ := new(big.Int).SetString(msg.Message, 10)
+					s.LocalTssData.Party = eddsaSigning.NewLocalParty(s.signData, s.LocalTssData.Params, s.savedData, outCh, endCh)
 					if err := s.LocalTssData.Party.Start(); err != nil {
 						return err
 					}
@@ -194,14 +194,12 @@ func (s *signEDDSAOperation) PartyUpdate(partyMsg models.PartyMessage) error {
 			err := fmt.Errorf("party %d tried to send a message to itself (%d)", dest[0].Index, partyMsg.GetFrom.Index)
 			return err
 		}
-		if s.LocalTssData.PartyID.Index == dest[0].Index {
-			models.Logger.Infof("updating party state p2p")
-			err := s.SharedPartyUpdater(s.LocalTssData.Party, partyMsg)
-			if err != nil {
-				return err
-			}
-			return nil
+		models.Logger.Infof("updating party state p2p")
+		err := s.SharedPartyUpdater(s.LocalTssData.Party, partyMsg)
+		if err != nil {
+			return err
 		}
+		return nil
 	}
 	return nil
 }
@@ -222,13 +220,13 @@ func (s *signEDDSAOperation) Setup(rosenTss _interface.RosenTss, signMsg *big.In
 
 	models.Logger.Infof("partyIds {%+v}", s.LocalTssData.PartyIds)
 	models.Logger.Infof("partyIds count {%+v}", len(s.LocalTssData.PartyIds))
-	for _, partyId := range s.LocalTssData.PartyIds {
-		models.Logger.Infof("partyId id:%v, index: %v", partyId.Id, partyId.Index)
-		if partyId.Id == s.LocalTssData.PartyID.Id {
-			s.LocalTssData.PartyID = partyId
-			break
-		}
-	}
+	//for _, partyId := range s.LocalTssData.PartyIds {
+	//	models.Logger.Infof("partyId id:%v, index: %v", partyId.Id, partyId.Index)
+	//	if partyId.Id == s.LocalTssData.PartyID.Id {
+	//		s.LocalTssData.PartyID = partyId
+	//		break
+	//	}
+	//}
 
 	ctx := tss.NewPeerContext(s.LocalTssData.PartyIds)
 	models.Logger.Info("creating params")

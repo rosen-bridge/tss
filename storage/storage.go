@@ -106,6 +106,8 @@ func (f *storage) LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveDa
 	id := xid.New()
 	pMoniker := fmt.Sprintf("tssPeer/%s", id.String())
 	partyID := tss.NewPartyID(id.String(), pMoniker, key.ShareID)
+	models.Logger.Infof("key: %+v", key)
+
 	var parties tss.UnSortedPartyIDs
 	parties = append(parties, partyID)
 	sortedPIDs := tss.SortPartyIDs(parties)
