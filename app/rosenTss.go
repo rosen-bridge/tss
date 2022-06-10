@@ -67,14 +67,14 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		// TODO: implement this
 
 	} else if signMessage.Crypto == "eddsa" {
-		EDDSAOperation := sign.NewSignEDDSAOperation(signData)
+		EDDSAOperation := sign.NewSignEDDSAOperation(signMessage)
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err
 		}
 		go func() {
 			models.Logger.Info("calling loop")
-			err := EDDSAOperation.Loop(r, r.ChannelMap[signDtaHash], signData)
+			err := EDDSAOperation.Loop(r, r.ChannelMap[signDtaHash])
 			if err != nil {
 				models.Logger.Error(err)
 				//TODO: handle error

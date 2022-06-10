@@ -8,8 +8,9 @@ import (
 var Logger = log.New("rosen-app")
 
 type SignMessage struct {
-	Crypto  string `json:"crypto"`
-	Message string `json:"message"`
+	Crypto      string `json:"crypto"`
+	Message     string `json:"message"`
+	CallBackUrl string `json:"callBackUrl"`
 }
 
 type Message struct {

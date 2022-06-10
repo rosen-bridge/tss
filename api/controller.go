@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"net/http"
-	"os"
 	"os/exec"
-	"path/filepath"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/models"
 )
@@ -48,13 +46,13 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 		data := models.SignMessage{}
 
 		if err := c.Bind(&data); err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 		c.Logger().Info("sign data: %+v ", data)
 
 		err := tssController.rosenTss.StartNewSign(data)
 		if err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
 		return c.String(http.StatusOK, "success")
@@ -77,7 +75,7 @@ func (tssController *tssController) Message() echo.HandlerFunc {
 		var data models.Message
 
 		if err := c.Bind(&data); err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 		c.Logger().Info("sign data: %+v ", data)
 
@@ -111,16 +109,14 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 // Export returns echo handler witch used to download all files of app
 func (tssController *tssController) Export() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		userHome, _ := os.UserHomeDir()
-		projectHome := filepath.Join(userHome, ".app")
-
-		out, err := exec.Command("zip", "-r", "-D", "/tmp/app.zip", projectHome).Output()
+		peerHome := tssController.rosenTss.GetPeerHome()
+		out, err := exec.Command("zip", "-r", "-D", "/tmp/rosenTss.zip", peerHome).Output()
 		if err != nil {
 			c.Logger().Errorf("%s", err)
 		}
 		c.Logger().Info("zipping file was successful.")
 		output := string(out[:])
 		fmt.Println(output)
-		return c.Attachment("/tmp/app.zip", "app.txt")
+		return c.Attachment("/tmp/rosenTss.zip", "rosenTss.zip")
 	}
 }

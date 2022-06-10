@@ -17,13 +17,13 @@ import (
 )
 
 type signEDDSAOperation struct {
-	signOperation
+	SignOperation
 	savedData eddsaKeygen.LocalPartySaveData
 }
 
-func NewSignEDDSAOperation(signData *big.Int) _interface.Operation {
+func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation {
 	return &signEDDSAOperation{
-		signOperation: signOperation{signData: signData},
+		SignOperation: SignOperation{SignMessage: signMessage},
 	}
 }
 
@@ -45,7 +45,9 @@ func (s *signEDDSAOperation) Init(rosenTss _interface.RosenTss, receiverId strin
 		s.LocalTssData.PartyID = pID
 	}
 	message := fmt.Sprintf("%s,%s,%d,%s", s.LocalTssData.PartyID.Id, s.LocalTssData.PartyID.Moniker, s.LocalTssData.PartyID.KeyInt(), "fromSign")
-	signDataBytes := blake2b.Sum256(s.signData.Bytes())
+	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
+	signData := new(big.Int).SetBytes(msgBytes)
+	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := hex.EncodeToString(signDataBytes[:])
 	jsonMessage := rosenTss.NewMessage(receiverId, s.LocalTssData.PartyID.Id, message, messageId, "partyId")
 	err := rosenTss.GetConnection().Publish(jsonMessage)
@@ -55,13 +57,16 @@ func (s *signEDDSAOperation) Init(rosenTss _interface.RosenTss, receiverId strin
 	return nil
 }
 
-func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message, signData *big.Int) error {
+func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
 
 	models.Logger.Infof("channel", messageCh)
+	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
+	signData := new(big.Int).SetBytes(msgBytes)
 
 	for {
 		select {
 		case message := <-messageCh:
+
 			msg := message.Message
 			models.Logger.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {
@@ -104,8 +109,7 @@ func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				}
 
 				if s.LocalTssData.Party == nil {
-					//signMessage, _ := new(big.Int).SetString(msg.Message, 10)
-					s.LocalTssData.Party = eddsaSigning.NewLocalParty(s.signData, s.LocalTssData.Params, s.savedData, outCh, endCh)
+					s.LocalTssData.Party = eddsaSigning.NewLocalParty(signData, s.LocalTssData.Params, s.savedData, outCh, endCh)
 					if err := s.LocalTssData.Party.Start(); err != nil {
 						return err
 					}
@@ -122,15 +126,6 @@ func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan m
 			}
 		}
 	}
-}
-
-func isExist(newPartyId *tss.PartyID, partyIds tss.SortedPartyIDs) bool {
-	for _, partyId := range partyIds {
-		if partyId.Id == newPartyId.Id {
-			return true
-		}
-	}
-	return false
 }
 
 // PartyIdMessageHandler handles get message from channel and cals initial function
@@ -151,7 +146,7 @@ func (s *signEDDSAOperation) PartyIdMessageHandler(rosenTss _interface.RosenTss,
 		switch partyIdParams[3] {
 
 		case "fromSign":
-			if !isExist(newParty, s.LocalTssData.PartyIds) {
+			if !s.IsExist(newParty, s.LocalTssData.PartyIds) {
 				s.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(s.LocalTssData.PartyIds.ToUnSorted(), newParty))
 
@@ -220,13 +215,6 @@ func (s *signEDDSAOperation) Setup(rosenTss _interface.RosenTss, signMsg *big.In
 
 	models.Logger.Infof("partyIds {%+v}", s.LocalTssData.PartyIds)
 	models.Logger.Infof("partyIds count {%+v}", len(s.LocalTssData.PartyIds))
-	//for _, partyId := range s.LocalTssData.PartyIds {
-	//	models.Logger.Infof("partyId id:%v, index: %v", partyId.Id, partyId.Index)
-	//	if partyId.Id == s.LocalTssData.PartyID.Id {
-	//		s.LocalTssData.PartyID = partyId
-	//		break
-	//	}
-	//}
 
 	ctx := tss.NewPeerContext(s.LocalTssData.PartyIds)
 	models.Logger.Info("creating params")
@@ -272,13 +260,11 @@ func (s *signEDDSAOperation) GossipMessageHandler(rosenTss _interface.RosenTss, 
 			models.Logger.Infof("signature: %v", save.Signature)
 			models.Logger.Info("EDDSA signing test done.")
 
-			messageBytes := blake2b.Sum256(signData.Bytes())
-			messageId := hex.EncodeToString(messageBytes[:])
-			time.Sleep(2 * time.Second)
-			err := rosenTss.GetStorage().WriteData(save, rosenTss.GetPeerHome(), messageId, signFileName, "eddsa")
+			err := rosenTss.GetConnection().CallBack(s.SignMessage.CallBackUrl, &save)
 			if err != nil {
 				return err
 			}
+
 			return nil
 		}
 	}

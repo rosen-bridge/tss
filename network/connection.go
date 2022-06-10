@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/binance-chain/tss-lib/common"
 	"github.com/spf13/viper"
 	"net/http"
 	"rosen-bridge/tss/models"
@@ -13,6 +14,7 @@ type Connection interface {
 	Publish(message models.GossipMessage) error
 	Subscribe() error
 	Unsubscribe() error
+	CallBack(string, *common.SignatureData) error
 }
 
 type connect struct {
@@ -105,6 +107,20 @@ func (c *connect) Subscribe() error {
 	return nil
 }
 
+func (c *connect) CallBack(url string, data *common.SignatureData) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("not ok response: {%v}", resp.Body)
+	}
+	return nil
+}
 func (c *connect) Unsubscribe() error {
 	// TODO: implement this
 	return nil
