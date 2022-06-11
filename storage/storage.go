@@ -33,18 +33,21 @@ func NewStorage() Storage {
 
 // MakefilePath Constructor of a storage struct
 func (f *storage) MakefilePath(peerHome string, topicName string, fileFormat string, protocol string) {
-	dirName := filepath.Join(peerHome, topicName)
-	f.filePath = fmt.Sprintf("%s/%s/"+fileFormat, dirName, protocol)
+	f.filePath = fmt.Sprintf("%s/%s/%s/", peerHome, protocol, topicName)
 }
 
 // WriteData writing given data to file in given path
 func (f *storage) WriteData(data interface{}, peerHome string, topicName string, fileFormat string, protocol string) error {
 
 	f.MakefilePath(peerHome, topicName, fileFormat, protocol)
-
-	fi, err := os.Stat(f.filePath)
+	err := os.MkdirAll(f.filePath, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	path := fmt.Sprintf("%s%s", f.filePath, fileFormat)
+	fi, err := os.Stat(path)
 	if !(err == nil && !fi.IsDir()) {
-		fd, err := os.OpenFile(f.filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+		fd, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 		defer fd.Close()
 
 		if err != nil {

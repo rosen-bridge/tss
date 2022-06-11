@@ -65,8 +65,10 @@ func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan m
 
 	for {
 		select {
-		case message := <-messageCh:
-
+		case message, ok := <-messageCh:
+			if !ok {
+				return fmt.Errorf("channel closed")
+			}
 			msg := message.Message
 			models.Logger.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {

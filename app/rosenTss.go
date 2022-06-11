@@ -141,7 +141,7 @@ func (r *rosenTss) SetMetaData() error {
 		log.Error(err)
 	}
 	if len(files) == 0 {
-		return errors.New("no keygen data found")
+		return errors.New("no config data found")
 	}
 	for _, File := range files {
 		if strings.Contains(File.Name(), "config") {

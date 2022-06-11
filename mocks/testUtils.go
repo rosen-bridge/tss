@@ -3,11 +3,20 @@ package mocks
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
+	"github.com/labstack/gommon/log"
 	"github.com/rs/xid"
+	"io/ioutil"
 	"math/big"
+	"path/filepath"
 	"rosen-bridge/tss/models"
+	"runtime"
+	"strings"
 )
 
 type TestUtilsMessage struct {
@@ -91,43 +100,54 @@ func CreateNewLocalEDDSATSSData() (models.TssData, error) {
 	return localTssData, nil
 }
 
-//func LoadEDDSAKeygenFixture() (eddsaKeygen.LocalPartySaveData, *tss.PartyID, error) {
-//	testFixtureDirFormat := "%s/../mocks/_eddsa_fixtures"
-//
-//	_, callerFileName, _, _ := runtime.Caller(0)
-//	srcDirName := filepath.Dir(callerFileName)
-//	rootFolder := fmt.Sprintf(testFixtureDirFormat, srcDirName)
-//	files, err := ioutil.ReadDir(rootFolder)
-//	keygenFile := files[0].Name()
-//
-//	if err != nil {
-//		log.Error(err)
-//	}
-//	if len(files) == 0 {
-//		return eddsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
-//	}
-//
-//	filePath := filepath.Join(rootFolder, keygenFile)
-//	log.Infof("File: %v", filePath)
-//	bz, err := ioutil.ReadFile(filePath)
-//	if err != nil {
-//		return eddsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(err,
-//			"could not open the File for party in the expected location: %s. run keygen first.", filePath)
-//	}
-//	var key eddsaKeygen.LocalPartySaveData
-//	if err = json.Unmarshal(bz, &key); err != nil {
-//		return eddsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(err,
-//			"could not unmarshal data for party located at: %s", filePath)
-//	}
-//	for _, kbxj := range key.BigXj {
-//		kbxj.SetCurve(tss.Edwards())
-//	}
-//	key.EDDSAPub.SetCurve(tss.Edwards())
-//	id := ksuid.New()
-//	pMoniker := fmt.Sprintf("%s", id.String())
-//	partyID := tss.NewPartyID(pMoniker, "/tssPeer", key.ShareID)
-//	var parties tss.UnSortedPartyIDs
-//	parties = append(parties, partyID)
-//	sortedPIDs := tss.SortPartyIDs(parties)
-//	return key, sortedPIDs[0], nil
-//}
+func LoadEDDSAKeygenFixture(index int) (eddsaKeygen.LocalPartySaveData, *tss.PartyID, error) {
+	testFixtureDirFormat := "%s/../mocks/_eddsa_keygen_fixtures"
+
+	_, callerFileName, _, _ := runtime.Caller(0)
+	srcDirName := filepath.Dir(callerFileName)
+	rootFolder := fmt.Sprintf(testFixtureDirFormat, srcDirName)
+	files, err := ioutil.ReadDir(rootFolder)
+
+	keygenFile := files[index].Name()
+
+	if err != nil {
+		log.Error(err)
+	}
+	if len(files) == 0 {
+		return eddsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
+	}
+
+	filePath := filepath.Join(rootFolder, keygenFile)
+	log.Infof("File: %v", filePath)
+	bz, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return eddsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(
+			"could not open the File for party in the expected location: %s. run keygen first.\nerror:{%s}",
+			filePath, err.Error())
+	}
+	var key eddsaKeygen.LocalPartySaveData
+	if err = json.Unmarshal(bz, &key); err != nil {
+		return eddsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(
+			"could not unmarshal data for party located at: %s\nerror: {%s}", filePath, err.Error())
+	}
+	for _, kbxj := range key.BigXj {
+		kbxj.SetCurve(tss.Edwards())
+	}
+	key.EDDSAPub.SetCurve(tss.Edwards())
+	id := xid.New()
+	pMoniker := fmt.Sprintf("%s", id.String())
+	partyID := tss.NewPartyID(pMoniker, "tss/tssPeer", key.ShareID)
+	var parties tss.UnSortedPartyIDs
+	parties = append(parties, partyID)
+	sortedPIDs := tss.SortPartyIDs(parties)
+	return key, sortedPIDs[0], nil
+}
+
+func Contains(item string, itemList []string) bool {
+	for _, element := range itemList {
+		if strings.Contains(item, element) {
+			return true
+		}
+	}
+	return false
+}
