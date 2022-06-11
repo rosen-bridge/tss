@@ -9,8 +9,8 @@ import (
 	"rosen-bridge/tss/storage"
 )
 
+// Operation (sign, keygen , regroup for ecdsa and eddsa protocol)
 type Operation interface {
-	// first initial of tss Operation (sign, keygen , regroup for ecdsa and eddsa)
 	Init(RosenTss, string) error
 	Loop(RosenTss, chan models.Message) error
 	PartyIdMessageHandler(rosenTss RosenTss, gossipMessage models.GossipMessage, signData *big.Int) error
@@ -25,7 +25,7 @@ type Operation interface {
 	// GetIdentifier() or GetClassName()
 }
 
-// RosenTss Interface of a app
+// RosenTss Interface of an app
 type RosenTss interface {
 	NewMessage(receiverId string, senderId string, message string, messageId string, name string) models.GossipMessage
 

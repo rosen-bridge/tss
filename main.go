@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/viper"
@@ -17,36 +18,49 @@ var (
 )
 
 func main() {
+	// parsing cli flags
+	projectPort := flag.String("port", "4000", "project port (e.g. 4000)")
+	p2pPort := flag.String("p2pPort", "8080", "p2p port (e.g. 8080)")
+	publishPath := flag.String(
+		"publishPath", "/p2p/send", "publish path of p2p (e.g. /p2p/send)")
+
+	subscriptionPath := flag.String(
+		"subscriptionPath", "/p2p/channel/subscribe", "subscriptionPath for p2p (e.g. /p2p/channel/subscribe)")
+	flag.Parse()
+
+	// creating new instance of echo framework
 	e := echo.New()
 
+	// initiating and reading configs
 	err := initConfig()
 	if err != nil {
 		e.Logger.Fatal(err)
 	}
-
 	homeAddress := viper.GetString("HOME_ADDRESS")
-	port := viper.GetString("PORT")
 
-	conn := network.InitConnection()
+	// creating connection and storage and app instance
+	conn := network.InitConnection(*publishPath, *subscriptionPath, *p2pPort)
 	localStorage := storage.NewStorage()
 
 	tss := app.NewRosenTss(conn, localStorage, homeAddress)
 
+	// setting up peer home based on configs
 	err = tss.SetPeerHome(homeAddress)
 	if err != nil {
 		e.Logger.Fatal(err)
 	}
 
 	// subscribe to p2p
-	err = tss.GetConnection().Subscribe()
+	err = tss.GetConnection().Subscribe(*projectPort)
 	if err != nil {
 		e.Logger.Fatal(err)
 	}
 
+	// running echo framework
 	tssController := api.NewTssController(tss)
 
 	api.InitRouting(e, tssController)
-	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", port)))
+	e.Logger.Fatal(e.Start(fmt.Sprintf(":%s", *projectPort)))
 }
 
 // initConfig reads in config file and ENV variables if set.

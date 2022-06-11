@@ -5,36 +5,40 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/binance-chain/tss-lib/common"
-	"github.com/spf13/viper"
 	"net/http"
 	"rosen-bridge/tss/models"
 )
 
 type Connection interface {
 	Publish(message models.GossipMessage) error
-	Subscribe() error
+	Subscribe(port string) error
 	Unsubscribe() error
 	CallBack(string, *common.SignatureData) error
+}
+
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
 type connect struct {
 	publishUrl      string
 	subscriptionUrl string
 	subscribeId     string
+	Client          HTTPClient
 }
 
-func InitConnection() Connection {
-	publishUrl := viper.GetString("PUBLISH_URL")
-	subscriptionUrl := viper.GetString("SUBSCRIPTION_URL")
-
+func InitConnection(publishPath string, subscriptionPath string, p2pPort string) Connection {
+	publishUrl := fmt.Sprintf("http://localhost:%s%s", p2pPort, publishPath)
+	subscriptionUrl := fmt.Sprintf("http://localhost:%s%s", p2pPort, subscriptionPath)
 	return &connect{
 		publishUrl:      publishUrl,
 		subscriptionUrl: subscriptionUrl,
+		Client:          &http.Client{},
 	}
 
 }
 
-// Publish publishes a message
+// Publish publishes a message to p2p
 func (c *connect) Publish(msg models.GossipMessage) error {
 	models.Logger.Infof("message published: {%+v}", msg)
 
@@ -46,10 +50,13 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(c.publishUrl, "application/json", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest(http.MethodPost, c.publishUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
+	req.Header.Add("content-type", "application/json")
+
+	resp, err := c.Client.Do(req)
 
 	type response struct {
 		Message string `json:"message"`
@@ -70,23 +77,29 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 	return nil
 }
 
-func (c *connect) Subscribe() error {
+// Subscribe to p2p at first
+func (c *connect) Subscribe(port string) error {
 	models.Logger.Info("Subscribing to p2p")
-	port := viper.GetString("PORT")
-	callBackURL := viper.GetString("CALLBACK_URL")
 	values := map[string]string{
 		"channel": "tss",
-		"url":     fmt.Sprintf("%s:%s/message", callBackURL, port),
+		"url":     fmt.Sprintf("http://localhost:%s/message", port),
 	}
 	jsonData, err := json.Marshal(values)
 	if err != nil {
 		return err
 	}
 
-	resp, err := http.Post(c.subscriptionUrl, "application/json", bytes.NewBuffer(jsonData))
+	//resp, err := http.Post(c.subscriptionUrl, "application/json", bytes.NewBuffer(jsonData))
+	//if err != nil {
+	//	return err
+	//}
+	req, err := http.NewRequest(http.MethodPost, c.subscriptionUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
+	req.Header.Add("content-type", "application/json")
+
+	resp, err := c.Client.Do(req)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("not ok response: {%v}", resp.Body)
@@ -107,20 +120,26 @@ func (c *connect) Subscribe() error {
 	return nil
 }
 
+// CallBack sends sign data to this url
 func (c *connect) CallBack(url string, data *common.SignatureData) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
+	req.Header.Add("content-type", "application/json")
+
+	resp, err := c.Client.Do(req)
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("not ok response: {%v}", resp.Body)
 	}
 	return nil
 }
+
 func (c *connect) Unsubscribe() error {
 	// TODO: implement this
 	return nil

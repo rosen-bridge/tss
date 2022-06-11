@@ -19,7 +19,6 @@ import (
 	"strings"
 )
 
-// rosenTss type can hold some data and methods
 type rosenTss struct {
 	ChannelMap map[string]chan models.Message
 	metaData   models.MetaData
@@ -29,7 +28,7 @@ type rosenTss struct {
 	peerHome   string
 }
 
-// NewRosenTss Constructor of a app app
+// NewRosenTss Constructor of an app
 func NewRosenTss(connection network.Connection, storage storage.Storage, homeAddress string) _interface.RosenTss {
 	return &rosenTss{
 		ChannelMap: make(map[string]chan models.Message),
@@ -85,6 +84,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	return nil
 }
 
+// MessageHandler handles the receiving message from message route
 func (r *rosenTss) MessageHandler(message models.Message) {
 
 	models.Logger.Infof("new message: %v", message)
@@ -96,13 +96,17 @@ func (r *rosenTss) MessageHandler(message models.Message) {
 	r.ChannelMap[message.Message.MessageId] <- message
 }
 
+// GetStorage returns the storage
 func (r *rosenTss) GetStorage() storage.Storage {
 	return r.storage
 }
+
+// GetConnection returns the connection
 func (r *rosenTss) GetConnection() network.Connection {
 	return r.connection
 }
 
+//SetPeerHome setups peer home address and creates that
 func (r *rosenTss) SetPeerHome(homeAddress string) error {
 	models.Logger.Info("setting up home directory")
 
@@ -128,10 +132,13 @@ func (r *rosenTss) SetPeerHome(homeAddress string) error {
 	}
 	return nil
 }
+
+// GetPeerHome returns the peer's home
 func (r *rosenTss) GetPeerHome() string {
 	return r.peerHome
 }
 
+// SetMetaData setting ups metadata from given file in the home directory
 func (r *rosenTss) SetMetaData() error {
 	// locating file
 	var configFile string
@@ -166,11 +173,13 @@ func (r *rosenTss) SetMetaData() error {
 	r.metaData = meta
 	return nil
 }
+
+// GetMetaData returns peer's meta data
 func (r *rosenTss) GetMetaData() models.MetaData {
 	return r.metaData
 }
 
-// NewMessage creates messages for app rounds
+// NewMessage creates gossip messages before publish
 func (r *rosenTss) NewMessage(receiverId string, senderId string, message string, messageId string, name string) models.GossipMessage {
 
 	m := models.GossipMessage{

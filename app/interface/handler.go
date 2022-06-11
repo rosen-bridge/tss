@@ -11,6 +11,7 @@ type OperationHandler struct {
 	Operation
 }
 
+// PartyMessageHandler handles gossip message from party to party(s)
 func (o *OperationHandler) PartyMessageHandler(partyMsg tss.Message) (string, error) {
 	msgBytes, _, err := partyMsg.WireBytes()
 	if err != nil {
@@ -46,6 +47,7 @@ func (o *OperationHandler) SharedPartyUpdater(party tss.Party, msg models.PartyM
 	return nil
 }
 
+// IsExist check if partyId exist in partyIds list or not
 func (o *OperationHandler) IsExist(newPartyId *tss.PartyID, partyIds tss.SortedPartyIDs) bool {
 	for _, partyId := range partyIds {
 		if partyId.Id == newPartyId.Id {

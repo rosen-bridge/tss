@@ -72,8 +72,8 @@ func TestEDDSA_Init(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			signEDDSAOperation := signEDDSAOperation{
-				SignOperation: SignOperation{
+			eddsaSign := operationEDDSASign{
+				OperationSign: OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -82,7 +82,7 @@ func TestEDDSA_Init(t *testing.T) {
 					},
 				},
 			}
-			err := signEDDSAOperation.Init(tt.app, tt.receiverId)
+			err := eddsaSign.Init(tt.app, tt.receiverId)
 			if err != nil {
 				t.Fatalf("Init failed: %v", err)
 			}
@@ -218,9 +218,9 @@ func TestEDDSA_Loop(t *testing.T) {
 					Return(tt.message.Message)
 			}
 
-			signEDDSAOperation := signEDDSAOperation{
+			eddsaSign := operationEDDSASign{
 				savedData: saveData,
-				SignOperation: SignOperation{
+				OperationSign: OperationSign{
 					LocalTssData: localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -237,7 +237,7 @@ func TestEDDSA_Loop(t *testing.T) {
 				close(messageCh)
 			}()
 			errorList := []string{"invalid wire-format", "channel closed"}
-			err := signEDDSAOperation.Loop(app, messageCh)
+			err := eddsaSign.Loop(app, messageCh)
 			if err != nil && !mockUtils.Contains(err.Error(), errorList) {
 				t.Fatal(err)
 			}
@@ -318,8 +318,8 @@ func TestEDDSA_PartyMessageHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(tt.gossipMessage)
-			signEDDSAOperation := signEDDSAOperation{
-				SignOperation: SignOperation{
+			eddsaSign := operationEDDSASign{
+				OperationSign: OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage:  tt.signMessage,
 				},
@@ -327,7 +327,7 @@ func TestEDDSA_PartyMessageHandler(t *testing.T) {
 			msgBytes, _ := hex.DecodeString(tt.signMessage.Message)
 			signData := new(big.Int).SetBytes(msgBytes)
 			// partyMessageHandler
-			err := signEDDSAOperation.PartyIdMessageHandler(app, tt.gossipMessage, signData)
+			err := eddsaSign.PartyIdMessageHandler(app, tt.gossipMessage, signData)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -419,8 +419,8 @@ func TestEDDSA_PartyUpdate(t *testing.T) {
 		},
 	}
 
-	signEDDSAOperation := signEDDSAOperation{
-		SignOperation: SignOperation{
+	eddsaSign := operationEDDSASign{
+		OperationSign: OperationSign{
 			LocalTssData: localTssData,
 			SignMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -432,7 +432,7 @@ func TestEDDSA_PartyUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := signEDDSAOperation.PartyUpdate(tt.message); (err != nil) != tt.wantErr {
+			if err := eddsaSign.PartyUpdate(tt.message); (err != nil) != tt.wantErr {
 				if !strings.Contains(err.Error(), "invalid wire-format data") {
 					t.Errorf("PartyUpdate() error = %v, wantErr %v", err, tt.wantErr)
 				}
@@ -495,8 +495,8 @@ func TestEDDSA_Setup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			signEDDSAOperation := signEDDSAOperation{
-				SignOperation: SignOperation{
+			eddsaSign := operationEDDSASign{
+				OperationSign: OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -506,10 +506,10 @@ func TestEDDSA_Setup(t *testing.T) {
 				},
 			}
 
-			msgBytes, _ := hex.DecodeString(signEDDSAOperation.SignMessage.Message)
+			msgBytes, _ := hex.DecodeString(eddsaSign.SignMessage.Message)
 			signData := new(big.Int).SetBytes(msgBytes)
 
-			err := signEDDSAOperation.Setup(tt.app, signData)
+			err := eddsaSign.Setup(tt.app, signData)
 			if err != nil && !tt.wantErr {
 				t.Errorf("Setup error = %v", err)
 			}
@@ -531,8 +531,8 @@ func TestEDDSA_GetClassName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			signEDDSAOperation := signEDDSAOperation{
-				SignOperation: SignOperation{
+			eddsaSign := operationEDDSASign{
+				OperationSign: OperationSign{
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
 						Crypto:      "eddsa",
@@ -541,7 +541,7 @@ func TestEDDSA_GetClassName(t *testing.T) {
 				},
 			}
 
-			result := signEDDSAOperation.GetClassName()
+			result := eddsaSign.GetClassName()
 			if result != tt.expected {
 				t.Errorf("GetClassName error = expected %s, got %s", tt.expected, result)
 			}

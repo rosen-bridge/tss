@@ -16,18 +16,19 @@ import (
 	"time"
 )
 
-type signEDDSAOperation struct {
-	SignOperation
+type operationEDDSASign struct {
+	OperationSign
 	savedData eddsaKeygen.LocalPartySaveData
 }
 
 func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation {
-	return &signEDDSAOperation{
-		SignOperation: SignOperation{SignMessage: signMessage},
+	return &operationEDDSASign{
+		OperationSign: OperationSign{SignMessage: signMessage},
 	}
 }
 
-func (s *signEDDSAOperation) Init(rosenTss _interface.RosenTss, receiverId string) error {
+// Init initializes the eddsa sign partyId and creates partyId message
+func (s *operationEDDSASign) Init(rosenTss _interface.RosenTss, receiverId string) error {
 
 	models.Logger.Info("Init called")
 
@@ -57,7 +58,8 @@ func (s *signEDDSAOperation) Init(rosenTss _interface.RosenTss, receiverId strin
 	return nil
 }
 
-func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
+// Loop listens to the given channel and parsing the message based on the name
+func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
 
 	models.Logger.Infof("channel", messageCh)
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
@@ -130,8 +132,8 @@ func (s *signEDDSAOperation) Loop(rosenTss _interface.RosenTss, messageCh chan m
 	}
 }
 
-// PartyIdMessageHandler handles get message from channel and cals initial function
-func (s *signEDDSAOperation) PartyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage, signData *big.Int) error {
+// PartyIdMessageHandler handles partyId message and if cals setup functions if patryIds list length was at least equal to the threshold
+func (s *operationEDDSASign) PartyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage, signData *big.Int) error {
 
 	if gossipMessage.SenderId != s.LocalTssData.PartyID.Id &&
 		(gossipMessage.ReceiverId == "" || gossipMessage.ReceiverId == s.LocalTssData.PartyID.Id) {
@@ -172,8 +174,8 @@ func (s *signEDDSAOperation) PartyIdMessageHandler(rosenTss _interface.RosenTss,
 	return nil
 }
 
-// PartyUpdate updates partyIds in ecdsa app party based on received message
-func (s *signEDDSAOperation) PartyUpdate(partyMsg models.PartyMessage) error {
+// PartyUpdate updates partyIds in eddsa app party based on received message
+func (s *operationEDDSASign) PartyUpdate(partyMsg models.PartyMessage) error {
 	dest := partyMsg.To
 	if dest == nil { // broadcast!
 
@@ -201,9 +203,8 @@ func (s *signEDDSAOperation) PartyUpdate(partyMsg models.PartyMessage) error {
 	return nil
 }
 
-// SetupSign called after if setting up was successful.
-// It initializes siging scenario in eddsa. And gathering all parties.
-func (s *signEDDSAOperation) Setup(rosenTss _interface.RosenTss, signMsg *big.Int) error {
+// Setup called after if Init up was successful. it used to create party params and sign message
+func (s *operationEDDSASign) Setup(rosenTss _interface.RosenTss, signMsg *big.Int) error {
 	meta := rosenTss.GetMetaData()
 
 	models.Logger.Infof("meta %+v", meta)
@@ -239,9 +240,8 @@ func (s *signEDDSAOperation) Setup(rosenTss _interface.RosenTss, signMsg *big.In
 	return nil
 }
 
-// SignMessageHandler called in the main loop of message passing between peers for signing scenario.
-// data stored in outCh and endCh in message passing.
-func (s *signEDDSAOperation) GossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData, signData *big.Int) error {
+// GossipMessageHandler called in the main loop of message passing between peers for signing scenario.
+func (s *operationEDDSASign) GossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData, signData *big.Int) error {
 	for {
 		select {
 		case partyMsg := <-outCh:
@@ -272,6 +272,7 @@ func (s *signEDDSAOperation) GossipMessageHandler(rosenTss _interface.RosenTss, 
 	}
 }
 
-func (s *signEDDSAOperation) GetClassName() string {
+// GetClassName returns the class name
+func (s *operationEDDSASign) GetClassName() string {
 	return "eddsaSign"
 }

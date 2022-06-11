@@ -9,7 +9,7 @@ const (
 	signFileName = "sign_data.json"
 )
 
-type SignOperation struct {
+type OperationSign struct {
 	_interface.OperationHandler
 	LocalTssData models.TssData
 	SignMessage  models.SignMessage

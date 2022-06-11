@@ -44,13 +44,13 @@ func (_m *Connection) Publish(message models.GossipMessage) error {
 	return r0
 }
 
-// Subscribe provides a mock function with given fields:
-func (_m *Connection) Subscribe() error {
-	ret := _m.Called()
+// Subscribe provides a mock function with given fields: port
+func (_m *Connection) Subscribe(port string) error {
+	ret := _m.Called(port)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(port)
 	} else {
 		r0 = ret.Error(0)
 	}

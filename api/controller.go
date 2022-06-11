@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"github.com/labstack/echo/v4"
 	"net/http"
 	"os/exec"
@@ -40,7 +39,7 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 
 }
 
-// Sign returns echo handler
+// Sign returns echo handler, starting new sign process.
 func (tssController *tssController) Sign() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		data := models.SignMessage{}
@@ -67,7 +66,7 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 	}
 }
 
-//Message returns echo handler
+//Message returns echo handler, receiving message from p2p and passing to related channel
 func (tssController *tssController) Message() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		c.Logger().Info("message called")
@@ -110,13 +109,11 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 func (tssController *tssController) Export() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		peerHome := tssController.rosenTss.GetPeerHome()
-		out, err := exec.Command("zip", "-r", "-D", "/tmp/rosenTss.zip", peerHome).Output()
+		_, err := exec.Command("zip", "-r", "-D", "/tmp/rosenTss.zip", peerHome).Output()
 		if err != nil {
 			c.Logger().Errorf("%s", err)
 		}
 		c.Logger().Info("zipping file was successful.")
-		output := string(out[:])
-		fmt.Println(output)
 		return c.Attachment("/tmp/rosenTss.zip", "rosenTss.zip")
 	}
 }

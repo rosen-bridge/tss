@@ -3,7 +3,6 @@ package api
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -105,7 +104,6 @@ func TestController_Message(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			fmt.Printf(string(marshal))
 			req := httptest.NewRequest(http.MethodPost, "/message", bytes.NewBuffer(marshal))
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 			rec := httptest.NewRecorder()
