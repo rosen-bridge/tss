@@ -19,6 +19,10 @@ import (
 	"strings"
 )
 
+const (
+	privateFileFormat = "private.txt"
+)
+
 type rosenTss struct {
 	ChannelMap map[string]chan models.Message
 	metaData   models.MetaData
@@ -82,6 +86,11 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		}()
 	}
 	return nil
+}
+
+// StartNewRegroup starts Regroup scenario for app based on given protocol.
+func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
+	panic("not implemented")
 }
 
 // MessageHandler handles the receiving message from message route
@@ -191,4 +200,20 @@ func (r *rosenTss) NewMessage(receiverId string, senderId string, message string
 	}
 
 	return m
+}
+
+func (r *rosenTss) SetPrivate(private models.Private) error {
+	err := r.GetStorage().WriteData(private, r.GetPeerHome(), privateFileFormat, private.Crypto)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *rosenTss) GetPrivate(crypto string) (string, error) {
+	private, err := r.GetStorage().LoadPrivate(r.GetPeerHome(), crypto)
+	if err != nil {
+		return "", err
+	}
+	return private, nil
 }

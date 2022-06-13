@@ -2,6 +2,7 @@ package network
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/binance-chain/tss-lib/common"
@@ -122,7 +123,19 @@ func (c *connect) Subscribe(port string) error {
 
 // CallBack sends sign data to this url
 func (c *connect) CallBack(url string, data *common.SignatureData) error {
-	jsonData, err := json.Marshal(data)
+	type signType struct {
+		Signature string `json:"signature"`
+		R         string `json:"r"`
+		S         string `json:"s"`
+		M         string `json:"m"`
+	}
+	signData := signType{
+		Signature: hex.EncodeToString(data.Signature),
+		R:         hex.EncodeToString(data.R),
+		S:         hex.EncodeToString(data.S),
+		M:         hex.EncodeToString(data.M),
+	}
+	jsonData, err := json.Marshal(signData)
 	if err != nil {
 		return err
 	}

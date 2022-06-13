@@ -24,6 +24,10 @@ type tssController struct {
 	rosenTss _interface.RosenTss
 }
 
+type response struct {
+	Message string `json:"message"`
+}
+
 // NewTssController Constructor of an app controller
 func NewTssController(rosenTss _interface.RosenTss) TssController {
 	return &tssController{rosenTss: rosenTss}
@@ -33,8 +37,9 @@ func NewTssController(rosenTss _interface.RosenTss) TssController {
 func (tssController *tssController) Keygen() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		// TODO: implement this
-		return c.String(http.StatusOK, "success")
-
+		return c.JSON(http.StatusOK, response{
+			Message: "ok",
+		})
 	}
 
 }
@@ -54,15 +59,30 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
-		return c.String(http.StatusOK, "success")
+		return c.JSON(http.StatusOK, response{
+			Message: "ok",
+		})
 	}
 }
 
 // Regroup returns echo handler
 func (tssController *tssController) Regroup() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		// TODO: implement this
-		return c.String(http.StatusOK, "success")
+		data := models.RegroupMessage{}
+
+		if err := c.Bind(&data); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		c.Logger().Info("sign data: %+v ", data)
+
+		err := tssController.rosenTss.StartNewRegroup(data)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+
+		return c.JSON(http.StatusOK, response{
+			Message: "ok",
+		})
 	}
 }
 
@@ -82,26 +102,28 @@ func (tssController *tssController) Message() echo.HandlerFunc {
 
 		tssController.rosenTss.MessageHandler(data)
 
-		return c.String(http.StatusOK, "success")
+		return c.JSON(http.StatusOK, response{
+			Message: "ok",
+		})
 	}
 }
 
 // Import returns echo handler witch used to using user key instead of generating a new key
 func (tssController *tssController) Import() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		type data struct {
-			Private string `json:"private"`
-			Crypto  string `json:"crypto"`
+		data := models.Private{}
+		if err := c.Bind(&data); err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
-		response := data{}
-		if err := c.Bind(&response); err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
-		}
-		c.Logger().Info("import data: %+v ", response)
+		c.Logger().Info("import data: %+v ", data)
 
-		// TODO: implement ImportPrivate
-		//tssController.tssUseCase.ImportPrivate(response.Private, response.Crypto)
-		return c.String(http.StatusOK, "success")
+		err := tssController.rosenTss.SetPrivate(data)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		return c.JSON(http.StatusOK, response{
+			Message: "ok",
+		})
 	}
 }
 

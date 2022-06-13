@@ -34,8 +34,8 @@ type MetaData struct {
 }
 
 type Private struct {
-	ECDSAPrivate string `json:"ecdsaPrivate"`
-	EDDSAPrivate string `json:"eddsaPrivate"`
+	Private string `json:"private"`
+	Crypto  string `json:"crypto"`
 }
 
 type TssData struct {
@@ -49,8 +49,8 @@ type TssRegroupData struct {
 	PartyID          *tss.PartyID
 	Params           *tss.Parameters
 	RegroupingParams *tss.ReSharingParameters
-	NewParties       tss.SortedPartyIDs
-	OldParties       tss.SortedPartyIDs
+	NewPartyIds      tss.SortedPartyIDs
+	OldPartyIds      tss.SortedPartyIDs
 	Party            tss.Party
 	PeerState        int
 }
@@ -62,4 +62,12 @@ type PartyMessage struct {
 	IsBroadcast             bool
 	IsToOldCommittee        bool
 	IsToOldAndNewCommittees bool
+}
+
+type RegroupMessage struct {
+	PeerState    int    `json:"peerState"`
+	Crypto       string `json:"crypto"`
+	NewThreshold int    `json:"newThreshold"`
+	OldThreshold int    `json:"oldThreshold"`
+	PeersCount   int    `json:"peersCount"`
 }
