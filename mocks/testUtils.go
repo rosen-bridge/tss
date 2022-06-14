@@ -87,15 +87,15 @@ func CreateNewEDDSAPartyId() (*tss.PartyID, error) {
 }
 
 func CreateNewLocalEDDSATSSData() (models.TssData, error) {
-	newParty, err := CreateNewEDDSAPartyId()
+	newPartyId, err := CreateNewEDDSAPartyId()
 	if err != nil {
 		return models.TssData{}, err
 	}
 	localTssData := models.TssData{
-		PartyID: newParty,
+		PartyID: newPartyId,
 	}
 	localTssData.PartyIds = tss.SortPartyIDs(
-		append(localTssData.PartyIds.ToUnSorted(), newParty))
+		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
 
 	return localTssData, nil
 }

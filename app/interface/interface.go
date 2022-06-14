@@ -1,9 +1,6 @@
 package _interface
 
 import (
-	"github.com/binance-chain/tss-lib/common"
-	"github.com/binance-chain/tss-lib/tss"
-	"math/big"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
@@ -13,10 +10,6 @@ import (
 type Operation interface {
 	Init(RosenTss, string) error
 	Loop(RosenTss, chan models.Message) error
-	PartyIdMessageHandler(rosenTss RosenTss, gossipMessage models.GossipMessage, signData *big.Int) error
-	PartyUpdate(models.PartyMessage) error
-	Setup(RosenTss, *big.Int) error
-	GossipMessageHandler(rosenTss RosenTss, outCh chan tss.Message, endCh chan common.SignatureData, signData *big.Int) error
 	GetClassName() string
 	//
 	// NewMessage(message models.Message)

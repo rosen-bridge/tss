@@ -50,13 +50,13 @@ func TestStorage_WriteData(t *testing.T) {
 			s := storage{}
 			err := s.WriteData(tt.data, tt.peerHome, tt.topicName, "test.txt", "eddsa")
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 		})
 	}
 	_, err := exec.Command("rm", "-rf", "/tmp/.rosenTss").Output()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }
 
@@ -66,12 +66,12 @@ func TestStorage_LoadEDDSAKeygen(t *testing.T) {
 	path := fmt.Sprintf("%s/%s", peerHome, "eddsa")
 
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	_, err := exec.Command("cp", "../mocks/_eddsa_keygen_fixtures/keygen_data_00.json", "/tmp/.rosenTss/eddsa/keygen_data.json").Output()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	tests := []struct {
@@ -89,13 +89,13 @@ func TestStorage_LoadEDDSAKeygen(t *testing.T) {
 			s := storage{}
 			keygen, _, err := s.LoadEDDSAKeygen(tt.peerHome)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			assert.NotEqual(t, keygen, eddsaKeygen.LocalPartySaveData{})
 		})
 	}
 	_, err = exec.Command("rm", "-rf", "/tmp/.rosenTss").Output()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }

@@ -102,7 +102,7 @@ func TestController_Message(t *testing.T) {
 			messageHandler := controller.Message()
 			marshal, err := json.Marshal(tt.message)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			req := httptest.NewRequest(http.MethodPost, "/message", bytes.NewBuffer(marshal))
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
@@ -113,7 +113,7 @@ func TestController_Message(t *testing.T) {
 			if err != nil && tt.wantErr {
 				assert.Equal(t, http.StatusInternalServerError, rec.Code)
 			} else if err == nil && tt.wantErr {
-				t.Fatal("false true")
+				t.Error("false true")
 			} else if err == nil && !tt.wantErr {
 				assert.Equal(t, http.StatusOK, rec.Code)
 			}

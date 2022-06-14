@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/binance-chain/tss-lib/common"
 	"net/http"
 	"rosen-bridge/tss/models"
 )
@@ -13,7 +12,7 @@ type Connection interface {
 	Publish(message models.GossipMessage) error
 	Subscribe(port string) error
 	Unsubscribe() error
-	CallBack(string, *common.SignatureData) error
+	CallBack(string, models.SignData) error
 }
 
 type HTTPClient interface {
@@ -89,10 +88,6 @@ func (c *connect) Subscribe(port string) error {
 		return err
 	}
 
-	//resp, err := http.Post(c.subscriptionUrl, "application/json", bytes.NewBuffer(jsonData))
-	//if err != nil {
-	//	return err
-	//}
 	req, err := http.NewRequest(http.MethodPost, c.subscriptionUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
@@ -121,7 +116,7 @@ func (c *connect) Subscribe(port string) error {
 }
 
 // CallBack sends sign data to this url
-func (c *connect) CallBack(url string, data *common.SignatureData) error {
+func (c *connect) CallBack(url string, data models.SignData) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		return err

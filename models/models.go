@@ -13,6 +13,13 @@ type SignMessage struct {
 	CallBackUrl string `json:"callBackUrl"`
 }
 
+type SignData struct {
+	Signature string `json:"signature"`
+	R         string `json:"r"`
+	S         string `json:"s"`
+	M         string `json:"m"`
+}
+
 type Message struct {
 	Message GossipMessage `json:"message"`
 	Sender  string        `json:"sender"`

@@ -22,11 +22,11 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 	peerHome := "/tmp/.rosenTss"
 	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 	_, err = exec.Command("cp", "../mocks/_config_fixtures/config.json", "/tmp/.rosenTss/eddsa/config.json").Output()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	tests := []struct {
@@ -49,7 +49,7 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 			}
 			err := app.SetMetaData()
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 
 			assert.Equal(t, app.metaData, tt.meta)
@@ -122,11 +122,11 @@ func TestRosenTss_SetPeerHome(t *testing.T) {
 
 	userHome, err := os.UserHomeDir()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 	absHomeAddress, err := filepath.Abs("./.rosenTss")
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	tests := []struct {
@@ -160,10 +160,14 @@ func TestRosenTss_SetPeerHome(t *testing.T) {
 			}
 			err := app.SetPeerHome(tt.homeAddress)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 
 			assert.Equal(t, app.peerHome, tt.expected)
+			_, err = exec.Command("rm", "-rf", tt.expected).Output()
+			if err != nil {
+				t.Error(err)
+			}
 		})
 	}
 }
@@ -172,7 +176,7 @@ func TestRosenTss_NewMessage(t *testing.T) {
 
 	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	message := fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign")
@@ -273,11 +277,11 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 	peerHome := "/tmp/.rosenTss"
 	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 	_, err = exec.Command("cp", "../mocks/_config_fixtures/config.json", "/tmp/.rosenTss/eddsa/config.json").Output()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	storage := mockedStorage.NewStorage(t)
@@ -328,7 +332,7 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 
 			err := app.StartNewSign(message)
 			if err != nil && err.Error() != "successful" {
-				t.Fatal(err)
+				t.Error(err)
 			}
 		})
 	}

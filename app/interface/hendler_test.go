@@ -30,17 +30,17 @@ func TestHandler_PartyMessageHandler(t *testing.T) {
 			// partyMessageHandler
 			partyMessageBytes, err := operation.PartyMessageHandler(tt.partyMsg)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			partyMessage := models.PartyMessage{}
 			decodeString, err := hex.DecodeString(partyMessageBytes)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 
 			err = json.Unmarshal(decodeString, &partyMessage)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			assert.Equal(t, hex.EncodeToString(partyMessage.Message), message.Data)
 		})
@@ -51,7 +51,7 @@ func TestHandler_PartyMessageHandler(t *testing.T) {
 func TestHandler_SharedPartyUpdater(t *testing.T) {
 	localTssData, err := mocks.CreateNewLocalEDDSATSSData()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
@@ -86,7 +86,7 @@ func TestHandler_SharedPartyUpdater(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := operation.SharedPartyUpdater(tt.party, tt.message)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 		})
 	}
@@ -95,12 +95,12 @@ func TestHandler_SharedPartyUpdater(t *testing.T) {
 func TestHandler_IsExist(t *testing.T) {
 	localTssData, err := mocks.CreateNewLocalEDDSATSSData()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 
 	newPartyId, err := mocks.CreateNewEDDSAPartyId()
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 	tests := []struct {
 		name     string
@@ -127,7 +127,7 @@ func TestHandler_IsExist(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := operation.IsExist(tt.partyId, tt.partyIds)
 			if result != tt.expected {
-				t.Fatal(err)
+				t.Error(err)
 			}
 		})
 	}
