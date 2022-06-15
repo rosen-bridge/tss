@@ -3,21 +3,14 @@ package api
 import (
 	"github.com/labstack/echo/v4"
 	"net/http"
-	"os/exec"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/models"
 )
 
-// TODO: implement import and export handlers
-
 // TssController Interface of an app controller
 type TssController interface {
-	Keygen() echo.HandlerFunc
 	Sign() echo.HandlerFunc
-	Regroup() echo.HandlerFunc
 	Message() echo.HandlerFunc
-	Import() echo.HandlerFunc
-	Export() echo.HandlerFunc
 }
 
 type tssController struct {
@@ -29,17 +22,7 @@ func NewTssController(rosenTss _interface.RosenTss) TssController {
 	return &tssController{rosenTss: rosenTss}
 }
 
-// Keygen returns echo handler
-func (tssController *tssController) Keygen() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		// TODO: implement this
-		return c.String(http.StatusOK, "success")
-
-	}
-
-}
-
-// Sign returns echo handler, starting new sign process.
+//Sign returns echo handler, starting new sign process.
 func (tssController *tssController) Sign() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		data := models.SignMessage{}
@@ -54,14 +37,6 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
-		return c.String(http.StatusOK, "success")
-	}
-}
-
-// Regroup returns echo handler
-func (tssController *tssController) Regroup() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		// TODO: implement this
 		return c.String(http.StatusOK, "success")
 	}
 }
@@ -83,37 +58,5 @@ func (tssController *tssController) Message() echo.HandlerFunc {
 		tssController.rosenTss.MessageHandler(data)
 
 		return c.String(http.StatusOK, "success")
-	}
-}
-
-// Import returns echo handler witch used to using user key instead of generating a new key
-func (tssController *tssController) Import() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		type data struct {
-			Private string `json:"private"`
-			Crypto  string `json:"crypto"`
-		}
-		response := data{}
-		if err := c.Bind(&response); err != nil {
-			return c.String(http.StatusInternalServerError, err.Error())
-		}
-		c.Logger().Info("import data: %+v ", response)
-
-		// TODO: implement ImportPrivate
-		//tssController.tssUseCase.ImportPrivate(response.Private, response.Crypto)
-		return c.String(http.StatusOK, "success")
-	}
-}
-
-// Export returns echo handler witch used to download all files of app
-func (tssController *tssController) Export() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		peerHome := tssController.rosenTss.GetPeerHome()
-		_, err := exec.Command("zip", "-r", "-D", "/tmp/rosenTss.zip", peerHome).Output()
-		if err != nil {
-			c.Logger().Errorf("%s", err)
-		}
-		c.Logger().Info("zipping file was successful.")
-		return c.Attachment("/tmp/rosenTss.zip", "rosenTss.zip")
 	}
 }

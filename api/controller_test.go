@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/mock"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	mockedApp "rosen-bridge/tss/mocks/app/interface"
 	"rosen-bridge/tss/models"
 	_ "rosen-bridge/tss/models"
@@ -120,32 +119,4 @@ func TestController_Message(t *testing.T) {
 		})
 	}
 
-}
-
-func TestController_Export(t *testing.T) {
-	// Setup
-	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/export", nil)
-	rec := httptest.NewRecorder()
-	c := e.NewContext(req, rec)
-
-	app := mockedApp.NewRosenTss(t)
-	peerHome := "/tmp/.rosenTss"
-	app.On("GetPeerHome").Return(peerHome)
-
-	if err := os.MkdirAll(peerHome, os.ModePerm); err != nil {
-		t.Error(err)
-	}
-	_, err := os.Create(peerHome + "/test.txt")
-	if err != nil {
-		t.Error()
-	}
-
-	controller := NewTssController(app)
-	exportHandler := controller.Export()
-	// Assertions
-	if assert.NoError(t, exportHandler(c)) {
-		assert.Equal(t, http.StatusOK, rec.Code)
-		t.Log(rec.Body)
-	}
 }

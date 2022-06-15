@@ -76,7 +76,6 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 			switch msg.Name {
 			case "partyId":
 				if msg.Message != "" {
-					//TODO: resend self partyId to the sender peer
 					err := s.partyIdMessageHandler(rosenTss, msg)
 					if err != nil {
 						return err
