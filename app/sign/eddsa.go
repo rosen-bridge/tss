@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/models"
+	"rosen-bridge/tss/utils"
 	"strings"
 	"time"
 )
@@ -214,7 +215,7 @@ func (s *operationEDDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss,
 		switch partyIdParams[3] {
 
 		case "fromSign":
-			if !s.IsExist(newParty, s.LocalTssData.PartyIds) {
+			if !utils.IsPartyExist(newParty, s.LocalTssData.PartyIds) {
 				s.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(s.LocalTssData.PartyIds.ToUnSorted(), newParty))
 
@@ -273,7 +274,6 @@ func (s *operationEDDSASign) setup(rosenTss _interface.RosenTss) error {
 	signData := new(big.Int).SetBytes(msgBytes)
 
 	meta := rosenTss.GetMetaData()
-
 	models.Logger.Infof("meta %+v", meta)
 
 	if len(s.LocalTssData.PartyIds) < meta.Threshold {

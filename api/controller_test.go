@@ -12,6 +12,7 @@ import (
 	mockedApp "rosen-bridge/tss/mocks/app/interface"
 	"rosen-bridge/tss/models"
 	_ "rosen-bridge/tss/models"
+	"strings"
 	"testing"
 )
 
@@ -84,7 +85,6 @@ func TestController_Message(t *testing.T) {
 					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 					SenderId:   "cahj2pgs4eqvn1eo1tp0",
 					ReceiverId: "",
-					Crypto:     "eddsa",
 					Name:       "partyId",
 				},
 			},
@@ -148,4 +148,113 @@ func TestController_Export(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		t.Log(rec.Body)
 	}
+}
+
+func TestController_Import(t *testing.T) {
+	// Setup
+	type data struct {
+		Private string `json:"private"`
+		Crypto  string `json:"crypto"`
+	}
+
+	tests := []struct {
+		name  string
+		usage string
+		data  interface{}
+	}{
+		{
+			name: "success gossip",
+			data: data{
+				Private: "4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d",
+				Crypto:  "ecdsa",
+			},
+		},
+		{
+			name: "success meta",
+			data: data{
+				Private: "4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d",
+				Crypto:  "eddsa",
+			},
+		},
+	}
+
+	e := echo.New()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			app := mockedApp.NewRosenTss(t)
+			app.On("SetPrivate", mock.AnythingOfType("models.Private")).Return(nil)
+
+			controller := NewTssController(app)
+			importHandler := controller.Import()
+			marshal, err := json.Marshal(tt.data)
+			if err != nil {
+				return
+			}
+			req := httptest.NewRequest(http.MethodPost, "/import", strings.NewReader(string(marshal)))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			// Assertions
+			if assert.NoError(t, importHandler(c)) {
+				assert.Equal(t, http.StatusOK, rec.Code)
+			} else {
+				assert.Equal(t, http.StatusInternalServerError, rec.Code)
+			}
+		})
+	}
+
+}
+
+func TestController_Keygen(t *testing.T) {
+	// Setup
+
+	tests := []struct {
+		name          string
+		keygenMessage models.KeygenMessage
+	}{
+		{
+			name: "new eddsa keygenMessage",
+			keygenMessage: models.KeygenMessage{
+				Threshold:  2,
+				PeersCount: 3,
+				Crypto:     "eddsa",
+			},
+		},
+		{
+			name: "success ecdsa keygenMessage",
+			keygenMessage: models.KeygenMessage{
+				Threshold:  2,
+				PeersCount: 3,
+				Crypto:     "ecdsa",
+			},
+		},
+	}
+
+	e := echo.New()
+	app := mockedApp.NewRosenTss(t)
+	app.On("StartNewKeygen", mock.AnythingOfType("models.KeygenMessage")).Return(nil)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := NewTssController(app)
+			keygenHandler := controller.Keygen()
+			marshal, err := json.Marshal(tt.keygenMessage)
+			if err != nil {
+				return
+			}
+			req := httptest.NewRequest(http.MethodPost, "/keygen", bytes.NewBuffer(marshal))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			// Assertions
+			if assert.NoError(t, keygenHandler(c)) {
+				assert.Equal(t, http.StatusOK, rec.Code)
+			} else {
+				assert.Equal(t, http.StatusInternalServerError, rec.Code)
+			}
+		})
+	}
+
 }

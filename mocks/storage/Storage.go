@@ -46,18 +46,39 @@ func (_m *Storage) LoadEDDSAKeygen(peerHome string) (keygen.LocalPartySaveData, 
 	return r0, r1, r2
 }
 
-// MakefilePath provides a mock function with given fields: peerHome, topicName, fileFormat, protocol
-func (_m *Storage) MakefilePath(peerHome string, topicName string, fileFormat string, protocol string) {
-	_m.Called(peerHome, topicName, fileFormat, protocol)
+// LoadPrivate provides a mock function with given fields: peerHome, crypto
+func (_m *Storage) LoadPrivate(peerHome string, crypto string) (string, error) {
+	ret := _m.Called(peerHome, crypto)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string, string) string); ok {
+		r0 = rf(peerHome, crypto)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string, string) error); ok {
+		r1 = rf(peerHome, crypto)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
-// WriteData provides a mock function with given fields: data, peerHome, topicName, fileFormat, protocol
-func (_m *Storage) WriteData(data interface{}, peerHome string, topicName string, fileFormat string, protocol string) error {
-	ret := _m.Called(data, peerHome, topicName, fileFormat, protocol)
+// MakefilePath provides a mock function with given fields: peerHome, protocol
+func (_m *Storage) MakefilePath(peerHome string, protocol string) {
+	_m.Called(peerHome, protocol)
+}
+
+// WriteData provides a mock function with given fields: data, peerHome, fileFormat, protocol
+func (_m *Storage) WriteData(data interface{}, peerHome string, fileFormat string, protocol string) error {
+	ret := _m.Called(data, peerHome, fileFormat, protocol)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(interface{}, string, string, string, string) error); ok {
-		r0 = rf(data, peerHome, topicName, fileFormat, protocol)
+	if rf, ok := ret.Get(0).(func(interface{}, string, string, string) error); ok {
+		r0 = rf(data, peerHome, fileFormat, protocol)
 	} else {
 		r0 = ret.Error(0)
 	}

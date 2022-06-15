@@ -12,11 +12,16 @@ import (
 	"os"
 	"path/filepath"
 	"rosen-bridge/tss/app/interface"
+	"rosen-bridge/tss/app/keygen"
 	"rosen-bridge/tss/app/sign"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
 	"strings"
+)
+
+const (
+	privateFileFormat = "private.txt"
 )
 
 type rosenTss struct {
@@ -78,7 +83,51 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 				models.Logger.Error(err)
 				//TODO: handle error
 			}
-			models.Logger.Info("end of  loop")
+			models.Logger.Info("end of loop")
+		}()
+	}
+	return nil
+}
+
+// StartNewKeygen starts keygen scenario for app based on given protocol.
+func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
+	log.Printf("Starting New keygen process")
+
+	meta := models.MetaData{
+		PeersCount: keygenMessage.PeersCount,
+		Threshold:  keygenMessage.Threshold,
+	}
+	err := r.GetStorage().WriteData(meta, r.GetPeerHome(), "config.json", "eddsa")
+	if err != nil {
+		return err
+	}
+
+	r.metaData = meta
+
+	if _, ok := r.ChannelMap["keygen"]; !ok {
+		messageCh := make(chan models.Message, 100)
+		r.ChannelMap["keygen"] = messageCh
+		models.Logger.Infof("creating new channel in StartNewKeygen: %v", "keygen")
+	}
+
+	// read loop function
+	if keygenMessage.Crypto == "ecdsa" {
+		// TODO: implement this
+
+	} else if keygenMessage.Crypto == "eddsa" {
+		EDDSAOperation := keygen.NewKeygenEDDSAOperation()
+		err := EDDSAOperation.Init(r, "")
+		if err != nil {
+			return err
+		}
+		go func() {
+			models.Logger.Info("calling loop")
+			err := EDDSAOperation.Loop(r, r.ChannelMap["keygen"])
+			if err != nil {
+				models.Logger.Error(err)
+				//TODO: handle error
+			}
+			models.Logger.Info("end of loop")
 		}()
 	}
 	return nil
@@ -191,4 +240,20 @@ func (r *rosenTss) NewMessage(receiverId string, senderId string, message string
 	}
 
 	return m
+}
+
+func (r *rosenTss) SetPrivate(private models.Private) error {
+	err := r.GetStorage().WriteData(private, r.GetPeerHome(), privateFileFormat, private.Crypto)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *rosenTss) GetPrivate(crypto string) (string, error) {
+	private, err := r.GetStorage().LoadPrivate(r.GetPeerHome(), crypto)
+	if err != nil {
+		return "", err
+	}
+	return private, nil
 }
