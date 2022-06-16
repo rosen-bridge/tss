@@ -75,9 +75,13 @@ func (k *operationEDDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId str
 // Loop listens to the given channel and parsing the message based on the name
 func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
 	models.Logger.Infof("channel", messageCh)
+	errorCh := make(chan error)
 
 	for {
 		select {
+		case err := <-errorCh:
+			return err
+
 		case message, ok := <-messageCh:
 			if !ok {
 				return fmt.Errorf("channel closed")
@@ -87,7 +91,6 @@ func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 			switch msg.Name {
 			case "partyId":
 				if msg.Message != "" {
-					//TODO: resend self partyId to the sender peer
 					err := k.partyIdMessageHandler(rosenTss, msg)
 					if err != nil {
 						return err
@@ -133,7 +136,7 @@ func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 						err := k.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
-							//TODO: handle error
+							errorCh <- err
 							return
 						}
 					}()

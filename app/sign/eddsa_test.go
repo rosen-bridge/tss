@@ -56,13 +56,13 @@ func TestEDDSA_Init(t *testing.T) {
 		localTssData models.TssData
 	}{
 		{
-			name:         "creating partyId message with localTssData",
+			name:         "creating partyId message with localTssData, there must be no error",
 			app:          app,
 			receiverId:   "",
 			localTssData: localTssData,
 		},
 		{
-			name:         "creating partyId message without localTssData",
+			name:         "creating partyId message without localTssData, there must be no error",
 			app:          app,
 			receiverId:   "cahj2pgs4eqvn1eo1tp0",
 			localTssData: models.TssData{},
@@ -83,7 +83,6 @@ func TestEDDSA_Init(t *testing.T) {
 			}
 			err := eddsaSignOp.Init(tt.app, tt.receiverId)
 			if err != nil {
-
 				t.Errorf("Init failed: %v", err)
 			}
 
@@ -135,11 +134,13 @@ func TestEDDSA_Loop(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		message models.Message
+		name     string
+		expected string
+		message  models.Message
 	}{
 		{
-			name: "partyId",
+			name:     "partyId",
+			expected: "handling incoming partyId message from p2p, there must be no error out of err list",
 			message: models.Message{
 				Topic: "tss",
 				Message: models.GossipMessage{
@@ -152,7 +153,8 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 		{
-			name: "partyMsg",
+			name:     "partyMsg",
+			expected: "handling incoming partyMsg message from p2p, there must be no error out of err list",
 			message: models.Message{
 				Topic: "tss",
 				Message: models.GossipMessage{
@@ -165,7 +167,8 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 		{
-			name: "sign with party",
+			name:     "sign with party",
+			expected: "handling incoming sign message from p2p, there must be no error out of err list",
 			message: models.Message{
 				Topic: "tss",
 				Message: models.GossipMessage{
@@ -178,7 +181,8 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 		{
-			name: "sign without party",
+			name:     "sign without party",
+			expected: "handling incoming sign message from p2p, there must be no error out of err list",
 			message: models.Message{
 				Topic: "tss",
 				Message: models.GossipMessage{
@@ -229,7 +233,7 @@ func TestEDDSA_Loop(t *testing.T) {
 
 			messageCh <- tt.message
 			go func() {
-				time.Sleep(time.Second * 1)
+				time.Sleep(time.Millisecond * 100)
 				close(messageCh)
 			}()
 			errorList := []string{"invalid wire-format", "channel closed"}
@@ -248,7 +252,7 @@ func TestEDDSA_GetClassName(t *testing.T) {
 		expected string
 	}{
 		{
-			name:     "get eddsa class name",
+			name:     "get class name of eddsa sign object",
 			expected: "eddsaSign",
 		},
 	}
@@ -296,7 +300,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 		localTssData  models.TssData
 	}{
 		{
-			name: "partyId message with t=1",
+			name: "partyId message with partyId list less than threshold, there must be no error",
 			gossipMessage: models.GossipMessage{
 				Message:    fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign"),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
@@ -312,7 +316,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			localTssData: localTssData,
 		},
 		{
-			name: "partyId message with t=2",
+			name: "partyId message with partyId list equal to threshold, there must be no error",
 			gossipMessage: models.GossipMessage{
 				Message:    fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign"),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
@@ -394,7 +398,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "PartyUpdate from self to self",
+			name: "PartyUpdate from self to self, there should be an error",
 			message: models.PartyMessage{
 				To:                      []*tss.PartyID{localTssData.PartyID},
 				GetFrom:                 localTssData.PartyID,
@@ -406,7 +410,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "PartyUpdate from new party to self",
+			name: "PartyUpdate from new party to self there should be no error",
 			message: models.PartyMessage{
 				To:                      []*tss.PartyID{localTssData.PartyID},
 				GetFrom:                 newParty,
@@ -418,7 +422,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "PartyUpdate from new party to all",
+			name: "PartyUpdate from new party to all, there must be no error",
 			message: models.PartyMessage{
 				To:                      nil,
 				GetFrom:                 newParty,
@@ -430,7 +434,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "PartyUpdate from self to all",
+			name: "PartyUpdate from self to all, there must be no error",
 			message: models.PartyMessage{
 				To:                      nil,
 				GetFrom:                 localTssData.PartyID,
@@ -504,13 +508,13 @@ func TestEDDSA_setup(t *testing.T) {
 		wantErr      bool
 	}{
 		{
-			name:         "creating sign message partyId less than threshold",
+			name:         "creating sign message with partyIds less than threshold, there must be an error",
 			app:          app,
 			localTssData: localTssData,
 			wantErr:      true,
 		},
 		{
-			name:         "creating sign message with partyId equal to threshold",
+			name:         "creating sign message with partyIds equal to threshold, there must be no error",
 			app:          app,
 			localTssData: localTssDataWith2PartyIds,
 			wantErr:      false,
@@ -567,7 +571,7 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 		tssMessage   tss.Message
 	}{
 		{
-			name:         "creating party message",
+			name:         "creating party message from tss.Message received, there must be no error",
 			app:          app,
 			localTssData: localTssData,
 			tssMessage:   &message,
@@ -617,7 +621,7 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 		signatureData *common.SignatureData
 	}{
 		{
-			name:          "save sign",
+			name:          "handling sign data in the end of loop, there must be no error from callback",
 			app:           app,
 			signatureData: &saveSign,
 		},
@@ -679,19 +683,22 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	app.On("GetConnection").Return(conn)
 	tests := []struct {
 		name          string
+		expected      string
 		app           _interface.RosenTss
 		signatureData *common.SignatureData
 		localTssData  models.TssData
 		tssMessage    tss.Message
 	}{
 		{
-			name:          "save sign",
+			name:          "handling sign",
+			expected:      "there should be an \"message received\" error",
 			app:           app,
 			signatureData: &saveSign,
 			localTssData:  localTssData,
 		},
 		{
 			name:         "party message",
+			expected:     "there should be an \"message received\" error",
 			app:          app,
 			localTssData: localTssData,
 			tssMessage:   &message,
@@ -712,7 +719,8 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 			outCh := make(chan tss.Message, len(eddsaSignOp.LocalTssData.PartyIds))
 			endCh := make(chan common.SignatureData, len(eddsaSignOp.LocalTssData.PartyIds))
 			switch tt.name {
-			case "save sign":
+
+			case "handling sign":
 				endCh <- *tt.signatureData
 			case "party message":
 				outCh <- tt.tssMessage

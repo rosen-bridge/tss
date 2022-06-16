@@ -11,11 +11,6 @@ type Operation interface {
 	Init(RosenTss, string) error
 	Loop(RosenTss, chan models.Message) error
 	GetClassName() string
-	//
-	// NewMessage(message models.Message)
-
-	// check operations type (sign, regroup, keygen)
-	// GetIdentifier() or GetClassName()
 }
 
 // RosenTss Interface of an app

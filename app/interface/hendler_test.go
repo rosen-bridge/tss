@@ -21,7 +21,9 @@ func TestHandler_PartyMessageHandler(t *testing.T) {
 		name     string
 		partyMsg tss.Message
 	}{
-		{name: "creating Keygen message", partyMsg: &message},
+		{
+			name:     "creating Keygen message, PartyMessage model should create successfully",
+			partyMsg: &message},
 	}
 	operation := OperationHandler{}
 	for _, tt := range tests {
@@ -75,7 +77,7 @@ func TestHandler_SharedPartyUpdater(t *testing.T) {
 		party   tss.Party
 	}{
 		{
-			name:    "updating shared party",
+			name:    "updating shared party, there must be no error",
 			message: message,
 			party:   localTssData.Party,
 		},

@@ -8,16 +8,13 @@ import (
 	"rosen-bridge/tss/models"
 )
 
-// TODO: implement import and export handlers
-
 // TssController Interface of an app controller
 type TssController interface {
-	Keygen() echo.HandlerFunc
 	Sign() echo.HandlerFunc
-	Regroup() echo.HandlerFunc
 	Message() echo.HandlerFunc
-	Import() echo.HandlerFunc
 	Export() echo.HandlerFunc
+	Import() echo.HandlerFunc
+	Keygen() echo.HandlerFunc
 }
 
 type tssController struct {
@@ -75,16 +72,6 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 	}
 }
 
-// Regroup returns echo handler
-func (tssController *tssController) Regroup() echo.HandlerFunc {
-	return func(c echo.Context) error {
-		// TODO: implement this
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
-	}
-}
-
 //Message returns echo handler, receiving message from p2p and passing to related channel
 func (tssController *tssController) Message() echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -95,8 +82,6 @@ func (tssController *tssController) Message() echo.HandlerFunc {
 		if err := c.Bind(&data); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
-		c.Logger().Info("sign data: %+v ", data)
-
 		c.Logger().Infof("message data: %+v ", data)
 
 		tssController.rosenTss.MessageHandler(data)
@@ -115,8 +100,6 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 		c.Logger().Info("import data: %+v ", data)
-
-		// TODO: implement ImportPrivate
 		err := tssController.rosenTss.SetPrivate(data)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())

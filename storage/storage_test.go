@@ -38,7 +38,7 @@ func TestStorage_WriteData(t *testing.T) {
 		topicName string
 	}{
 		{
-			name:      "write test data",
+			name:      "write test data, there must be no error(the file must be created)",
 			data:      data,
 			peerHome:  peerHome,
 			topicName: topicName,
@@ -79,7 +79,7 @@ func TestStorage_LoadEDDSAKeygen(t *testing.T) {
 		peerHome string
 	}{
 		{
-			name:     "load test data",
+			name:     "load eddsa keygen data from home address, the result must have correct data",
 			peerHome: peerHome,
 		},
 	}
