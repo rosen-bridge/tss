@@ -65,8 +65,12 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 
+	errorCh := make(chan error)
+
 	for {
 		select {
+		case err := <-errorCh:
+			return err
 		case message, ok := <-messageCh:
 			if !ok {
 				return fmt.Errorf("channel closed")
@@ -121,7 +125,7 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 						err := s.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
-							//TODO: handle error
+							errorCh <- err
 							return
 						}
 					}()

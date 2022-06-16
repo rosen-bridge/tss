@@ -12,7 +12,7 @@ import (
 )
 
 func TestConnection_Publish(t *testing.T) {
-
+	// test for publish route, there must be no error and the response code and response type must bo correct
 	message := models.Message{
 		Message: models.GossipMessage{
 			Message:    "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
@@ -62,6 +62,7 @@ func TestConnection_Publish(t *testing.T) {
 }
 
 func TestConnection_Subscribe(t *testing.T) {
+	// test for Subscribe route, there must be no error and the response code and response type must bo correct
 
 	cnn := connect{
 		publishUrl:      "http://localhost:8080/p2p/send",
@@ -99,6 +100,7 @@ func TestConnection_Subscribe(t *testing.T) {
 }
 
 func TestConnection_CallBack(t *testing.T) {
+	// test for CallBack route, there must be no error and the response code and response type must bo correct
 
 	cnn := connect{
 		publishUrl:      "http://localhost:8080/p2p/send",

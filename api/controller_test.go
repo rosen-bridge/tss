@@ -20,10 +20,9 @@ func TestController_Sign(t *testing.T) {
 	tests := []struct {
 		name        string
 		signMessage models.SignMessage
-		wantErr     bool
 	}{
 		{
-			name: "new eddsa signMessage",
+			name: "new eddsa signMessage, get status code 200",
 			signMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
 				Crypto:      "eddsa",
@@ -31,7 +30,7 @@ func TestController_Sign(t *testing.T) {
 			},
 		},
 		{
-			name: "success ecdsa signMessage",
+			name: "new ecdsa signMessage, , get status code 200",
 			signMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
 				Crypto:      "ecdsa",
@@ -56,10 +55,11 @@ func TestController_Sign(t *testing.T) {
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 			rec := httptest.NewRecorder()
 			c := e.NewContext(req, rec)
+
 			// Assertions
 			if assert.NoError(t, signHandler(c)) {
 				assert.Equal(t, http.StatusOK, rec.Code)
-			} else if tt.wantErr {
+			} else {
 				assert.Equal(t, http.StatusInternalServerError, rec.Code)
 			}
 		})
@@ -75,7 +75,7 @@ func TestController_Message(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "new true message",
+			name: "new true message, get status code 200",
 			message: models.Message{
 				Topic: "tss",
 				Message: models.GossipMessage{

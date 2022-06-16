@@ -51,8 +51,6 @@ func (tssController *tssController) Message() echo.HandlerFunc {
 		if err := c.Bind(&data); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
-		c.Logger().Info("sign data: %+v ", data)
-
 		c.Logger().Infof("message data: %+v ", data)
 
 		tssController.rosenTss.MessageHandler(data)

@@ -34,7 +34,7 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 		meta models.MetaData
 	}{
 		{
-			name: "relative home address",
+			name: "set meta data, rosenTss metaData should be equal to given one",
 			meta: models.MetaData{
 				Threshold:  2,
 				PeersCount: 3,
@@ -58,7 +58,7 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 }
 
 func TestRosenTss_GetMetaData(t *testing.T) {
-
+	// test for returning rosenTss metaData, It should be correct
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
 	app := rosenTss{
@@ -76,6 +76,7 @@ func TestRosenTss_GetMetaData(t *testing.T) {
 }
 
 func TestRosenTss_GetStorage(t *testing.T) {
+	// test for returning rosenTss storage object, It should be correct
 
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
@@ -88,6 +89,7 @@ func TestRosenTss_GetStorage(t *testing.T) {
 }
 
 func TestRosenTss_GetConnection(t *testing.T) {
+	// test for returning rosenTss connection object, It should be correct
 
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
@@ -100,6 +102,7 @@ func TestRosenTss_GetConnection(t *testing.T) {
 }
 
 func TestRosenTss_GetPeerHome(t *testing.T) {
+	// test for returning rosenTss peer home address, It should be equal to given one
 
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
@@ -135,12 +138,12 @@ func TestRosenTss_SetPeerHome(t *testing.T) {
 		expected    string
 	}{
 		{
-			name:        "relative home address",
+			name:        "relative home address, should be equal to expected",
 			homeAddress: "./.rosenTss",
 			expected:    absHomeAddress,
 		},
 		{
-			name:        "user home address",
+			name:        "user home address, should be equal to expected",
 			homeAddress: "~/.rosenTss",
 			expected:    fmt.Sprintf("%s/.rosenTss", userHome),
 		},
@@ -186,7 +189,7 @@ func TestRosenTss_NewMessage(t *testing.T) {
 		gossipMessage models.GossipMessage
 	}{
 		{
-			name: "relative home address",
+			name: "creating gossip message from given data, the result must be correct",
 			gossipMessage: models.GossipMessage{
 				Message:    message,
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
@@ -231,7 +234,7 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 		message    models.Message
 	}{
 		{
-			name: "with channel id",
+			name: "the channel with messageId is exist in the channel map, there must be not error",
 			message: models.Message{
 				Topic: "tss",
 				Message: models.GossipMessage{
@@ -246,7 +249,7 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 			channelMap: channelMap,
 		},
 		{
-			name: "without channel id",
+			name: "the channel with messageId is not exist in the channel map, there must be no error",
 			message: models.Message{
 				Topic: "tss",
 				Message: models.GossipMessage{
@@ -316,12 +319,12 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 		messageId  string
 	}{
 		{
-			name:       "with channel id",
+			name:       "there is an channel map to messageId in channel map",
 			messageId:  messageId,
 			channelMap: channelMap,
 		},
 		{
-			name:       "without channel id",
+			name:       "there is no channel map to messageId in channel map",
 			messageId:  "aad5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 			channelMap: channelMap,
 		},
