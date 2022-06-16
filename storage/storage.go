@@ -40,33 +40,37 @@ func (f *storage) MakefilePath(peerHome string, protocol string) {
 // WriteData writing given data to file in given path
 func (f *storage) WriteData(data interface{}, peerHome string, fileFormat string, protocol string) error {
 
+	fmt.Println("write data called")
+
 	f.MakefilePath(peerHome, protocol)
 	err := os.MkdirAll(f.filePath, os.ModePerm)
 	if err != nil {
 		return err
 	}
-	path := fmt.Sprintf("%s/%s", f.filePath, fileFormat)
-	fi, err := os.Stat(path)
-	if !(err == nil && !fi.IsDir()) {
-		fd, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-		defer fd.Close()
+	path := filepath.Join(f.filePath, fileFormat)
 
+	fmt.Println(path)
+	fd, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	defer func(fd *os.File) {
+		err := fd.Close()
 		if err != nil {
-			return fmt.Errorf("unable to open File %s for writing, err:{%v}", f.filePath, err)
+			models.Logger.Error("unable to Close File %s, err:{%v}", path, err)
 		}
-		bz, err := json.MarshalIndent(&data, "", "    ")
-		if err != nil {
-			return fmt.Errorf("unable to marshal save data for File %s, err:{%v}", f.filePath, err)
-		}
-		_, err = fd.Write(bz)
-		if err != nil {
-			return fmt.Errorf("unable to write to File %s", f.filePath)
-		}
-		models.Logger.Infof("Saved a File: %s", f.filePath)
-		return nil
+	}(fd)
+
+	if err != nil {
+		return fmt.Errorf("unable to open File %s for writing, err:{%v}", path, err)
 	}
-	return fmt.Errorf("file stat error: %v", err)
-
+	bz, err := json.MarshalIndent(&data, "", "    ")
+	if err != nil {
+		return fmt.Errorf("unable to marshal save data for File %s, err:{%v}", path, err)
+	}
+	_, err = fd.Write(bz)
+	if err != nil {
+		return fmt.Errorf("unable to write to File %s", path)
+	}
+	models.Logger.Infof("Saved a File: %s", path)
+	return nil
 }
 
 // LoadEDDSAKeygen Loads the EDDSA keygen data from the file
@@ -135,6 +139,9 @@ func (f *storage) LoadPrivate(peerHome string, crypto string) (string, error) {
 		if strings.Contains(File.Name(), "private") {
 			privateFile = File.Name()
 		}
+	}
+	if privateFile == "" {
+		return "", nil
 	}
 	filePath := filepath.Join(f.filePath, privateFile)
 	models.Logger.Infof("File: %v", filePath)
