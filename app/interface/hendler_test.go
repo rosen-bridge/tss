@@ -11,7 +11,17 @@ import (
 	"testing"
 )
 
+/*	TestHandler_PartyMessageHandler
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there is a models.Message used as a function argument.
+	Dependencies:
+	-
+*/
 func TestHandler_PartyMessageHandler(t *testing.T) {
+
 	message := mocks.TestUtilsMessage{
 		Broadcast: true,
 		Data:      "cfc72ea72b7e96bcf542ea2e359596031e13134d68a503cb13d3f31d8428ae03",
@@ -23,7 +33,8 @@ func TestHandler_PartyMessageHandler(t *testing.T) {
 	}{
 		{
 			name:     "creating Keygen message, PartyMessage model should create successfully",
-			partyMsg: &message},
+			partyMsg: &message,
+		},
 	}
 	operation := OperationHandler{}
 	for _, tt := range tests {
@@ -50,11 +61,25 @@ func TestHandler_PartyMessageHandler(t *testing.T) {
 
 }
 
+/*	TestHandler_SharedPartyUpdater
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are a models.PartyMessage and tss.Party used as function arguments.
+	Dependencies:
+	- localTssData models.TssData
+	- tss.Party for eddsaKeygen
+*/
 func TestHandler_SharedPartyUpdater(t *testing.T) {
+
+	// creating fake localTssData
 	localTssData, err := mocks.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Error(err)
 	}
+
+	// creating fake tss.Party
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
 		tss.Edwards(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
@@ -62,6 +87,7 @@ func TestHandler_SharedPartyUpdater(t *testing.T) {
 	endCh := make(chan eddsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
 	localTssData.Party = eddsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)
 
+	// fake models.PartyMessage
 	message := models.PartyMessage{
 		To:                      []*tss.PartyID{localTssData.PartyID},
 		GetFrom:                 localTssData.PartyID,
@@ -94,12 +120,25 @@ func TestHandler_SharedPartyUpdater(t *testing.T) {
 	}
 }
 
+/*	TestHandler_IsExist
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are a tss.SortedPartyIDs and tss.PartyId used as function arguments.
+	Dependencies:
+	- localTssData models.TssData
+	- tss.PartyId
+*/
 func TestHandler_IsExist(t *testing.T) {
+
+	// creating fake localTssData
 	localTssData, err := mocks.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Error(err)
 	}
 
+	// creating fake partyId
 	newPartyId, err := mocks.CreateNewEDDSAPartyId()
 	if err != nil {
 		t.Error(err)

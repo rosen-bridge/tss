@@ -14,8 +14,16 @@ import (
 	"testing"
 )
 
+/*	TestController_Sign
+	TestCases :
+	testing sign controller, there are 2 testcases 1 for ecdsa and 1 for eddsa.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there is a models.SignMessage used as a function argument.
+	Dependencies:
+	it depends on `rosenTss.StartNewSign` function and will be handled as a mocked one.
+*/
 func TestController_Sign(t *testing.T) {
-	// Setup
 
 	tests := []struct {
 		name        string
@@ -30,7 +38,7 @@ func TestController_Sign(t *testing.T) {
 			},
 		},
 		{
-			name: "new ecdsa signMessage, , get status code 200",
+			name: "new ecdsa signMessage, get status code 200",
 			signMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
 				Crypto:      "ecdsa",
@@ -67,8 +75,17 @@ func TestController_Sign(t *testing.T) {
 
 }
 
+/*	TestController_Message
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there is a models.Message used as a function argument.
+	Dependencies:
+	it depends on `rosenTss.MessageHandler` function and will be handled as a mocked one.
+*/
 func TestController_Message(t *testing.T) {
-	// Setup
+
 	tests := []struct {
 		name    string
 		message interface{}

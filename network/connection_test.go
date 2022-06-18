@@ -11,6 +11,13 @@ import (
 	"testing"
 )
 
+/*	TestConnection_Publish
+	TestCases:
+	test for publish route,
+	there must be no error and the response code and response type must bo correct
+	Dependencies:
+	- http client
+*/
 func TestConnection_Publish(t *testing.T) {
 	// test for publish route, there must be no error and the response code and response type must bo correct
 	message := models.Message{
@@ -61,8 +68,14 @@ func TestConnection_Publish(t *testing.T) {
 	}
 }
 
+/*	TestConnection_Subscribe
+	TestCases:
+	test for Subscribe route,
+	there must be no error and the response code and response type must bo correct
+	Dependencies:
+	- http client
+*/
 func TestConnection_Subscribe(t *testing.T) {
-	// test for Subscribe route, there must be no error and the response code and response type must bo correct
 
 	cnn := connect{
 		publishUrl:      "http://localhost:8080/p2p/send",
@@ -99,9 +112,14 @@ func TestConnection_Subscribe(t *testing.T) {
 	}
 }
 
+/*	TestConnection_CallBack
+	TestCases:
+	test for CallBack route,
+	there must be no error and the response code and response type must bo correct
+	Dependencies:
+	- http client
+*/
 func TestConnection_CallBack(t *testing.T) {
-	// test for CallBack route, there must be no error and the response code and response type must bo correct
-
 	cnn := connect{
 		publishUrl:      "http://localhost:8080/p2p/send",
 		subscriptionUrl: "http://localhost:8080/p2p/channel/subscribe",

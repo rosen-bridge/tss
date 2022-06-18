@@ -21,17 +21,34 @@ import (
 	"time"
 )
 
+/*	TestEDDSA_Init
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are _interface.RosenTss, models.TssData, receiverId used as test arguments.
+	Dependencies:
+	- localTssData
+	- eddsaKeygen.LocalPartySaveData
+	- storage.LoadEDDSAKeygen function
+	- network.Publish function
+	- rosenTss GetStorage, GetConnection, GetPeerHome, NewMessage functions
+*/
 func TestEDDSA_Init(t *testing.T) {
 
+	// creating fake localTssData
 	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Errorf("CreateNewLocalEDDSATSSData error = %v", err)
 	}
 
+	// reading eddsaKeygen.LocalPartySaveData data from fixtures
 	data, id, err := mockUtils.LoadEDDSAKeygenFixture(0)
 	if err != nil {
 		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
 	}
+
+	// using mock functions
 	storage := mockedStorage.NewStorage(t)
 	storage.On("LoadEDDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
 	app := mockedInterface.NewRosenTss(t)
@@ -40,7 +57,6 @@ func TestEDDSA_Init(t *testing.T) {
 	app.On("GetStorage").Return(storage)
 	app.On("GetConnection").Return(conn)
 	app.On("GetPeerHome").Return(".rosenTss")
-
 	app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(models.GossipMessage{
 			Message:    fmt.Sprintf("%s,%s,%d,%s", localTssData.PartyID.Id, localTssData.PartyID.Moniker, localTssData.PartyID.KeyInt(), "fromSign"),
@@ -50,6 +66,7 @@ func TestEDDSA_Init(t *testing.T) {
 			Crypto:     "eddsa",
 			Name:       "partyId",
 		})
+
 	tests := []struct {
 		name         string
 		app          _interface.RosenTss
@@ -91,7 +108,23 @@ func TestEDDSA_Init(t *testing.T) {
 	}
 }
 
+/*	TestEDDSA_Loop
+	TestCases:
+	testing message controller, there are 4 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there is models.Message used as test arguments.
+	Dependencies:
+	- localTssData models.TssData
+	- eddsaKeygen.LocalPartySaveData
+	- tss.Party for eddsaSign.NewLocalParty
+	- network.Publish function
+	- rosenTss GetMetaData, GetConnection, NewMessage functions
+*/
 func TestEDDSA_Loop(t *testing.T) {
+	// pre-test part, faking data and using mocks
+
+	// reading eddsaKeygen.LocalPartySaveData from fixtures
 	saveData, Id1, err := mockUtils.LoadEDDSAKeygenFixture(0)
 	if err != nil {
 		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
@@ -101,6 +134,7 @@ func TestEDDSA_Loop(t *testing.T) {
 		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
 	}
 
+	// creating localTssData and new partyId
 	localTssData := models.TssData{
 		PartyID: Id1,
 	}
@@ -113,6 +147,7 @@ func TestEDDSA_Loop(t *testing.T) {
 	signDataBytes, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
 	signData := new(big.Int).SetBytes(signDataBytes)
 
+	// creating new tss party for eddsa sign
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
 		tss.Edwards(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
@@ -134,10 +169,15 @@ func TestEDDSA_Loop(t *testing.T) {
 		t.Error("failed to marshal message", err)
 	}
 
+	// creating new app from mocked rosenTss, handling mock function done in each case separately
+	app := mockedInterface.NewRosenTss(t)
+
+	// test cases
 	tests := []struct {
-		name     string
-		expected string
-		message  models.Message
+		name      string
+		expected  string
+		message   models.Message
+		AppConfig func()
 	}{
 		{
 			name:     "partyId",
@@ -152,6 +192,13 @@ func TestEDDSA_Loop(t *testing.T) {
 					Crypto:     "eddsa",
 					Name:       "partyId",
 				},
+			},
+			AppConfig: func() {
+				app.On("GetMetaData").Return(
+					models.MetaData{
+						PeersCount: 3,
+						Threshold:  2,
+					})
 			},
 		},
 		{
@@ -168,6 +215,9 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "partyMsg",
 				},
 			},
+			AppConfig: func() {
+				localTssData.Party = party
+			},
 		},
 		{
 			name:     "sign with party",
@@ -182,6 +232,9 @@ func TestEDDSA_Loop(t *testing.T) {
 					Crypto:     "eddsa",
 					Name:       "sign",
 				},
+			},
+			AppConfig: func() {
+				localTssData.Party = party
 			},
 		},
 		{
@@ -198,31 +251,27 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "sign",
 				},
 			},
-		},
-	}
-
-	app := mockedInterface.NewRosenTss(t)
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			switch tt.name {
-			case "partyId":
-				app.On("GetMetaData").Return(
-					models.MetaData{
-						PeersCount: 3,
-						Threshold:  2,
-					})
-			case "partyMsg", "sign with party":
-				localTssData.Party = party
-			case "sign without party":
+			AppConfig: func() {
 				localTssData.Party = nil
 				conn := mockedNetwork.NewConnection(t)
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 				app.On("GetConnection").Return(conn)
 				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(tt.message.Message)
-			}
+					Return(models.GossipMessage{
+						Message:    signData.String(),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Crypto:     "eddsa",
+						Name:       "sign",
+					})
+			},
+		},
+	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.AppConfig()
 			eddsaSignOp := operationEDDSASign{
 				savedData: saveData,
 				OperationSign: OperationSign{
@@ -250,6 +299,14 @@ func TestEDDSA_Loop(t *testing.T) {
 	}
 }
 
+/*	TestEDDSA_GetClassName
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	-
+*/
 func TestEDDSA_GetClassName(t *testing.T) {
 
 	tests := []struct {
@@ -282,7 +339,23 @@ func TestEDDSA_GetClassName(t *testing.T) {
 	}
 }
 
+/*	TestEDDSA_partyIdMessageHandler
+	TestCases:
+	testing message controller, there is 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there is models.GossipMessage, models.SignMessage, models.TssData used as test arguments.
+	Dependencies:
+	- localTssData models.TssData
+	- tss.PartyId
+	- eddsaKeygen.LocalPartySaveData
+	- tss.Party for eddsaSign.NewLocalParty
+	- network.Publish function
+	- rosenTss GetMetaData, GetConnection, NewMessage functions
+*/
 func TestEDDSA_partyIdMessageHandler(t *testing.T) {
+
+	// creating new localTssData and new partyIds
 	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
 	if err != nil {
 		t.Error(err)
@@ -297,6 +370,27 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 	localTssDataWith2PartyIds = localTssData
 	localTssDataWith2PartyIds.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId2))
+
+	// using mocked structures and functions
+	conn := mockedNetwork.NewConnection(t)
+	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+	app := mockedInterface.NewRosenTss(t)
+	app.On("GetConnection").Return(conn)
+	app.On("GetMetaData").Return(
+		models.MetaData{
+			Threshold:  2,
+			PeersCount: 3,
+		},
+	)
+	app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(models.GossipMessage{
+			Message:    fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign"),
+			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+			SenderId:   "cahj2pgs4eqvn1eo1tp0",
+			ReceiverId: "",
+			Crypto:     "eddsa",
+			Name:       "partyId",
+		})
 
 	tests := []struct {
 		name          string
@@ -340,21 +434,9 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 		},
 	}
 
-	conn := mockedNetwork.NewConnection(t)
-	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
-	app := mockedInterface.NewRosenTss(t)
-	app.On("GetConnection").Return(conn)
-	app.On("GetMetaData").Return(
-		models.MetaData{
-			Threshold:  2,
-			PeersCount: 3,
-		},
-	)
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-				Return(tt.gossipMessage)
+
 			eddsaSignOp := operationEDDSASign{
 				OperationSign: OperationSign{
 					LocalTssData: tt.localTssData,
@@ -371,8 +453,21 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 	}
 }
 
+/*	TestEDDSA_partyUpdate
+	TestCases:
+	testing message controller, there is 4 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there is models.PartyMessage used as test arguments.
+	Dependencies:
+	- localTssData models.TssData
+	- tss.PartyId
+	- eddsaKeygen.LocalPartySaveData
+	- tss.Party for eddsaSign.NewLocalParty
+*/
 func TestEDDSA_partyUpdate(t *testing.T) {
 
+	// creating new localTssData and new partyId
 	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Error(err)
@@ -385,6 +480,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newParty))
 
+	// creating new tss.Party for eddsa sign
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
 		tss.S256(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
@@ -477,8 +573,21 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	}
 }
 
+/*	TestEDDSA_setup
+	TestCases:
+	testing message controller, there is 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are _interface.RosenTss, models.TssData used as test arguments.
+	Dependencies:
+	- localTssData models.TssData
+	- tss.PartyId
+	- network.Publish function
+	- rosenTss GetMetaData, GetConnection, NewMessage functions
+*/
 func TestEDDSA_setup(t *testing.T) {
 
+	// creating new localTssData and new partyId
 	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Errorf("createNewLocalEDDSAParty error = %v", err)
@@ -491,7 +600,12 @@ func TestEDDSA_setup(t *testing.T) {
 	localTssDataWith2PartyIds.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
 
+	// using mocked function and struct
+	conn := mockedNetwork.NewConnection(t)
+	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
 	app := mockedInterface.NewRosenTss(t)
+	app.On("GetConnection").Return(conn)
 	app.On("GetMetaData").Return(
 		models.MetaData{
 			PeersCount: 3,
@@ -506,9 +620,7 @@ func TestEDDSA_setup(t *testing.T) {
 			Crypto:     "eddsa",
 			Name:       "partyId",
 		})
-	conn := mockedNetwork.NewConnection(t)
-	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
-	app.On("GetConnection").Return(conn)
+
 	tests := []struct {
 		name         string
 		app          _interface.RosenTss
@@ -549,17 +661,31 @@ func TestEDDSA_setup(t *testing.T) {
 	}
 }
 
+/*	TestEDDSA_handleOutMessage
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are _interface.RosenTss, models.TssData, tss.Message used as test arguments.
+	Dependencies:
+	- localTssData models.TssData
+	- network.Publish function
+	- rosenTss GetConnection, NewMessage functions
+*/
 func TestEDDSA_handleOutMessage(t *testing.T) {
+	// creating fake mockUtils.TestUtilsMessage as tss.Message
 	message := mockUtils.TestUtilsMessage{
 		Broadcast: true,
 		Data:      "cfc72ea72b7e96bcf542ea2e359596031e13134d68a503cb13d3f31d8428ae03",
 	}
 
+	// creating new localTssData
 	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Errorf("createNewLocalEDDSAParty error = %v", err)
 	}
 
+	// using mocked functions and structs
 	app := mockedInterface.NewRosenTss(t)
 	app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(models.GossipMessage{
@@ -573,6 +699,7 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	conn := mockedNetwork.NewConnection(t)
 	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 	app.On("GetConnection").Return(conn)
+
 	tests := []struct {
 		name         string
 		app          _interface.RosenTss
@@ -607,7 +734,18 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	}
 }
 
+/*	TestEDDSA_handleEndMessage
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are _interface.RosenTss, common.SignatureData used as test arguments.
+	Dependencies:
+	- network.CallBack function
+	- rosenTss GetConnection functions
+*/
 func TestEDDSA_handleEndMessage(t *testing.T) {
+	// creating fake sign save data
 	r, _ := hex.DecodeString("b24c712530dd03739ac87a491e45bd80ea8e3cef19c835bc6ed3262a9794974d")
 	s, _ := hex.DecodeString("02fe41c73871ca7ded0ff3e8adc76a64ea93643e75569bd9db8f772166adfc35")
 	m, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
@@ -624,6 +762,7 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	conn := mockedNetwork.NewConnection(t)
 	conn.On("CallBack", mock.AnythingOfType("string"), mock.AnythingOfType("models.SignData")).Return(nil)
 	app.On("GetConnection").Return(conn)
+
 	tests := []struct {
 		name          string
 		app           _interface.RosenTss
@@ -649,7 +788,19 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	}
 }
 
+/*	TestEDDSA_handleOutMessage
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are _interface.RosenTss, models.TssData, tss.Message, common.SignatureData used as test arguments.
+	Dependencies:
+	- localTssData models.TssData
+	- network Publish, CallBack functions
+	- rosenTss GetConnection, NewMessage functions
+*/
 func TestEDDSA_gossipMessageHandler(t *testing.T) {
+	// creating fake sign data
 	r, _ := hex.DecodeString("b24c712530dd03739ac87a491e45bd80ea8e3cef19c835bc6ed3262a9794974d")
 	s, _ := hex.DecodeString("02fe41c73871ca7ded0ff3e8adc76a64ea93643e75569bd9db8f772166adfc35")
 	m, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
@@ -665,6 +816,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 		Data:      "cfc72ea72b7e96bcf542ea2e359596031e13134d68a503cb13d3f31d8428ae03",
 	}
 
+	// creating localTssData and new partyId
 	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Errorf("createNewLocalEDDSAParty error = %v", err)
@@ -676,6 +828,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
 
+	// using mocked structs and functions
 	app := mockedInterface.NewRosenTss(t)
 	app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(models.GossipMessage{
@@ -691,6 +844,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	conn.On("CallBack", mock.AnythingOfType("string"), mock.AnythingOfType("models.SignData")).Return(
 		fmt.Errorf("message received"))
 	app.On("GetConnection").Return(conn)
+
 	tests := []struct {
 		name          string
 		expected      string

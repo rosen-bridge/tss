@@ -18,7 +18,17 @@ import (
 	"testing"
 )
 
+/*	TestRosenTss_SetMetadata
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are models.MetaData used as test arguments.
+	Dependencies:
+	-
+*/
 func TestRosenTss_SetMetadata(t *testing.T) {
+	// setting fake peer home and creating files and folders
 	peerHome := "/tmp/.rosenTss"
 	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
 	if err != nil {
@@ -28,6 +38,14 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+
+	// cleaning up after each test case called
+	t.Cleanup(func() {
+		_, err = exec.Command("rm", "-rf", peerHome).Output()
+		if err != nil {
+			t.Error(err)
+		}
+	})
 
 	tests := []struct {
 		name string
@@ -44,6 +62,7 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
 			app := rosenTss{
 				peerHome: peerHome,
 			}
@@ -57,8 +76,15 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 	}
 }
 
+/*	TestRosenTss_GetMetaData
+	TestCases:
+	testing message controller, there is 1 testcase.
+	test for GetMetaData rosenTss metaData, It should be correct
+	there are models.TssData used as test arguments.
+	Dependencies:
+	-
+*/
 func TestRosenTss_GetMetaData(t *testing.T) {
-	// test for returning rosenTss metaData, It should be correct
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
 	app := rosenTss{
@@ -75,9 +101,14 @@ func TestRosenTss_GetMetaData(t *testing.T) {
 	assert.Equal(t, app.metaData, metaData)
 }
 
+/*	TestRosenTss_GetStorage
+	TestCases:
+	testing message controller, there is 1 testcases.
+	test for returning GetStorage object, It should be correct
+	Dependencies:
+	-
+*/
 func TestRosenTss_GetStorage(t *testing.T) {
-	// test for returning rosenTss storage object, It should be correct
-
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
 	app := rosenTss{
@@ -88,9 +119,14 @@ func TestRosenTss_GetStorage(t *testing.T) {
 	assert.Equal(t, app.storage, app.GetStorage())
 }
 
+/*	TestRosenTss_GetConnection
+	TestCases:
+	testing message controller, there is 1 testcase.
+	test for GetConnection object, It should be correct
+	Dependencies:
+	-
+*/
 func TestRosenTss_GetConnection(t *testing.T) {
-	// test for returning rosenTss connection object, It should be correct
-
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
 	app := rosenTss{
@@ -101,9 +137,14 @@ func TestRosenTss_GetConnection(t *testing.T) {
 	assert.Equal(t, app.connection, app.GetConnection())
 }
 
+/*	TestRosenTss_GetPeerHome
+	TestCases:
+	testing message controller, there are 2 testcases.
+	test for GetPeerHome, It should be equal to given one.
+	Dependencies:
+	-
+*/
 func TestRosenTss_GetPeerHome(t *testing.T) {
-	// test for returning rosenTss peer home address, It should be equal to given one
-
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
 	app := rosenTss{
@@ -121,12 +162,22 @@ func TestRosenTss_GetPeerHome(t *testing.T) {
 	assert.Equal(t, app.peerHome, home)
 }
 
+/*	TestRosenTss_SetPeerHome
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	-
+*/
 func TestRosenTss_SetPeerHome(t *testing.T) {
 
+	// get user home dir
 	userHome, err := os.UserHomeDir()
 	if err != nil {
 		t.Error(err)
 	}
+	// creating absolute path from relative path
 	absHomeAddress, err := filepath.Abs("./.rosenTss")
 	if err != nil {
 		t.Error(err)
@@ -175,8 +226,18 @@ func TestRosenTss_SetPeerHome(t *testing.T) {
 	}
 }
 
+/*	TestRosenTss_NewMessage
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are  models.GossipMessage used as test arguments.
+	Dependencies:
+	- tss.PartyId
+*/
 func TestRosenTss_NewMessage(t *testing.T) {
 
+	// creating ner party id
 	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
 	if err != nil {
 		t.Error(err)
@@ -211,8 +272,19 @@ func TestRosenTss_NewMessage(t *testing.T) {
 	}
 }
 
+/*	TestRosenTss_MessageHandler
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are _interface.RosenTss, models.TssData, receiverId used as test arguments.
+	Dependencies:
+	- storage function
+	- network struct
+*/
 func TestRosenTss_MessageHandler(t *testing.T) {
 
+	// using mocked connection and storage
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
 	app := rosenTss{
@@ -228,6 +300,7 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 	messageCh := make(chan models.Message, 100)
 	channelMap := make(map[string]chan models.Message)
 	channelMap["ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1"] = messageCh
+
 	tests := []struct {
 		name       string
 		channelMap map[string]chan models.Message
@@ -276,7 +349,17 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 	}
 }
 
+/*	TestRosenTss_StartNewSign
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- storage.LoadEDDSAKeygen function
+	- network struct
+*/
 func TestRosenTss_StartNewSign(t *testing.T) {
+	// creating peer home folder and files
 	peerHome := "/tmp/.rosenTss"
 	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
 	if err != nil {
@@ -287,10 +370,12 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 		t.Error(err)
 	}
 
+	// using mocked structs and functions
 	storage := mockedStorage.NewStorage(t)
 	storage.On("LoadEDDSAKeygen", mock.AnythingOfType("string")).Return(
 		eddsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf("successful"))
 	conn := mockedNetwork.NewConnection(t)
+
 	app := rosenTss{
 		ChannelMap: make(map[string]chan models.Message),
 		metaData: models.MetaData{
@@ -301,6 +386,8 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 		connection: conn,
 		peerHome:   peerHome,
 	}
+
+	// creating fake channels and sign data
 	messageCh := make(chan models.Message, 100)
 	channelMap := make(map[string]chan models.Message)
 	channelMap["ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1"] = messageCh
@@ -313,6 +400,7 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := hex.EncodeToString(signDataBytes[:])
+
 	tests := []struct {
 		name       string
 		channelMap map[string]chan models.Message

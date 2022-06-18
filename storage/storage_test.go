@@ -13,7 +13,16 @@ import (
 	"testing"
 )
 
+/*	TestEDDSA_Init
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	-
+*/
 func TestStorage_WriteData(t *testing.T) {
+	// creating fake data for write
 	message := models.SignMessage{
 		Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
 		Crypto:      "eddsa",
@@ -30,6 +39,13 @@ func TestStorage_WriteData(t *testing.T) {
 	}
 
 	peerHome := "/tmp/.rosenTss"
+
+	t.Cleanup(func() {
+		_, err := exec.Command("rm", "-rf", peerHome).Output()
+		if err != nil {
+			t.Error(err)
+		}
+	})
 
 	tests := []struct {
 		name      string
@@ -54,15 +70,20 @@ func TestStorage_WriteData(t *testing.T) {
 			}
 		})
 	}
-	_, err := exec.Command("rm", "-rf", "/tmp/.rosenTss").Output()
-	if err != nil {
-		t.Error(err)
-	}
+
 }
 
+/*	TestEDDSA_Init
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	-
+*/
 func TestStorage_LoadEDDSAKeygen(t *testing.T) {
+	// creating peerHome
 	peerHome := "/tmp/.rosenTss"
-
 	path := fmt.Sprintf("%s/%s", peerHome, "eddsa")
 
 	if err := os.MkdirAll(path, os.ModePerm); err != nil {
@@ -84,6 +105,13 @@ func TestStorage_LoadEDDSAKeygen(t *testing.T) {
 		},
 	}
 
+	t.Cleanup(func() {
+		_, err = exec.Command("rm", "-rf", peerHome).Output()
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := storage{}
@@ -94,8 +122,5 @@ func TestStorage_LoadEDDSAKeygen(t *testing.T) {
 			assert.NotEqual(t, keygen, eddsaKeygen.LocalPartySaveData{})
 		})
 	}
-	_, err = exec.Command("rm", "-rf", "/tmp/.rosenTss").Output()
-	if err != nil {
-		t.Error(err)
-	}
+
 }
