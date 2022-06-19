@@ -19,6 +19,7 @@ import (
 	"strings"
 )
 
+// TestUtilsMessage internal struct for mocking tss.Message
 type TestUtilsMessage struct {
 	Broadcast    bool
 	From         string
@@ -70,10 +71,12 @@ func (tu *TestUtilsMessage) IsBroadcast() bool {
 	return tu.Broadcast
 }
 
+// GenerateEDDSAKey generates private and public for edward curve
 func GenerateEDDSAKey() ([]byte, *big.Int, *big.Int, error) {
 	return edwards.GenerateKey(rand.Reader)
 }
 
+// CreateNewEDDSAPartyId creates a new partyId with edward key
 func CreateNewEDDSAPartyId() (*tss.PartyID, error) {
 	private, _, _, err := GenerateEDDSAKey()
 	if err != nil {
@@ -86,6 +89,7 @@ func CreateNewEDDSAPartyId() (*tss.PartyID, error) {
 	return partyId, nil
 }
 
+// CreateNewLocalEDDSATSSData creates a new partyId with edward key and setting it in localTssData
 func CreateNewLocalEDDSATSSData() (models.TssData, error) {
 	newPartyId, err := CreateNewEDDSAPartyId()
 	if err != nil {
@@ -100,6 +104,7 @@ func CreateNewLocalEDDSATSSData() (models.TssData, error) {
 	return localTssData, nil
 }
 
+// LoadEDDSAKeygenFixture reads eddsa keygen fixer file by given index
 func LoadEDDSAKeygenFixture(index int) (eddsaKeygen.LocalPartySaveData, *tss.PartyID, error) {
 	testFixtureDirFormat := "%s/../mocks/_eddsa_keygen_fixtures"
 
@@ -143,6 +148,7 @@ func LoadEDDSAKeygenFixture(index int) (eddsaKeygen.LocalPartySaveData, *tss.Par
 	return key, sortedPIDs[0], nil
 }
 
+// Contains check if item exist in the list or not
 func Contains(item string, itemList []string) bool {
 	for _, element := range itemList {
 		if strings.Contains(item, element) {

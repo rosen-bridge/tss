@@ -20,10 +20,6 @@ format:
     - go fmt $(go list ./...)
     # - go vet $(go list ./...)
 
-race_detector:
-  stage: test
-  script:
-    - go test -race -short $(go list ./...)
 
 code_coverage:
   stage: test

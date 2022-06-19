@@ -54,7 +54,7 @@ func (f *storage) WriteData(data interface{}, peerHome string, fileFormat string
 	defer func(fd *os.File) {
 		err := fd.Close()
 		if err != nil {
-			models.Logger.Error("unable to Close File %s, err:{%v}", path, err)
+			models.Logger.Errorf("unable to Close File %s, err:{%v}", path, err)
 		}
 	}(fd)
 
