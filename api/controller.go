@@ -164,13 +164,8 @@ func (tssController *tssController) Export() echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
-		//write the zipped file to the disk
-		err = ioutil.WriteFile("/tmp/rosenTss.zip", buf.Bytes(), 0777)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-
 		models.Logger.Info("zipping file was successful.")
-		return c.Attachment("/tmp/rosenTss.zip", "rosenTss.zip")
+		c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf("filename=%q", "rosenTss.zip"))
+		return c.Stream(200, echo.HeaderContentDisposition, buf)
 	}
 }
