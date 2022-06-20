@@ -1,9 +1,14 @@
 package api
 
 import (
+	"archive/zip"
+	"bytes"
+	"fmt"
 	"github.com/labstack/echo/v4"
+	"io/ioutil"
 	"net/http"
-	"os/exec"
+	"os"
+	"path/filepath"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/models"
 )
@@ -114,11 +119,58 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 func (tssController *tssController) Export() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		peerHome := tssController.rosenTss.GetPeerHome()
-		_, err := exec.Command("zip", "-r", "-D", "/tmp/rosenTss.zip", peerHome).Output()
+		// Create a buffer to write our archive to.
+		fmt.Println("export called")
+		buf := new(bytes.Buffer)
+
+		// Create a new zip archive.
+		zipWriter := zip.NewWriter(buf)
+
+		var files []string
+		err := filepath.Walk(peerHome, func(path string, info os.FileInfo, err error) error {
+			if info.IsDir() {
+				return nil
+			}
+			files = append(files, path)
+			return nil
+		})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+		// Add some files to the archive.
+
+		for _, file := range files {
+			zipFile, err := zipWriter.Create(file)
+			if err != nil {
+				c.Logger().Errorf("%s", err)
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			}
+			content, err := ioutil.ReadFile(file)
+			if err != nil {
+				c.Logger().Errorf("%s", err)
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			}
+			_, err = zipFile.Write(content)
+			if err != nil {
+				c.Logger().Errorf("%s", err)
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			}
+		}
+
+		// Make sure to check the error on Close.
+		err = zipWriter.Close()
 		if err != nil {
 			c.Logger().Errorf("%s", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
-		c.Logger().Info("zipping file was successful.")
+
+		//write the zipped file to the disk
+		err = ioutil.WriteFile("/tmp/rosenTss.zip", buf.Bytes(), 0777)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+		}
+
+		models.Logger.Info("zipping file was successful.")
 		return c.Attachment("/tmp/rosenTss.zip", "rosenTss.zip")
 	}
 }

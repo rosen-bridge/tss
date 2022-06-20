@@ -141,13 +141,12 @@ func TestController_Message(t *testing.T) {
 /*	TestController_Export
 	TestCases:
 	testing message controller, there is 1 testcase.
-	each test case runs as a subtests.
-	target and expected outPut clarified in each testCase
+	the result should have status code 200.
 	Dependencies:
 	-
 */
 func TestController_Export(t *testing.T) {
-	// Setup
+	// Setup, creating fake peer home with some files in it
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/export", nil)
 	rec := httptest.NewRecorder()
@@ -165,12 +164,12 @@ func TestController_Export(t *testing.T) {
 		t.Error()
 	}
 
+	// calling controller
 	controller := NewTssController(app)
 	exportHandler := controller.Export()
 	// Assertions
 	if assert.NoError(t, exportHandler(c)) {
 		assert.Equal(t, http.StatusOK, rec.Code)
-		t.Log(rec.Body)
 	}
 }
 

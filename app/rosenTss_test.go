@@ -372,7 +372,7 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 	// using mocked structs and functions
 	storage := mockedStorage.NewStorage(t)
 	storage.On("LoadEDDSAKeygen", mock.AnythingOfType("string")).Return(
-		eddsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf("successful"))
+		eddsaKeygen.LocalPartySaveData{}, nil, nil)
 	conn := mockedNetwork.NewConnection(t)
 
 	app := rosenTss{
@@ -387,9 +387,6 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 	}
 
 	// creating fake channels and sign data
-	messageCh := make(chan models.Message, 100)
-	channelMap := make(map[string]chan models.Message)
-	channelMap["ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1"] = messageCh
 	message := models.SignMessage{
 		Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
 		Crypto:      "eddsa",
@@ -400,6 +397,12 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := hex.EncodeToString(signDataBytes[:])
 
+	messageCh := make(chan models.Message, 100)
+	channelMap := make(map[string]chan models.Message)
+	channelMapWithoutMessageId := make(map[string]chan models.Message)
+	channelMapWithoutMessageId["no sign"] = messageCh
+	channelMap[messageId] = messageCh
+
 	tests := []struct {
 		name       string
 		channelMap map[string]chan models.Message
@@ -407,13 +410,11 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 	}{
 		{
 			name:       "there is an channel map to messageId in channel map",
-			messageId:  messageId,
 			channelMap: channelMap,
 		},
 		{
 			name:       "there is no channel map to messageId in channel map",
-			messageId:  "aad5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-			channelMap: channelMap,
+			channelMap: channelMapWithoutMessageId,
 		},
 	}
 
@@ -428,6 +429,15 @@ func TestRosenTss_StartNewSign(t *testing.T) {
 	}
 }
 
+/*	TestRosenTss_StartNewKeygen
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- storage LoadPrivate, WriteData function
+	- network Publish function
+*/
 func TestRosenTss_StartNewKeygen(t *testing.T) {
 	peerHome := "/tmp/.rosenTss"
 	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
@@ -481,15 +491,119 @@ func TestRosenTss_StartNewKeygen(t *testing.T) {
 			name:       "without channel id",
 			channelMap: channelMapWithoutKeygen,
 		},
+		{
+			name:       "error in loop",
+			channelMap: channelMapWithKeygen,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app.ChannelMap = tt.channelMap
+			if tt.name == "error in loop" {
+				app.ChannelMap["keygen"] <- models.Message{
+					Topic: "tss",
+					Message: models.GossipMessage{
+						Message:    "generate key",
+						MessageId:  "keygen",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "keygen",
+					},
+				}
+			}
 			err := app.StartNewKeygen(message)
 			if err != nil && err.Error() != "successful" {
 				t.Error(err)
 			}
+		})
+	}
+}
+
+/*	TestRosenTss_SetPrivate
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are models.Private used as test arguments.
+	Dependencies:
+	- storage WriteData function
+*/
+func TestRosenTss_SetPrivate(t *testing.T) {
+	// setting fake peer home and creating files and folders
+	peerHome := "/tmp/.rosenTss"
+
+	tests := []struct {
+		name    string
+		private models.Private
+	}{
+		{
+			name: "set private, there must be no error",
+			private: models.Private{
+				Private: "4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d",
+				Crypto:  "ecdsa",
+			},
+		},
+	}
+
+	store := mockedStorage.NewStorage(t)
+	store.On("WriteData", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			app := rosenTss{
+				peerHome: peerHome,
+				storage:  store,
+			}
+			err := app.SetPrivate(tt.private)
+			if err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+/*	TestRosenTss_GetPrivate
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are models.Private used as test arguments.
+	Dependencies:
+	- storage LoadPrivate function
+*/
+func TestRosenTss_GetPrivate(t *testing.T) {
+	// setting fake peer home and creating files and folders
+	peerHome := "/tmp/.rosenTss"
+
+	tests := []struct {
+		name    string
+		private models.Private
+	}{
+		{
+			name: "set private, there must be no error",
+			private: models.Private{
+				Private: "4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d",
+				Crypto:  "ecdsa",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := mockedStorage.NewStorage(t)
+			store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(tt.private.Private, nil)
+			app := rosenTss{
+				peerHome: peerHome,
+				storage:  store,
+			}
+			private, err := app.GetPrivate(tt.private.Crypto)
+			if err != nil {
+				t.Error(err)
+			}
+			assert.Equal(t, private, tt.private.Private)
 		})
 	}
 }

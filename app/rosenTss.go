@@ -53,8 +53,6 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		return err
 	}
 
-	errorCh := make(chan error)
-
 	msgBytes, _ := hex.DecodeString(signMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
@@ -83,28 +81,17 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 			err := EDDSAOperation.Loop(r, r.ChannelMap[signDtaHash])
 			if err != nil {
 				models.Logger.Error(err)
-				errorCh <- err
+				os.Exit(1)
 			}
 			models.Logger.Info("end of loop")
 		}()
 	}
-	go func(errCh chan error) {
-		for {
-			select {
-			case err := <-errCh:
-				models.Logger.Error(err)
-				os.Exit(1)
-			}
-		}
-	}(errorCh)
 	return nil
 }
 
 // StartNewKeygen starts keygen scenario for app based on given protocol.
 func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 	log.Printf("Starting New keygen process")
-
-	errorCh := make(chan error)
 
 	meta := models.MetaData{
 		PeersCount: keygenMessage.PeersCount,
@@ -138,20 +125,11 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 			err := EDDSAOperation.Loop(r, r.ChannelMap["keygen"])
 			if err != nil {
 				models.Logger.Error(err)
-				errorCh <- err
+				os.Exit(1)
 			}
 			models.Logger.Info("end of loop")
 		}()
 	}
-	go func(errCh chan error) {
-		for {
-			select {
-			case err := <-errCh:
-				models.Logger.Error(err)
-				os.Exit(1)
-			}
-		}
-	}(errorCh)
 	return nil
 }
 
