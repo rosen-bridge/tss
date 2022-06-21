@@ -175,6 +175,20 @@ func (_m *RosenTss) StartNewKeygen(_a0 models.KeygenMessage) error {
 	return r0
 }
 
+// StartNewRegroup provides a mock function with given fields: _a0
+func (_m *RosenTss) StartNewRegroup(_a0 models.RegroupMessage) error {
+	ret := _m.Called(_a0)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(models.RegroupMessage) error); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // StartNewSign provides a mock function with given fields: _a0
 func (_m *RosenTss) StartNewSign(_a0 models.SignMessage) error {
 	ret := _m.Called(_a0)

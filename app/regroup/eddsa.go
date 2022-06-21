@@ -23,9 +23,14 @@ type operationEDDSARegroup struct {
 	savedData eddsaKeygen.LocalPartySaveData
 }
 
-func NewOperationEDDSARegroup(regroupMessage models.RegroupMessage) _interface.Operation {
+func NewRegroupEDDSAOperation(regroupMessage models.RegroupMessage) _interface.Operation {
 	return &operationEDDSARegroup{
-		OperationRegroup: OperationRegroup{RegroupMessage: regroupMessage},
+		OperationRegroup: OperationRegroup{
+			LocalTssData: models.TssRegroupData{
+				PeerState: regroupMessage.PeerState,
+			},
+			RegroupMessage: regroupMessage,
+		},
 	}
 }
 
@@ -33,47 +38,54 @@ func NewOperationEDDSARegroup(regroupMessage models.RegroupMessage) _interface.O
 func (r *operationEDDSARegroup) Init(rosenTss _interface.RosenTss, receiverId string) error {
 	fmt.Println("Init called")
 
-	if r.LocalTssData.PeerState == 1 {
-
-		var private []byte
-		localPriv, err := rosenTss.GetPrivate("eddsa")
-		if err != nil {
-			return err
-		}
-		if localPriv == "" {
-			priv, _, _, err := utils.GenerateEDDSAKey()
-			if err != nil {
-				private = nil
-				return err
-			}
-			private = priv
-		} else {
-			priv, err := hex.DecodeString(localPriv)
+	if r.LocalTssData.PartyID == nil {
+		if r.LocalTssData.PeerState == 1 {
+			var private []byte
+			localPriv, err := rosenTss.GetPrivate("eddsa")
 			if err != nil {
 				return err
 			}
-			private = priv
-		}
+			if localPriv == "" {
+				priv, _, _, err := utils.GenerateEDDSAKey()
+				if err != nil {
+					private = nil
+					return err
+				}
+				err = rosenTss.SetPrivate(models.Private{
+					Private: hex.EncodeToString(priv),
+					Crypto:  "eddsa",
+				})
+				if err != nil {
+					return err
+				}
+				private = priv
+			} else {
+				priv, err := hex.DecodeString(localPriv)
+				if err != nil {
+					return err
+				}
+				private = priv
+			}
 
-		key := new(big.Int).SetBytes(private)
-		id := xid.New()
-		pMoniker := fmt.Sprintf("tssPeer/%s", id.String())
-		r.LocalTssData.PartyID = tss.NewPartyID(r.LocalTssData.PartyID.Id, pMoniker, key)
+			key := new(big.Int).SetBytes(private)
+			id := xid.New()
+			pMoniker := fmt.Sprintf("tssPeer/%s", id.String())
+			r.LocalTssData.PartyID = tss.NewPartyID(id.String(), pMoniker, key)
+		}
+		if r.LocalTssData.PeerState == 0 || r.LocalTssData.PeerState == 2 {
+			data, pID, err := rosenTss.GetStorage().LoadEDDSAKeygen(rosenTss.GetPeerHome())
+			if err != nil {
+				return err
+			}
+			if pID == nil {
+				return fmt.Errorf("pIDs is nil")
+
+			} else {
+				r.savedData = data
+				r.LocalTssData.PartyID = pID
+			}
+		}
 	}
-	if r.LocalTssData.PeerState == 0 || r.LocalTssData.PeerState == 2 {
-		data, pID, err := rosenTss.GetStorage().LoadEDDSAKeygen(rosenTss.GetPeerHome())
-		if err != nil {
-			return err
-		}
-		if pID == nil {
-			return fmt.Errorf("pIDs is nil")
-
-		} else {
-			r.savedData = data
-			r.LocalTssData.PartyID = pID
-		}
-	}
-
 	message := fmt.Sprintf("%s,%s,%d,%s,%d",
 		r.LocalTssData.PartyID.Id, r.LocalTssData.PartyID.Moniker,
 		r.LocalTssData.PartyID.KeyInt(), "fromRegroup", r.LocalTssData.PeerState)
@@ -89,11 +101,12 @@ func (r *operationEDDSARegroup) Init(rosenTss _interface.RosenTss, receiverId st
 // Loop listens to the given channel and parsing the message based on the name
 func (r *operationEDDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
 	models.Logger.Infof("channel", messageCh)
-	//msgBytes, _ := hex.DecodeString(r.SignMessage.Message)
-	//signData := new(big.Int).SetBytes(msgBytes)
+	errorCh := make(chan error)
 
 	for {
 		select {
+		case err := <-errorCh:
+			return err
 		case message, ok := <-messageCh:
 			if !ok {
 				return fmt.Errorf("channel closed")
@@ -158,7 +171,7 @@ func (r *operationEDDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 						err := r.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
-							//TODO: handle error
+							errorCh <- err
 							return
 						}
 					}()
@@ -173,6 +186,74 @@ func (r *operationEDDSARegroup) GetClassName() string {
 	return "eddsaRegroup"
 }
 
+// HandleOutMessage handling party messages on out channel
+func (r *operationEDDSARegroup) handleOutMessage(rosenTss _interface.RosenTss, partyMsg tss.Message) error {
+	msgHex, err := r.PartyMessageHandler(partyMsg)
+	if err != nil {
+		return err
+	}
+
+	jsonMessage := rosenTss.NewMessage("", r.LocalTssData.PartyID.Id, msgHex, "regroup", "partyMsg")
+	err = rosenTss.GetConnection().Publish(jsonMessage)
+	if err != nil {
+		return err
+	}
+
+	meta := models.MetaData{
+		PeersCount: r.RegroupMessage.PeersCount,
+		Threshold:  r.RegroupMessage.NewThreshold,
+	}
+	err = rosenTss.GetStorage().WriteData(meta, rosenTss.GetPeerHome(), "config.json", "eddsa")
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// HandleEndMessage handling save data on end cahnnel of party
+func (r *operationEDDSARegroup) handleEndMessage(rosenTss _interface.RosenTss, saveData eddsaKeygen.LocalPartySaveData) error {
+	if r.LocalTssData.PeerState == 1 || r.LocalTssData.PeerState == 2 {
+		pkX, pkY := saveData.EDDSAPub.X(), saveData.EDDSAPub.Y()
+		pk := edwards.PublicKey{
+			Curve: tss.Edwards(),
+			X:     pkX,
+			Y:     pkY,
+		}
+
+		public := utils.GetPKFromEDDSAPub(pk.X, pk.Y)
+		encodedPK := base58.Encode(public)
+		models.Logger.Infof("pk length: %d", len(public))
+		models.Logger.Infof("base58 pk: %v", encodedPK)
+
+		models.Logger.Infof("reasharing data: %v", saveData.EDDSAPub)
+
+		err := rosenTss.GetStorage().WriteData(saveData, rosenTss.GetPeerHome(), regroupFileName, "eddsa")
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// gossipMessageHandler called in the main loop of message passing between peers for signing scenario.
+func (r *operationEDDSARegroup) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan eddsaKeygen.LocalPartySaveData) error {
+	for {
+		select {
+		case partyMsg := <-outCh:
+			err := r.handleOutMessage(rosenTss, partyMsg)
+			if err != nil {
+				return err
+			}
+		case save := <-endCh:
+			err := r.handleEndMessage(rosenTss, save)
+			if err != nil {
+				return err
+			}
+		}
+	}
+}
+
 // PartyIdMessageHandler handles partyId message and if cals setup functions if patryIds list length was at least equal to the threshold
 func (r *operationEDDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
 	if gossipMessage.SenderId != r.LocalTssData.PartyID.Id &&
@@ -184,8 +265,6 @@ func (r *operationEDDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 		models.Logger.Infof("partyIdParams: %v", partyIdParams)
 		key, _ := new(big.Int).SetString(partyIdParams[2], 10)
 		newParty := tss.NewPartyID(partyIdParams[0], partyIdParams[1], key)
-
-		meta := rosenTss.GetMetaData()
 
 		switch partyIdParams[3] {
 
@@ -214,7 +293,7 @@ func (r *operationEDDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 			}
 
 			lenAllParties := len(r.LocalTssData.OldPartyIds) + len(r.LocalTssData.NewPartyIds)
-			if len(r.LocalTssData.OldPartyIds) < meta.Threshold || lenAllParties < r.RegroupMessage.NewThreshold {
+			if len(r.LocalTssData.OldPartyIds) < r.RegroupMessage.OldThreshold || lenAllParties < r.RegroupMessage.NewThreshold {
 				err := r.Init(rosenTss, newParty.Id)
 				if err != nil {
 					return err
@@ -235,12 +314,44 @@ func (r *operationEDDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 
 // PartyUpdate updates partyIds in eddsa app party based on received message
 func (r *operationEDDSARegroup) partyUpdate(partyMsg models.PartyMessage) error {
-	panic("implement me")
+	dest := partyMsg.To
+	if dest == nil {
+		models.Logger.Error("did not expect a msg to have a nil destination during regrouping")
+	}
+	if partyMsg.IsToOldCommittee || partyMsg.IsToOldAndNewCommittees {
+		if r.LocalTssData.PeerState == 0 || r.LocalTssData.PeerState == 2 {
+			for _, destP := range dest {
+				if destP.Id == r.LocalTssData.PartyID.Id {
+					err := r.SharedPartyUpdater(r.LocalTssData.Party, partyMsg)
+					if err != nil {
+						models.Logger.Error(err)
+						return err
+					}
+				}
+			}
+
+		}
+	}
+	if !partyMsg.IsToOldCommittee || partyMsg.IsToOldAndNewCommittees {
+		if r.LocalTssData.PeerState == 1 || r.LocalTssData.PeerState == 2 {
+			for _, destP := range dest {
+				if destP.Id == r.LocalTssData.PartyID.Id {
+					err := r.SharedPartyUpdater(r.LocalTssData.Party, partyMsg)
+					if err != nil {
+						models.Logger.Error(err)
+						return err
+					}
+				}
+			}
+
+		}
+	}
+	return nil
 }
 
-// Setup called after if Init up was successful. it used to create party params and sign message
+// Setup called after if Init up was successful. it used to create party params and regroup message
 func (r *operationEDDSARegroup) setup(rosenTss _interface.RosenTss) error {
-	models.Logger.Info("regroup called")
+	models.Logger.Info("setup called")
 	models.Logger.Infof("len NewPartyIds: %d", len(r.LocalTssData.NewPartyIds))
 	models.Logger.Infof("len OldPartyIds: %d", len(r.LocalTssData.OldPartyIds))
 
@@ -271,66 +382,10 @@ func (r *operationEDDSARegroup) setup(rosenTss _interface.RosenTss) error {
 
 	models.Logger.Infof("r.LocalTssData RegroupingParams: %v\n", *r.LocalTssData.RegroupingParams)
 
-	//m := models.GossipMessage{
-	//	Name:     "regroup",
-	//	Message:  "regroup pre params creates.",
-	//	SenderId: r.LocalTssData.PartyID.Id,
-	//}
-	//models.Logger.Infof("regroup message: %v\n", m)
-	//msgBytes, err := json.Marshal(m)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//sendCh <- msgBytes
-	return nil
-}
-
-// gossipMessageHandler called in the main loop of message passing between peers for signing scenario.
-func (r *operationEDDSARegroup) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan eddsaKeygen.LocalPartySaveData) error {
-	for {
-		select {
-		case partyMsg := <-outCh:
-			msgHex, err := r.PartyMessageHandler(partyMsg)
-			if err != nil {
-				return err
-			}
-
-			jsonMessage := rosenTss.NewMessage("", r.LocalTssData.PartyID.Id, msgHex, "regroup", "partyMsg")
-			err = rosenTss.GetConnection().Publish(jsonMessage)
-			if err != nil {
-				return err
-			}
-		case save := <-endCh:
-
-			err := r.saveEDDSARegroupData(rosenTss, save)
-			if err != nil {
-				return err
-			}
-
-		}
-	}
-}
-
-func (r *operationEDDSARegroup) saveEDDSARegroupData(rosenTss _interface.RosenTss, save eddsaKeygen.LocalPartySaveData) error {
-	if r.LocalTssData.PeerState == 1 || r.LocalTssData.PeerState == 2 {
-		pkX, pkY := save.EDDSAPub.X(), save.EDDSAPub.Y()
-		pk := edwards.PublicKey{
-			Curve: tss.Edwards(),
-			X:     pkX,
-			Y:     pkY,
-		}
-
-		public := utils.GetPKFromEDDSAPub(pk.X, pk.Y)
-		encodedPK := base58.Encode(public)
-		models.Logger.Infof("pk length: %d", len(public))
-		models.Logger.Infof("base58 pk: %v", encodedPK)
-
-		models.Logger.Infof("reasharing data: %v", save.EDDSAPub)
-
-		err := rosenTss.GetStorage().WriteData(save, rosenTss.GetPeerHome(), regroupFileName, "eddsa")
-		if err != nil {
-			return err
-		}
+	jsonMessage := rosenTss.NewMessage("", r.LocalTssData.PartyID.Id, "regroup pre params creates.", "regroup", "regroup")
+	err := rosenTss.GetConnection().Publish(jsonMessage)
+	if err != nil {
+		return err
 	}
 	return nil
 }

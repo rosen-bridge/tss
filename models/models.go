@@ -53,7 +53,6 @@ type TssData struct {
 
 type TssRegroupData struct {
 	PartyID          *tss.PartyID
-	Params           *tss.Parameters
 	RegroupingParams *tss.ReSharingParameters
 	NewPartyIds      tss.SortedPartyIDs
 	OldPartyIds      tss.SortedPartyIDs

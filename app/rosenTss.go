@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/keygen"
+	"rosen-bridge/tss/app/regroup"
 	"rosen-bridge/tss/app/sign"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
@@ -135,7 +136,35 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 
 // StartNewRegroup starts Regroup scenario for app based on given protocol.
 func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
-	panic("not implemented")
+	log.Printf("Starting New regroup process")
+
+	if _, ok := r.ChannelMap["regroup"]; !ok {
+		messageCh := make(chan models.Message, 100)
+		r.ChannelMap["regroup"] = messageCh
+		models.Logger.Infof("creating new channel in StartNewRegroup: %v", "regroup")
+	}
+
+	// read loop function
+	if regroupMessage.Crypto == "ecdsa" {
+		//TODO: implement this
+
+	} else if regroupMessage.Crypto == "eddsa" {
+		EDDSAOperation := regroup.NewRegroupEDDSAOperation(regroupMessage)
+		err := EDDSAOperation.Init(r, "")
+		if err != nil {
+			return err
+		}
+		go func() {
+			models.Logger.Info("calling loop")
+			err := EDDSAOperation.Loop(r, r.ChannelMap["regroup"])
+			if err != nil {
+				models.Logger.Errorf("en error occurred in eddsa regroup loop, err: %+v", err)
+				os.Exit(1)
+			}
+			models.Logger.Info("end of loop")
+		}()
+	}
+	return nil
 }
 
 // MessageHandler handles the receiving message from message route

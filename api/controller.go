@@ -20,6 +20,7 @@ type TssController interface {
 	Export() echo.HandlerFunc
 	Import() echo.HandlerFunc
 	Keygen() echo.HandlerFunc
+	Regroup() echo.HandlerFunc
 }
 
 type tssController struct {
@@ -87,13 +88,13 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 		data := models.RegroupMessage{}
 
 		if err := c.Bind(&data); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
 		}
 		c.Logger().Info("sign data: %+v ", data)
 
 		err := tssController.rosenTss.StartNewRegroup(data)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
 		}
 
 		return c.JSON(http.StatusOK, response{
