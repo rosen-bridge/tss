@@ -120,7 +120,6 @@ func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 				for {
 					if k.LocalTssData.Params == nil {
 						time.Sleep(time.Second)
-						continue
 					} else {
 						break
 					}

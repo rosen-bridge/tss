@@ -80,7 +80,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 			models.Logger.Info("calling loop")
 			err := EDDSAOperation.Loop(r, r.ChannelMap[signDtaHash])
 			if err != nil {
-				models.Logger.Error(err)
+				models.Logger.Errorf("en error occurred in eddsa sign loop, err: %+v", err)
 				os.Exit(1)
 			}
 			models.Logger.Info("end of loop")
@@ -124,7 +124,7 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 			models.Logger.Info("calling loop")
 			err := EDDSAOperation.Loop(r, r.ChannelMap["keygen"])
 			if err != nil {
-				models.Logger.Error(err)
+				models.Logger.Errorf("en error occurred in eddsa Keygen loop, err: %+v", err)
 				os.Exit(1)
 			}
 			models.Logger.Info("end of loop")
