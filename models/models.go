@@ -27,7 +27,6 @@ type Message struct {
 }
 
 type GossipMessage struct {
-	Crypto     string `json:"crypto"`
 	MessageId  string `json:"messageId"` // keygen or sign or regroup
 	Name       string `json:"name"`
 	Message    string `json:"message"`
@@ -41,8 +40,8 @@ type MetaData struct {
 }
 
 type Private struct {
-	ECDSAPrivate string `json:"ecdsaPrivate"`
-	EDDSAPrivate string `json:"eddsaPrivate"`
+	Private string `json:"private"`
+	Crypto  string `json:"crypto"`
 }
 
 type TssData struct {
@@ -69,4 +68,10 @@ type PartyMessage struct {
 	IsBroadcast             bool
 	IsToOldCommittee        bool
 	IsToOldAndNewCommittees bool
+}
+
+type KeygenMessage struct {
+	PeersCount int    `json:"peersCount"`
+	Threshold  int    `json:"threshold"`
+	Crypto     string `json:"crypto"`
 }

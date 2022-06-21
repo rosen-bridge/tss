@@ -24,7 +24,6 @@ func TestConnection_Publish(t *testing.T) {
 		Message: models.GossipMessage{
 			Message:    "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-			Crypto:     "eddsa",
 			SenderId:   "1",
 			ReceiverId: "",
 			Name:       "partyId",

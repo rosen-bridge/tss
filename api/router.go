@@ -15,4 +15,7 @@ func InitRouting(e *echo.Echo, tssController TssController) {
 
 	e.POST("/sign", tssController.Sign())
 	e.POST("/message", tssController.Message())
+	e.POST("/keygen", tssController.Keygen())
+	e.POST("/import", tssController.Import())
+	e.GET("/export", tssController.Export())
 }
