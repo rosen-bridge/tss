@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"rosen-bridge/tss/app/interface"
+	"rosen-bridge/tss/app/keygen"
 	"rosen-bridge/tss/app/sign"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
@@ -67,7 +68,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 
 	// read loop function
 	if signMessage.Crypto == "ecdsa" {
-		// TODO: implement this
+		//TODO: implement this
 
 	} else if signMessage.Crypto == "eddsa" {
 		EDDSAOperation := sign.NewSignEDDSAOperation(signMessage)
@@ -79,10 +80,54 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 			models.Logger.Info("calling loop")
 			err := EDDSAOperation.Loop(r, r.ChannelMap[signDtaHash])
 			if err != nil {
-				models.Logger.Error(err)
-				//TODO: handle error
+				models.Logger.Errorf("en error occurred in eddsa sign loop, err: %+v", err)
+				os.Exit(1)
 			}
-			models.Logger.Info("end of  loop")
+			models.Logger.Info("end of loop")
+		}()
+	}
+	return nil
+}
+
+// StartNewKeygen starts keygen scenario for app based on given protocol.
+func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
+	log.Printf("Starting New keygen process")
+
+	meta := models.MetaData{
+		PeersCount: keygenMessage.PeersCount,
+		Threshold:  keygenMessage.Threshold,
+	}
+	err := r.GetStorage().WriteData(meta, r.GetPeerHome(), "config.json", "eddsa")
+	if err != nil {
+		return err
+	}
+
+	r.metaData = meta
+
+	if _, ok := r.ChannelMap["keygen"]; !ok {
+		messageCh := make(chan models.Message, 100)
+		r.ChannelMap["keygen"] = messageCh
+		models.Logger.Infof("creating new channel in StartNewKeygen: %v", "keygen")
+	}
+
+	// read loop function
+	if keygenMessage.Crypto == "ecdsa" {
+		//TODO: implement this
+
+	} else if keygenMessage.Crypto == "eddsa" {
+		EDDSAOperation := keygen.NewKeygenEDDSAOperation()
+		err := EDDSAOperation.Init(r, "")
+		if err != nil {
+			return err
+		}
+		go func() {
+			models.Logger.Info("calling loop")
+			err := EDDSAOperation.Loop(r, r.ChannelMap["keygen"])
+			if err != nil {
+				models.Logger.Errorf("en error occurred in eddsa Keygen loop, err: %+v", err)
+				os.Exit(1)
+			}
+			models.Logger.Info("end of loop")
 		}()
 	}
 	return nil

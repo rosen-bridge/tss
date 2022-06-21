@@ -5,11 +5,6 @@ stages:
 
 before_script:
   - echo "before_script"
-  - apt-get update -y && \
-    apt-get upgrade -y && \
-    apt-get -y autoremove && \
-    apt-get clean
-  - apt-get install -y zip
   - mkdir -p .go
   - go env -w GO111MODULE=on
   - go env -w GOPROXY="https://goproxy.io,direct"
@@ -20,10 +15,6 @@ format:
     - go fmt $(go list ./...)
     # - go vet $(go list ./...)
 
-race_detector:
-  stage: test
-  script:
-    - go test -race -short $(go list ./...)
 
 code_coverage:
   stage: test

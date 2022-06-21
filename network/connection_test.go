@@ -2,10 +2,8 @@ package network
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/binance-chain/tss-lib/common"
 	"io/ioutil"
 	"net/http"
 	mockedClient "rosen-bridge/tss/mocks/client"
@@ -13,13 +11,19 @@ import (
 	"testing"
 )
 
+/*	TestConnection_Publish
+	TestCases:
+	test for publish route,
+	there must be no error and the response code and response type must bo correct
+	Dependencies:
+	- http client
+*/
 func TestConnection_Publish(t *testing.T) {
-
+	// test for publish route, there must be no error and the response code and response type must bo correct
 	message := models.Message{
 		Message: models.GossipMessage{
 			Message:    "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-			Crypto:     "eddsa",
 			SenderId:   "1",
 			ReceiverId: "",
 			Name:       "partyId",
@@ -47,7 +51,7 @@ func TestConnection_Publish(t *testing.T) {
 			}
 			jsonMessage, err := json.Marshal(response)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			responseBody := ioutil.NopCloser(bytes.NewReader(jsonMessage))
 			return &http.Response{
@@ -59,10 +63,17 @@ func TestConnection_Publish(t *testing.T) {
 
 	err := cnn.Publish(message.Message)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }
 
+/*	TestConnection_Subscribe
+	TestCases:
+	test for Subscribe route,
+	there must be no error and the response code and response type must bo correct
+	Dependencies:
+	- http client
+*/
 func TestConnection_Subscribe(t *testing.T) {
 
 	cnn := connect{
@@ -84,7 +95,7 @@ func TestConnection_Subscribe(t *testing.T) {
 			}
 			jsonMessage, err := json.Marshal(response)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			responseBody := ioutil.NopCloser(bytes.NewReader(jsonMessage))
 			return &http.Response{
@@ -96,12 +107,18 @@ func TestConnection_Subscribe(t *testing.T) {
 
 	err := cnn.Subscribe(projectPort)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }
 
+/*	TestConnection_CallBack
+	TestCases:
+	test for CallBack route,
+	there must be no error and the response code and response type must bo correct
+	Dependencies:
+	- http client
+*/
 func TestConnection_CallBack(t *testing.T) {
-
 	cnn := connect{
 		publishUrl:      "http://localhost:8080/p2p/send",
 		subscriptionUrl: "http://localhost:8080/p2p/channel/subscribe",
@@ -109,11 +126,11 @@ func TestConnection_CallBack(t *testing.T) {
 	callBackURLHost := "http://localhost:5050"
 	callBackURLPath := "/"
 
-	r, _ := hex.DecodeString("b24c712530dd03739ac87a491e45bd80ea8e3cef19c835bc6ed3262a9794974d")
-	s, _ := hex.DecodeString("02fe41c73871ca7ded0ff3e8adc76a64ea93643e75569bd9db8f772166adfc35")
-	m, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
-	signature, _ := hex.DecodeString("4d9794972a26d36ebc35c819ef3c8eea80bd451e497ac89a7303dd3025714cb235fcad6621778fdbd99b56753e6493ea646ac7ade8f30fed7dca7138c741fe02")
-	saveSign := common.SignatureData{
+	r := "b24c712530dd03739ac87a491e45bd80ea8e3cef19c835bc6ed3262a9794974d"
+	s := "02fe41c73871ca7ded0ff3e8adc76a64ea93643e75569bd9db8f772166adfc35"
+	m := "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70"
+	signature := "4d9794972a26d36ebc35c819ef3c8eea80bd451e497ac89a7303dd3025714cb235fcad6621778fdbd99b56753e6493ea646ac7ade8f30fed7dca7138c741fe02"
+	saveSign := models.SignData{
 		R:         r,
 		S:         s,
 		M:         m,
@@ -134,7 +151,7 @@ func TestConnection_CallBack(t *testing.T) {
 			}
 			jsonMessage, err := json.Marshal(response)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			responseBody := ioutil.NopCloser(bytes.NewReader(jsonMessage))
 			return &http.Response{
@@ -145,8 +162,8 @@ func TestConnection_CallBack(t *testing.T) {
 	}
 
 	url := fmt.Sprintf("%s%s", callBackURLHost, callBackURLPath)
-	err := cnn.CallBack(url, &saveSign)
+	err := cnn.CallBack(url, saveSign)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
 	}
 }

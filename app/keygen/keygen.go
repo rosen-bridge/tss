@@ -1,4 +1,4 @@
-package sign
+package keygen
 
 import (
 	_interface "rosen-bridge/tss/app/interface"
@@ -6,11 +6,10 @@ import (
 )
 
 const (
-	signFileName = "sign_data.json"
+	keygenFileName = "keygen_data.json"
 )
 
-type OperationSign struct {
+type OperationKeygen struct {
 	_interface.OperationHandler
 	LocalTssData models.TssData
-	SignMessage  models.SignMessage
 }

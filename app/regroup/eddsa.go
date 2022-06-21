@@ -21,7 +21,6 @@ import (
 type operationEDDSARegroup struct {
 	OperationRegroup
 	savedData eddsaKeygen.LocalPartySaveData
-	endCh     chan eddsaKeygen.LocalPartySaveData
 }
 
 func NewOperationEDDSARegroup(regroupMessage models.RegroupMessage) _interface.Operation {
@@ -104,8 +103,7 @@ func (r *operationEDDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 			switch msg.Name {
 			case "partyId":
 				if msg.Message != "" {
-					//TODO: resend self partyId to the sender peer
-					err := r.PartyIdMessageHandler(rosenTss, msg)
+					err := r.partyIdMessageHandler(rosenTss, msg)
 					if err != nil {
 						return err
 					}
@@ -122,7 +120,7 @@ func (r *operationEDDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 				if err != nil {
 					models.Logger.Error(err)
 				}
-				err = r.PartyUpdate(partyMsg)
+				err = r.partyUpdate(partyMsg)
 				if err != nil {
 					return err
 				}
@@ -131,7 +129,7 @@ func (r *operationEDDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 					fmt.Sprintf("from: %s", msg.SenderId))
 				partiesLength := len(r.LocalTssData.NewPartyIds) + len(r.LocalTssData.OldPartyIds)
 				outCh := make(chan tss.Message, partiesLength)
-				r.endCh = make(chan eddsaKeygen.LocalPartySaveData, partiesLength)
+				endCh := make(chan eddsaKeygen.LocalPartySaveData, partiesLength)
 
 				for {
 					if r.LocalTssData.RegroupingParams == nil {
@@ -145,11 +143,11 @@ func (r *operationEDDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 				if r.LocalTssData.Party == nil {
 					models.Logger.Info(r.LocalTssData)
 					if r.LocalTssData.PeerState == 0 || r.LocalTssData.PeerState == 2 {
-						r.LocalTssData.Party = eddsaResharing.NewLocalParty(r.LocalTssData.RegroupingParams, r.savedData, outCh, r.endCh)
+						r.LocalTssData.Party = eddsaResharing.NewLocalParty(r.LocalTssData.RegroupingParams, r.savedData, outCh, endCh)
 
 					} else if r.LocalTssData.PeerState == 1 {
 						save := eddsaKeygen.NewLocalPartySaveData(len(r.LocalTssData.NewPartyIds))
-						r.LocalTssData.Party = eddsaResharing.NewLocalParty(r.LocalTssData.RegroupingParams, save, outCh, r.endCh)
+						r.LocalTssData.Party = eddsaResharing.NewLocalParty(r.LocalTssData.RegroupingParams, save, outCh, endCh)
 					}
 					if err := r.LocalTssData.Party.Start(); err != nil {
 						return err
@@ -157,7 +155,7 @@ func (r *operationEDDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 						models.Logger.Info("party started")
 					}
 					go func() {
-						err := r.GossipMessageHandler(rosenTss, outCh)
+						err := r.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
 							//TODO: handle error
@@ -170,8 +168,13 @@ func (r *operationEDDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 	}
 }
 
+// GetClassName returns the class name
+func (r *operationEDDSARegroup) GetClassName() string {
+	return "eddsaRegroup"
+}
+
 // PartyIdMessageHandler handles partyId message and if cals setup functions if patryIds list length was at least equal to the threshold
-func (r *operationEDDSARegroup) PartyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
+func (r *operationEDDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
 	if gossipMessage.SenderId != r.LocalTssData.PartyID.Id &&
 		(gossipMessage.ReceiverId == "" || gossipMessage.ReceiverId == r.LocalTssData.PartyID.Id) {
 
@@ -190,21 +193,21 @@ func (r *operationEDDSARegroup) PartyIdMessageHandler(rosenTss _interface.RosenT
 			switch partyIdParams[3] {
 
 			case "0":
-				if !r.IsExist(newParty, r.LocalTssData.OldPartyIds) {
+				if !utils.IsPartyExist(newParty, r.LocalTssData.OldPartyIds) {
 					r.LocalTssData.OldPartyIds = tss.SortPartyIDs(
 						append(r.LocalTssData.OldPartyIds.ToUnSorted(), newParty))
 				}
 			case "1":
-				if !r.IsExist(newParty, r.LocalTssData.NewPartyIds) {
+				if !utils.IsPartyExist(newParty, r.LocalTssData.NewPartyIds) {
 					r.LocalTssData.NewPartyIds = tss.SortPartyIDs(
 						append(r.LocalTssData.NewPartyIds.ToUnSorted(), newParty))
 				}
 			case "2":
-				if !r.IsExist(newParty, r.LocalTssData.NewPartyIds) {
+				if !utils.IsPartyExist(newParty, r.LocalTssData.NewPartyIds) {
 					r.LocalTssData.NewPartyIds = tss.SortPartyIDs(
 						append(r.LocalTssData.NewPartyIds.ToUnSorted(), newParty))
 				}
-				if !r.IsExist(newParty, r.LocalTssData.OldPartyIds) {
+				if !utils.IsPartyExist(newParty, r.LocalTssData.OldPartyIds) {
 					r.LocalTssData.OldPartyIds = tss.SortPartyIDs(
 						append(r.LocalTssData.OldPartyIds.ToUnSorted(), newParty))
 				}
@@ -217,7 +220,7 @@ func (r *operationEDDSARegroup) PartyIdMessageHandler(rosenTss _interface.RosenT
 					return err
 				}
 			} else {
-				err := r.Setup(rosenTss)
+				err := r.setup(rosenTss)
 				if err != nil {
 					return err
 				}
@@ -231,12 +234,12 @@ func (r *operationEDDSARegroup) PartyIdMessageHandler(rosenTss _interface.RosenT
 }
 
 // PartyUpdate updates partyIds in eddsa app party based on received message
-func (r *operationEDDSARegroup) PartyUpdate(partyMsg models.PartyMessage) error {
+func (r *operationEDDSARegroup) partyUpdate(partyMsg models.PartyMessage) error {
 	panic("implement me")
 }
 
 // Setup called after if Init up was successful. it used to create party params and sign message
-func (r *operationEDDSARegroup) Setup(rosenTss _interface.RosenTss) error {
+func (r *operationEDDSARegroup) setup(rosenTss _interface.RosenTss) error {
 	models.Logger.Info("regroup called")
 	models.Logger.Infof("len NewPartyIds: %d", len(r.LocalTssData.NewPartyIds))
 	models.Logger.Infof("len OldPartyIds: %d", len(r.LocalTssData.OldPartyIds))
@@ -268,26 +271,22 @@ func (r *operationEDDSARegroup) Setup(rosenTss _interface.RosenTss) error {
 
 	models.Logger.Infof("r.LocalTssData RegroupingParams: %v\n", *r.LocalTssData.RegroupingParams)
 
-	m := models.GossipMessage{
-		Name:     "regroup",
-		Message:  "regroup pre params creates.",
-		SenderID: useCase.GetMetaData().PeerId,
-	}
-	models.Logger.Infof("regroup message: %v\n", m)
-	msgBytes, err := json.Marshal(m)
-	if err != nil {
-		panic(err)
-	}
-	sendCh <- msgBytes
-}
-
-// GetClassName returns the class name
-func (r *operationEDDSARegroup) GetClassName() string {
-	return "eddsaRegroup"
+	//m := models.GossipMessage{
+	//	Name:     "regroup",
+	//	Message:  "regroup pre params creates.",
+	//	SenderId: r.LocalTssData.PartyID.Id,
+	//}
+	//models.Logger.Infof("regroup message: %v\n", m)
+	//msgBytes, err := json.Marshal(m)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//sendCh <- msgBytes
+	return nil
 }
 
 // gossipMessageHandler called in the main loop of message passing between peers for signing scenario.
-func (r *operationEDDSARegroup) GossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message) error {
+func (r *operationEDDSARegroup) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan eddsaKeygen.LocalPartySaveData) error {
 	for {
 		select {
 		case partyMsg := <-outCh:
@@ -301,7 +300,7 @@ func (r *operationEDDSARegroup) GossipMessageHandler(rosenTss _interface.RosenTs
 			if err != nil {
 				return err
 			}
-		case save := <-r.endCh:
+		case save := <-endCh:
 
 			err := r.saveEDDSARegroupData(rosenTss, save)
 			if err != nil {

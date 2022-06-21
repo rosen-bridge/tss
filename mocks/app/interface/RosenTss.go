@@ -63,6 +63,27 @@ func (_m *RosenTss) GetPeerHome() string {
 	return r0
 }
 
+// GetPrivate provides a mock function with given fields: _a0
+func (_m *RosenTss) GetPrivate(_a0 string) (string, error) {
+	ret := _m.Called(_a0)
+
+	var r0 string
+	if rf, ok := ret.Get(0).(func(string) string); ok {
+		r0 = rf(_a0)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(_a0)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetStorage provides a mock function with given fields:
 func (_m *RosenTss) GetStorage() storage.Storage {
 	ret := _m.Called()
@@ -126,12 +147,26 @@ func (_m *RosenTss) SetPeerHome(_a0 string) error {
 	return r0
 }
 
-// StartNewRegroup provides a mock function with given fields: _a0
-func (_m *RosenTss) StartNewRegroup(_a0 models.RegroupMessage) error {
+// SetPrivate provides a mock function with given fields: private
+func (_m *RosenTss) SetPrivate(private models.Private) error {
+	ret := _m.Called(private)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(models.Private) error); ok {
+		r0 = rf(private)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// StartNewKeygen provides a mock function with given fields: _a0
+func (_m *RosenTss) StartNewKeygen(_a0 models.KeygenMessage) error {
 	ret := _m.Called(_a0)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(models.RegroupMessage) error); ok {
+	if rf, ok := ret.Get(0).(func(models.KeygenMessage) error); ok {
 		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)

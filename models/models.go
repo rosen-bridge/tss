@@ -13,6 +13,13 @@ type SignMessage struct {
 	CallBackUrl string `json:"callBackUrl"`
 }
 
+type SignData struct {
+	Signature string `json:"signature"`
+	R         string `json:"r"`
+	S         string `json:"s"`
+	M         string `json:"m"`
+}
+
 type Message struct {
 	Message GossipMessage `json:"message"`
 	Sender  string        `json:"sender"`
@@ -20,7 +27,6 @@ type Message struct {
 }
 
 type GossipMessage struct {
-	Crypto     string `json:"crypto"`
 	MessageId  string `json:"messageId"` // keygen or sign or regroup
 	Name       string `json:"name"`
 	Message    string `json:"message"`
@@ -70,4 +76,10 @@ type RegroupMessage struct {
 	NewThreshold int    `json:"newThreshold"`
 	OldThreshold int    `json:"oldThreshold"`
 	PeersCount   int    `json:"peersCount"`
+}
+
+type KeygenMessage struct {
+	PeersCount int    `json:"peersCount"`
+	Threshold  int    `json:"threshold"`
+	Crypto     string `json:"crypto"`
 }

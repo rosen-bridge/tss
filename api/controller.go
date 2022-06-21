@@ -1,23 +1,25 @@
 package api
 
 import (
+	"archive/zip"
+	"bytes"
+	"fmt"
 	"github.com/labstack/echo/v4"
+	"io/ioutil"
 	"net/http"
-	"os/exec"
+	"os"
+	"path/filepath"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/models"
 )
 
-// TODO: implement import and export handlers
-
 // TssController Interface of an app controller
 type TssController interface {
-	Keygen() echo.HandlerFunc
 	Sign() echo.HandlerFunc
-	Regroup() echo.HandlerFunc
 	Message() echo.HandlerFunc
-	Import() echo.HandlerFunc
 	Export() echo.HandlerFunc
+	Import() echo.HandlerFunc
+	Keygen() echo.HandlerFunc
 }
 
 type tssController struct {
@@ -33,15 +35,29 @@ func NewTssController(rosenTss _interface.RosenTss) TssController {
 	return &tssController{rosenTss: rosenTss}
 }
 
+func errorHandler(code int, err string, c echo.Context) *echo.HTTPError {
+	c.Logger().Error(err)
+	return echo.NewHTTPError(code, err)
+}
+
 // Keygen returns echo handler
 func (tssController *tssController) Keygen() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		// TODO: implement this
+		data := models.KeygenMessage{}
+
+		if err := c.Bind(&data); err != nil {
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+		}
+		c.Logger().Info("keygen data: %+v ", data)
+
+		err := tssController.rosenTss.StartNewKeygen(data)
+		if err != nil {
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+		}
 		return c.JSON(http.StatusOK, response{
 			Message: "ok",
 		})
 	}
-
 }
 
 // Sign returns echo handler, starting new sign process.
@@ -50,13 +66,13 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 		data := models.SignMessage{}
 
 		if err := c.Bind(&data); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
 		}
 		c.Logger().Info("sign data: %+v ", data)
 
 		err := tssController.rosenTss.StartNewSign(data)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
 		}
 
 		return c.JSON(http.StatusOK, response{
@@ -94,10 +110,8 @@ func (tssController *tssController) Message() echo.HandlerFunc {
 		var data models.Message
 
 		if err := c.Bind(&data); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
 		}
-		c.Logger().Info("sign data: %+v ", data)
-
 		c.Logger().Infof("message data: %+v ", data)
 
 		tssController.rosenTss.MessageHandler(data)
@@ -113,13 +127,12 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		data := models.Private{}
 		if err := c.Bind(&data); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
 		}
 		c.Logger().Info("import data: %+v ", data)
-
 		err := tssController.rosenTss.SetPrivate(data)
 		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
 		}
 		return c.JSON(http.StatusOK, response{
 			Message: "ok",
@@ -131,11 +144,49 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 func (tssController *tssController) Export() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		peerHome := tssController.rosenTss.GetPeerHome()
-		_, err := exec.Command("zip", "-r", "-D", "/tmp/rosenTss.zip", peerHome).Output()
+		// Create a buffer to write our archive to.
+		c.Logger().Info("export called")
+		buf := new(bytes.Buffer)
+
+		// Create a new zip archive.
+		zipWriter := zip.NewWriter(buf)
+
+		var files []string
+		err := filepath.Walk(peerHome, func(path string, info os.FileInfo, err error) error {
+			if info.IsDir() {
+				return nil
+			}
+			files = append(files, path)
+			return nil
+		})
 		if err != nil {
-			c.Logger().Errorf("%s", err)
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
 		}
-		c.Logger().Info("zipping file was successful.")
-		return c.Attachment("/tmp/rosenTss.zip", "rosenTss.zip")
+		// Add some files to the archive.
+
+		for _, file := range files {
+			zipFile, err := zipWriter.Create(file)
+			if err != nil {
+				return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			}
+			content, err := ioutil.ReadFile(file)
+			if err != nil {
+				return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			}
+			_, err = zipFile.Write(content)
+			if err != nil {
+				return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			}
+		}
+
+		// Make sure to check the error on Close.
+		err = zipWriter.Close()
+		if err != nil {
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+		}
+
+		models.Logger.Info("zipping file was successful.")
+		c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf("filename=%q", "rosenTss.zip"))
+		return c.Stream(200, echo.HeaderContentDisposition, buf)
 	}
 }

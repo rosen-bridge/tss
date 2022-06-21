@@ -3,8 +3,10 @@ package utils
 import (
 	"crypto/elliptic"
 	"crypto/rand"
-	"github.com/btcsuite/btcutil/base58"
+
+	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
+	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/blake2b"
 	"math/big"
 )
@@ -17,6 +19,16 @@ func GenerateECDSAKey() ([]byte, *big.Int, *big.Int, error) {
 // GetPKFromECDSAPub returns the public key from an ECDSA public key
 func GetPKFromECDSAPub(x *big.Int, y *big.Int) []byte {
 	return elliptic.MarshalCompressed(elliptic.P256(), x, y)
+}
+
+// GenerateEDDSAKey generates a new EDDSA key pair.
+func GenerateEDDSAKey() ([]byte, *big.Int, *big.Int, error) {
+	return edwards.GenerateKey(rand.Reader)
+}
+
+// GetPKFromEDDSAPub returns the public key Serialized from an EDDSA public key.
+func GetPKFromEDDSAPub(x *big.Int, y *big.Int) []byte {
+	return edwards.NewPublicKey(x, y).Serialize()
 }
 
 // GetErgoAddressFromPK returns the Ergo address from a public key
@@ -37,12 +49,12 @@ func GetErgoAddressFromPK(pk []byte, testNet bool) string {
 	return base58.Encode(address[:38])
 }
 
-// GenerateEDDSAKey generates a new EDDSA key pair.
-func GenerateEDDSAKey() ([]byte, *big.Int, *big.Int, error) {
-	return edwards.GenerateKey(rand.Reader)
-}
-
-// GetPKFromEDDSAPub returns the public key Serialized from an EDDSA public key.
-func GetPKFromEDDSAPub(x *big.Int, y *big.Int) []byte {
-	return edwards.NewPublicKey(x, y).Serialize()
+// IsPartyExist check if partyId exist in partyIds list or not
+func IsPartyExist(newPartyId *tss.PartyID, partyIds tss.SortedPartyIDs) bool {
+	for _, partyId := range partyIds {
+		if partyId.Id == newPartyId.Id {
+			return true
+		}
+	}
+	return false
 }
