@@ -474,7 +474,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	// creating new tss.Party for eddsa sign
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
-		tss.S256(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
+		tss.Edwards(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
 	endCh := make(chan eddsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
 	localTssData.Party = eddsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)

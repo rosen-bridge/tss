@@ -269,7 +269,7 @@ func (r *operationEDDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 		switch partyIdParams[3] {
 
 		case "fromRegroup":
-			switch partyIdParams[3] {
+			switch partyIdParams[4] {
 
 			case "0":
 				if !utils.IsPartyExist(newParty, r.LocalTssData.OldPartyIds) {
