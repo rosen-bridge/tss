@@ -70,7 +70,7 @@ type PartyMessage struct {
 }
 
 type RegroupMessage struct {
-	PeerState    int    `json:"peerState"`
+	PeerState    int    `json:"peerState"` // 0 for old and 1 for new
 	Crypto       string `json:"crypto"`
 	NewThreshold int    `json:"newThreshold"`
 	OldThreshold int    `json:"oldThreshold"`

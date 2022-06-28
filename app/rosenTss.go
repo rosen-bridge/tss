@@ -170,7 +170,7 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 // MessageHandler handles the receiving message from message route
 func (r *rosenTss) MessageHandler(message models.Message) {
 
-	models.Logger.Infof("new message: %v", message)
+	models.Logger.Infof("new message: %+v", message)
 	if _, ok := r.ChannelMap[message.Message.MessageId]; !ok {
 		models.Logger.Infof("creating new channel in MessageHandler: %v", message.Message.MessageId)
 		messageCh := make(chan models.Message, 100)
@@ -276,6 +276,7 @@ func (r *rosenTss) NewMessage(receiverId string, senderId string, message string
 	return m
 }
 
+// SetPrivate writes private data in a file in peer home folder
 func (r *rosenTss) SetPrivate(private models.Private) error {
 	err := r.GetStorage().WriteData(private, r.GetPeerHome(), privateFileFormat, private.Crypto)
 	if err != nil {
@@ -284,10 +285,8 @@ func (r *rosenTss) SetPrivate(private models.Private) error {
 	return nil
 }
 
-func (r *rosenTss) GetPrivate(crypto string) (string, error) {
-	private, err := r.GetStorage().LoadPrivate(r.GetPeerHome(), crypto)
-	if err != nil {
-		return "", err
-	}
-	return private, nil
+// GetPrivate returns private data from peer home folder
+func (r *rosenTss) GetPrivate(crypto string) string {
+	private := r.GetStorage().LoadPrivate(r.GetPeerHome(), crypto)
+	return private
 }

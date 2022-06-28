@@ -41,7 +41,7 @@ func errorHandler(code int, err string, c echo.Context) *echo.HTTPError {
 	return echo.NewHTTPError(code, err)
 }
 
-// Keygen returns echo handler
+// Keygen returns echo handler, starting new keygen process
 func (tssController *tssController) Keygen() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		data := models.KeygenMessage{}
@@ -82,7 +82,7 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 	}
 }
 
-// Regroup returns echo handler
+// Regroup returns echo handler, starting new regroup process
 func (tssController *tssController) Regroup() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		data := models.RegroupMessage{}
@@ -90,7 +90,7 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 		if err := c.Bind(&data); err != nil {
 			return errorHandler(http.StatusInternalServerError, err.Error(), c)
 		}
-		c.Logger().Info("sign data: %+v ", data)
+		c.Logger().Info("regroup data: %+v ", data)
 
 		err := tssController.rosenTss.StartNewRegroup(data)
 		if err != nil {

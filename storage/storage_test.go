@@ -172,10 +172,7 @@ func TestStorage_LoadPrivate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := storage{}
-			private, err := s.LoadPrivate(tt.peerHome, tt.private.Crypto)
-			if err != nil {
-				t.Error(err)
-			}
+			private := s.LoadPrivate(tt.peerHome, tt.private.Crypto)
 			assert.Equal(t, private, tt.private.Private)
 		})
 	}

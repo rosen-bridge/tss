@@ -155,7 +155,7 @@ func TestRosenTss_GetPeerHome(t *testing.T) {
 		},
 		storage:    storage,
 		connection: conn,
-		peerHome:   ".rosenTss",
+		peerHome:   "/tmp/.rosenTss",
 	}
 
 	home := app.GetPeerHome()
@@ -196,8 +196,8 @@ func TestRosenTss_SetPeerHome(t *testing.T) {
 		},
 		{
 			name:        "user home address, should be equal to expected",
-			homeAddress: "~/.rosenTss",
-			expected:    fmt.Sprintf("%s/.rosenTss", userHome),
+			homeAddress: "~/tmp/.rosenTss",
+			expected:    fmt.Sprintf("%s/tmp/.rosenTss", userHome),
 		},
 	}
 
@@ -296,7 +296,7 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 		},
 		storage:    storage,
 		connection: conn,
-		peerHome:   ".rosenTss",
+		peerHome:   "/tmp/.rosenTss",
 	}
 	messageCh := make(chan models.Message, 100)
 	channelMap := make(map[string]chan models.Message)
@@ -599,10 +599,7 @@ func TestRosenTss_GetPrivate(t *testing.T) {
 				peerHome: peerHome,
 				storage:  store,
 			}
-			private, err := app.GetPrivate(tt.private.Crypto)
-			if err != nil {
-				t.Error(err)
-			}
+			private := app.GetPrivate(tt.private.Crypto)
 			assert.Equal(t, private, tt.private.Private)
 		})
 	}
@@ -711,30 +708,6 @@ func TestRosenTss_StartNewRegroup(t *testing.T) {
 					mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
 				store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", nil)
 
-				conn := mockedNetwork.NewConnection(t)
-				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
-
-				return rosenTss{
-					ChannelMap: make(map[string]chan models.Message),
-					storage:    store,
-					connection: conn,
-					peerHome:   peerHome,
-				}
-			},
-		},
-		{
-			name:       "with channel id, peerStare 2",
-			channelMap: channelMapWithRegroup,
-			message: models.RegroupMessage{
-				NewThreshold: 3,
-				OldThreshold: 2,
-				PeersCount:   3,
-				PeerState:    2,
-				Crypto:       "eddsa",
-			},
-			appConfig: func() rosenTss {
-				store := mockedStorage.NewStorage(t)
-				store.On("LoadEDDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
 				conn := mockedNetwork.NewConnection(t)
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 

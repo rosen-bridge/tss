@@ -32,5 +32,5 @@ type RosenTss interface {
 	GetPeerHome() string
 
 	SetPrivate(private models.Private) error
-	GetPrivate(string) (string, error)
+	GetPrivate(string) string
 }
