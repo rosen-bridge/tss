@@ -104,20 +104,21 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 					return err
 				}
 			case "sign":
-				models.Logger.Info("received sign message: ",
-					fmt.Sprintf("from: %s", msg.SenderId))
-				outCh := make(chan tss.Message, len(s.LocalTssData.PartyIds))
-				endCh := make(chan common.SignatureData, len(s.LocalTssData.PartyIds))
-				for {
-					if s.LocalTssData.Params == nil {
-						time.Sleep(time.Second)
-						continue
-					} else {
-						break
-					}
-				}
-
 				if s.LocalTssData.Party == nil {
+					models.Logger.Infof("partyIds: %+v", s.LocalTssData.PartyIds)
+					models.Logger.Info("received sign message: ",
+						fmt.Sprintf("from: %s", msg.SenderId))
+					outCh := make(chan tss.Message, len(s.LocalTssData.PartyIds))
+					endCh := make(chan common.SignatureData, len(s.LocalTssData.PartyIds))
+					for {
+						if s.LocalTssData.Params == nil {
+							time.Sleep(time.Second)
+							continue
+						} else {
+							break
+						}
+					}
+
 					s.LocalTssData.Party = ecdsaSigning.NewLocalParty(signData, s.LocalTssData.Params, s.savedData, outCh, endCh)
 					if err := s.LocalTssData.Party.Start(); err != nil {
 						return err

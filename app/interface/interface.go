@@ -25,7 +25,7 @@ type RosenTss interface {
 	GetStorage() storage.Storage
 	GetConnection() network.Connection
 
-	SetMetaData() error
+	SetMetaData(string) error
 	GetMetaData() models.MetaData
 
 	SetPeerHome(string) error

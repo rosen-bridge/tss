@@ -50,7 +50,7 @@ func NewRosenTss(connection network.Connection, storage storage.Storage, homeAdd
 // StartNewSign starts sign scenario for app based on given protocol.
 func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	log.Printf("Starting New Sign process")
-	err := r.SetMetaData()
+	err := r.SetMetaData(signMessage.Crypto)
 	if err != nil {
 		return err
 	}
@@ -236,10 +236,10 @@ func (r *rosenTss) GetPeerHome() string {
 }
 
 // SetMetaData setting ups metadata from given file in the home directory
-func (r *rosenTss) SetMetaData() error {
+func (r *rosenTss) SetMetaData(crypto string) error {
 	// locating file
 	var configFile string
-	rootFolder := filepath.Join(r.peerHome, "eddsa")
+	rootFolder := filepath.Join(r.peerHome, crypto)
 	files, err := ioutil.ReadDir(rootFolder)
 	if err != nil {
 		log.Error(err)
