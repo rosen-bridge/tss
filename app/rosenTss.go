@@ -14,7 +14,8 @@ import (
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/keygen"
 	"rosen-bridge/tss/app/regroup"
-	"rosen-bridge/tss/app/sign"
+	"rosen-bridge/tss/app/sign/ecdsa"
+	"rosen-bridge/tss/app/sign/eddsa"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
@@ -69,10 +70,23 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 
 	// read loop function
 	if signMessage.Crypto == "ecdsa" {
-		//TODO: implement this
+		ECDSAOperation := ecdsa.NewSignECDSAOperation(signMessage)
+		err := ECDSAOperation.Init(r, "")
+		if err != nil {
+			return err
+		}
+		go func() {
+			models.Logger.Info("calling loop")
+			err := ECDSAOperation.Loop(r, r.ChannelMap[signDtaHash])
+			if err != nil {
+				models.Logger.Errorf("en error occurred in ecdsa sign loop, err: %+v", err)
+				os.Exit(1)
+			}
+			models.Logger.Info("end of loop")
+		}()
 
 	} else if signMessage.Crypto == "eddsa" {
-		EDDSAOperation := sign.NewSignEDDSAOperation(signMessage)
+		EDDSAOperation := eddsa.NewSignEDDSAOperation(signMessage)
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err

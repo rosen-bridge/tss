@@ -1,16 +1,17 @@
-package sign
+package ecdsa
 
 import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/binance-chain/tss-lib/common"
-	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
-	eddsaSign "github.com/binance-chain/tss-lib/eddsa/signing"
+	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
+	ecdsaSign "github.com/binance-chain/tss-lib/ecdsa/signing"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/stretchr/testify/mock"
 	"math/big"
 	_interface "rosen-bridge/tss/app/interface"
+	"rosen-bridge/tss/app/sign"
 	mockUtils "rosen-bridge/tss/mocks"
 	mockedInterface "rosen-bridge/tss/mocks/app/interface"
 	mockedNetwork "rosen-bridge/tss/mocks/network"
@@ -21,7 +22,7 @@ import (
 	"time"
 )
 
-/*	TestEDDSA_Init
+/*	TestECDSA_Init
 	TestCases:
 	testing message controller, there are 2 testcases.
 	each test case runs as a subtests.
@@ -29,28 +30,28 @@ import (
 	there are _interface.RosenTss, models.TssData, receiverId used as test arguments.
 	Dependencies:
 	- localTssData
-	- eddsaKeygen.LocalPartySaveData
-	- storage.LoadEDDSAKeygen function
+	- ecdsaKeygen.LocalPartySaveData
+	- storage.LoadECDSAKeygen function
 	- network.Publish function
 	- rosenTss GetStorage, GetConnection, GetPeerHome, NewMessage functions
 */
-func TestEDDSA_Init(t *testing.T) {
+func TestECDSA_Init(t *testing.T) {
 
 	// creating fake localTssData
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
-		t.Errorf("CreateNewLocalEDDSATSSData error = %v", err)
+		t.Errorf("CreateNewLocalECDSATSSData error = %v", err)
 	}
 
-	// reading eddsaKeygen.LocalPartySaveData data from fixtures
-	data, id, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	// reading ecdsaKeygen.LocalPartySaveData data from fixtures
+	data, id, err := mockUtils.LoadECDSAKeygenFixture(0)
 	if err != nil {
-		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+		t.Errorf("LoadECDSAKeygenFixture error = %v", err)
 	}
 
 	// using mock functions
 	storage := mockedStorage.NewStorage(t)
-	storage.On("LoadEDDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
+	storage.On("LoadECDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
 	app := mockedInterface.NewRosenTss(t)
 	conn := mockedNetwork.NewConnection(t)
 	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
@@ -88,17 +89,17 @@ func TestEDDSA_Init(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaSignOp := operationEDDSASign{
-				OperationSign: OperationSign{
+			ecdsaSignOp := operationECDSASign{
+				OperationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-						Crypto:      "eddsa",
+						Crypto:      "ecdsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
 				},
 			}
-			err := eddsaSignOp.Init(tt.app, tt.receiverId)
+			err := ecdsaSignOp.Init(tt.app, tt.receiverId)
 			if err != nil {
 				t.Errorf("Init failed: %v", err)
 			}
@@ -107,7 +108,7 @@ func TestEDDSA_Init(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_Loop
+/*	TestECDSA_Loop
 	TestCases:
 	testing message controller, there are 4 testcases.
 	each test case runs as a subtests.
@@ -115,22 +116,22 @@ func TestEDDSA_Init(t *testing.T) {
 	there is models.Message used as test arguments.
 	Dependencies:
 	- localTssData models.TssData
-	- eddsaKeygen.LocalPartySaveData
-	- tss.Party for eddsaSign.NewLocalParty
+	- ecdsaKeygen.LocalPartySaveData
+	- tss.Party for ecdsaSign.NewLocalParty
 	- network.Publish function
 	- rosenTss GetMetaData, GetConnection, NewMessage functions
 */
-func TestEDDSA_Loop(t *testing.T) {
+func TestECDSA_Loop(t *testing.T) {
 	// pre-test part, faking data and using mocks
 
-	// reading eddsaKeygen.LocalPartySaveData from fixtures
-	saveData, Id1, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	// reading ecdsaKeygen.LocalPartySaveData from fixtures
+	saveData, Id1, err := mockUtils.LoadECDSAKeygenFixture(0)
 	if err != nil {
-		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+		t.Errorf("LoadECDSAKeygenFixture error = %v", err)
 	}
-	_, Id2, err := mockUtils.LoadEDDSAKeygenFixture(1)
+	_, Id2, err := mockUtils.LoadECDSAKeygenFixture(1)
 	if err != nil {
-		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+		t.Errorf("LoadECDSAKeygenFixture error = %v", err)
 	}
 
 	// creating localTssData and new partyId
@@ -146,13 +147,13 @@ func TestEDDSA_Loop(t *testing.T) {
 	signDataBytes, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
 	signData := new(big.Int).SetBytes(signDataBytes)
 
-	// creating new tss party for eddsa sign
+	// creating new tss party for ecdsa sign
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
-		tss.Edwards(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
+		tss.S256(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
 	endCh := make(chan common.SignatureData, len(localTssData.PartyIds))
-	party := eddsaSign.NewLocalParty(signData, localTssData.Params, saveData, outCh, endCh)
+	party := ecdsaSign.NewLocalParty(signData, localTssData.Params, saveData, outCh, endCh)
 
 	partyIDMessage := fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign")
 
@@ -273,13 +274,13 @@ func TestEDDSA_Loop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.AppConfig()
-			eddsaSignOp := operationEDDSASign{
+			ecdsaSignOp := operationECDSASign{
 				savedData: saveData,
-				OperationSign: OperationSign{
+				OperationSign: sign.OperationSign{
 					LocalTssData: localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-						Crypto:      "eddsa",
+						Crypto:      "ecdsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
 				},
@@ -288,11 +289,11 @@ func TestEDDSA_Loop(t *testing.T) {
 
 			messageCh <- tt.message
 			go func() {
-				time.Sleep(time.Millisecond * 100)
+				time.Sleep(time.Second)
 				close(messageCh)
 			}()
 			errorList := []string{"invalid wire-format", "channel closed"}
-			err := eddsaSignOp.Loop(app, messageCh)
+			err := ecdsaSignOp.Loop(app, messageCh)
 			if err != nil && !mockUtils.Contains(err.Error(), errorList) {
 				t.Error(err)
 			}
@@ -300,7 +301,7 @@ func TestEDDSA_Loop(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_GetClassName
+/*	TestECDSA_GetClassName
 	TestCases:
 	testing message controller, there is 1 testcase.
 	each test case runs as a subtests.
@@ -308,30 +309,30 @@ func TestEDDSA_Loop(t *testing.T) {
 	Dependencies:
 	-
 */
-func TestEDDSA_GetClassName(t *testing.T) {
+func TestECDSA_GetClassName(t *testing.T) {
 
 	tests := []struct {
 		name     string
 		expected string
 	}{
 		{
-			name:     "get class name of eddsa sign object",
-			expected: "eddsaSign",
+			name:     "get class name of ecdsa sign object",
+			expected: "ecdsaSign",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaSignOp := operationEDDSASign{
-				OperationSign: OperationSign{
+			ecdsaSignOp := operationECDSASign{
+				OperationSign: sign.OperationSign{
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-						Crypto:      "eddsa",
+						Crypto:      "ecdsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
 				},
 			}
 
-			result := eddsaSignOp.GetClassName()
+			result := ecdsaSignOp.GetClassName()
 			if result != tt.expected {
 				t.Errorf("GetClassName error = expected %s, got %s", tt.expected, result)
 			}
@@ -340,7 +341,7 @@ func TestEDDSA_GetClassName(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_partyIdMessageHandler
+/*	TestECDSA_partyIdMessageHandler
 	TestCases:
 	testing message controller, there is 2 testcases.
 	each test case runs as a subtests.
@@ -349,19 +350,19 @@ func TestEDDSA_GetClassName(t *testing.T) {
 	Dependencies:
 	- localTssData models.TssData
 	- tss.PartyId
-	- eddsaKeygen.LocalPartySaveData
-	- tss.Party for eddsaSign.NewLocalParty
+	- ecdsaKeygen.LocalPartySaveData
+	- tss.Party for ecdsaSign.NewLocalParty
 	- network.Publish function
 	- rosenTss GetMetaData, GetConnection, NewMessage functions
 */
-func TestEDDSA_partyIdMessageHandler(t *testing.T) {
+func TestECDSA_partyIdMessageHandler(t *testing.T) {
 
 	// creating new localTssData and new partyIds
-	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
+	newPartyId, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
 		t.Error(err)
 	}
-	newPartyId2, err := mockUtils.CreateNewEDDSAPartyId()
+	newPartyId2, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
 		t.Error(err)
 	}
@@ -409,7 +410,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			},
 			signMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-				Crypto:      "eddsa",
+				Crypto:      "ecdsa",
 				CallBackUrl: "http://localhost:5050/callback/sign",
 			},
 			localTssData: localTssData,
@@ -425,7 +426,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			},
 			signMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-				Crypto:      "eddsa",
+				Crypto:      "ecdsa",
 				CallBackUrl: "http://localhost:5050/callback/sign",
 			},
 			localTssData: localTssDataWith2PartyIds,
@@ -435,14 +436,14 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			eddsaSignOp := operationEDDSASign{
-				OperationSign: OperationSign{
+			ecdsaSignOp := operationECDSASign{
+				OperationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage:  tt.signMessage,
 				},
 			}
-			// partyMessageHandler
-			err := eddsaSignOp.partyIdMessageHandler(app, tt.gossipMessage)
+			// partyIdMessageHandler
+			err = ecdsaSignOp.partyIdMessageHandler(app, tt.gossipMessage)
 			if err != nil {
 				t.Error(err)
 			}
@@ -451,7 +452,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_partyUpdate
+/*	TestECDSA_partyUpdate
 	TestCases:
 	testing message controller, there is 4 testcases.
 	each test case runs as a subtests.
@@ -460,31 +461,31 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 	Dependencies:
 	- localTssData models.TssData
 	- tss.PartyId
-	- eddsaKeygen.LocalPartySaveData
-	- tss.Party for eddsaSign.NewLocalParty
+	- ecdsaKeygen.LocalPartySaveData
+	- tss.Party for ecdsaSign.NewLocalParty
 */
-func TestEDDSA_partyUpdate(t *testing.T) {
+func TestECDSA_partyUpdate(t *testing.T) {
 
 	// creating new localTssData and new partyId
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
 		t.Error(err)
 	}
 
-	newParty, err := mockUtils.CreateNewEDDSAPartyId()
+	newParty, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
 		t.Error(err)
 	}
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newParty))
 
-	// creating new tss.Party for eddsa sign
+	// creating new tss.Party for ecdsa sign
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
-		tss.Edwards(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
+		tss.S256(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
-	endCh := make(chan eddsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
-	localTssData.Party = eddsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)
+	endCh := make(chan ecdsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
+	localTssData.Party = ecdsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)
 
 	for _, party := range localTssData.PartyIds {
 		if party.Id == newParty.Id {
@@ -548,12 +549,12 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 		},
 	}
 
-	eddsaSignOp := operationEDDSASign{
-		OperationSign: OperationSign{
+	ecdsaSignOp := operationECDSASign{
+		OperationSign: sign.OperationSign{
 			LocalTssData: localTssData,
 			SignMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-				Crypto:      "eddsa",
+				Crypto:      "ecdsa",
 				CallBackUrl: "http://localhost:5050/callback/sign",
 			},
 		},
@@ -561,7 +562,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := eddsaSignOp.partyUpdate(tt.message); (err != nil) != tt.wantErr {
+			if err := ecdsaSignOp.partyUpdate(tt.message); (err != nil) != tt.wantErr {
 				if !strings.Contains(err.Error(), "invalid wire-format data") {
 					t.Errorf("PartyUpdate() error = %v, wantErr %v", err, tt.wantErr)
 				}
@@ -571,7 +572,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_setup
+/*	TestECDSA_setup
 	TestCases:
 	testing message controller, there is 2 testcases.
 	each test case runs as a subtests.
@@ -583,16 +584,16 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	- network.Publish function
 	- rosenTss GetMetaData, GetConnection, NewMessage functions
 */
-func TestEDDSA_setup(t *testing.T) {
+func TestECDSA_setup(t *testing.T) {
 
 	// creating new localTssData and new partyId
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
-		t.Errorf("createNewLocalEDDSAParty error = %v", err)
+		t.Errorf("createNewLocalECDSAParty error = %v", err)
 	}
-	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
+	newPartyId, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
-		t.Errorf("CreateNewEDDSAPartyId error = %v", err)
+		t.Errorf("CreateNewECDSAPartyId error = %v", err)
 	}
 	localTssDataWith2PartyIds := localTssData
 	localTssDataWith2PartyIds.PartyIds = tss.SortPartyIDs(
@@ -639,17 +640,17 @@ func TestEDDSA_setup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaSignOp := operationEDDSASign{
-				OperationSign: OperationSign{
+			ecdsaSignOp := operationECDSASign{
+				OperationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-						Crypto:      "eddsa",
+						Crypto:      "ecdsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
 				},
 			}
-			err := eddsaSignOp.setup(tt.app)
+			err := ecdsaSignOp.setup(tt.app)
 			if err != nil && !tt.wantErr {
 				t.Errorf("Setup error = %v", err)
 			}
@@ -658,7 +659,7 @@ func TestEDDSA_setup(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_handleOutMessage
+/*	TestECDSA_handleOutMessage
 	TestCases:
 	testing message controller, there is 1 testcase.
 	each test case runs as a subtests.
@@ -669,7 +670,7 @@ func TestEDDSA_setup(t *testing.T) {
 	- network.Publish function
 	- rosenTss GetConnection, NewMessage functions
 */
-func TestEDDSA_handleOutMessage(t *testing.T) {
+func TestECDSA_handleOutMessage(t *testing.T) {
 	// creating fake mockUtils.TestUtilsMessage as tss.Message
 	message := mockUtils.TestUtilsMessage{
 		Broadcast: true,
@@ -677,9 +678,9 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	}
 
 	// creating new localTssData
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
-		t.Errorf("createNewLocalEDDSAParty error = %v", err)
+		t.Errorf("createNewLocalECDSAParty error = %v", err)
 	}
 
 	// using mocked functions and structs
@@ -711,17 +712,17 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaSignOp := operationEDDSASign{
-				OperationSign: OperationSign{
+			ecdsaSignOp := operationECDSASign{
+				OperationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-						Crypto:      "eddsa",
+						Crypto:      "ecdsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
 				},
 			}
-			err := eddsaSignOp.handleOutMessage(tt.app, tt.tssMessage)
+			err := ecdsaSignOp.handleOutMessage(tt.app, tt.tssMessage)
 			if err != nil {
 				t.Errorf("handleOutMessage error = %v", err)
 			}
@@ -730,7 +731,7 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_handleEndMessage
+/*	TestECDSA_handleEndMessage
 	TestCases:
 	testing message controller, there is 1 testcase.
 	each test case runs as a subtests.
@@ -740,7 +741,7 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	- network.CallBack function
 	- rosenTss GetConnection functions
 */
-func TestEDDSA_handleEndMessage(t *testing.T) {
+func TestECDSA_handleEndMessage(t *testing.T) {
 	// creating fake sign save data
 	r, _ := hex.DecodeString("b24c712530dd03739ac87a491e45bd80ea8e3cef19c835bc6ed3262a9794974d")
 	s, _ := hex.DecodeString("02fe41c73871ca7ded0ff3e8adc76a64ea93643e75569bd9db8f772166adfc35")
@@ -772,10 +773,10 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaSignOp := operationEDDSASign{
-				OperationSign: OperationSign{},
+			ecdsaSignOp := operationECDSASign{
+				OperationSign: sign.OperationSign{},
 			}
-			err := eddsaSignOp.handleEndMessage(tt.app, tt.signatureData)
+			err := ecdsaSignOp.handleEndMessage(tt.app, tt.signatureData)
 			if err != nil {
 				t.Errorf("handleOutMessage error = %v", err)
 			}
@@ -784,7 +785,7 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_handleOutMessage
+/*	TestECDSA_handleOutMessage
 	TestCases:
 	testing message controller, there are 2 testcase.
 	each test case runs as a subtests.
@@ -795,7 +796,7 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	- network Publish, CallBack functions
 	- rosenTss GetConnection, NewMessage functions
 */
-func TestEDDSA_gossipMessageHandler(t *testing.T) {
+func TestECDSA_gossipMessageHandler(t *testing.T) {
 	// creating fake sign data
 	r, _ := hex.DecodeString("b24c712530dd03739ac87a491e45bd80ea8e3cef19c835bc6ed3262a9794974d")
 	s, _ := hex.DecodeString("02fe41c73871ca7ded0ff3e8adc76a64ea93643e75569bd9db8f772166adfc35")
@@ -813,13 +814,13 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	}
 
 	// creating localTssData and new partyId
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
-		t.Errorf("createNewLocalEDDSAParty error = %v", err)
+		t.Errorf("createNewLocalECDSAParty error = %v", err)
 	}
-	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
+	newPartyId, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
-		t.Errorf("CreateNewEDDSAPartyId error = %v", err)
+		t.Errorf("CreateNewECDSAPartyId error = %v", err)
 	}
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
@@ -865,18 +866,18 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaSignOp := operationEDDSASign{
-				OperationSign: OperationSign{
+			ecdsaSignOp := operationECDSASign{
+				OperationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-						Crypto:      "eddsa",
+						Crypto:      "ecdsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
 				},
 			}
-			outCh := make(chan tss.Message, len(eddsaSignOp.LocalTssData.PartyIds))
-			endCh := make(chan common.SignatureData, len(eddsaSignOp.LocalTssData.PartyIds))
+			outCh := make(chan tss.Message, len(ecdsaSignOp.LocalTssData.PartyIds))
+			endCh := make(chan common.SignatureData, len(ecdsaSignOp.LocalTssData.PartyIds))
 			switch tt.name {
 
 			case "handling sign":
@@ -884,7 +885,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 			case "party message":
 				outCh <- tt.tssMessage
 			}
-			err := eddsaSignOp.gossipMessageHandler(tt.app, outCh, endCh)
+			err := ecdsaSignOp.gossipMessageHandler(tt.app, outCh, endCh)
 			if err != nil && err.Error() != "message received" {
 				t.Errorf("gossipMessageHandler error = %v", err)
 			}

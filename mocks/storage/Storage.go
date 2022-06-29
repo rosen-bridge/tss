@@ -3,7 +3,9 @@
 package mocks
 
 import (
-	keygen "github.com/binance-chain/tss-lib/eddsa/keygen"
+	keygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
+	eddsakeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
+
 	mock "github.com/stretchr/testify/mock"
 
 	testing "testing"
@@ -16,8 +18,8 @@ type Storage struct {
 	mock.Mock
 }
 
-// LoadEDDSAKeygen provides a mock function with given fields: peerHome
-func (_m *Storage) LoadEDDSAKeygen(peerHome string) (keygen.LocalPartySaveData, *tss.PartyID, error) {
+// LoadECDSAKeygen provides a mock function with given fields: peerHome
+func (_m *Storage) LoadECDSAKeygen(peerHome string) (keygen.LocalPartySaveData, *tss.PartyID, error) {
 	ret := _m.Called(peerHome)
 
 	var r0 keygen.LocalPartySaveData
@@ -25,6 +27,36 @@ func (_m *Storage) LoadEDDSAKeygen(peerHome string) (keygen.LocalPartySaveData, 
 		r0 = rf(peerHome)
 	} else {
 		r0 = ret.Get(0).(keygen.LocalPartySaveData)
+	}
+
+	var r1 *tss.PartyID
+	if rf, ok := ret.Get(1).(func(string) *tss.PartyID); ok {
+		r1 = rf(peerHome)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*tss.PartyID)
+		}
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(string) error); ok {
+		r2 = rf(peerHome)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// LoadEDDSAKeygen provides a mock function with given fields: peerHome
+func (_m *Storage) LoadEDDSAKeygen(peerHome string) (eddsakeygen.LocalPartySaveData, *tss.PartyID, error) {
+	ret := _m.Called(peerHome)
+
+	var r0 eddsakeygen.LocalPartySaveData
+	if rf, ok := ret.Get(0).(func(string) eddsakeygen.LocalPartySaveData); ok {
+		r0 = rf(peerHome)
+	} else {
+		r0 = ret.Get(0).(eddsakeygen.LocalPartySaveData)
 	}
 
 	var r1 *tss.PartyID

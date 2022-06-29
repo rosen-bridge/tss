@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/pkg/errors"
@@ -18,6 +19,7 @@ type Storage interface {
 	MakefilePath(peerHome string, protocol string)
 	WriteData(data interface{}, peerHome string, fileFormat string, protocol string) error
 	LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveData, *tss.PartyID, error)
+	LoadECDSAKeygen(peerHome string) (ecdsaKeygen.LocalPartySaveData, *tss.PartyID, error)
 	LoadPrivate(peerHome string, crypto string) string
 }
 
@@ -112,6 +114,55 @@ func (f *storage) LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveDa
 		kbxj.SetCurve(tss.Edwards())
 	}
 	key.EDDSAPub.SetCurve(tss.Edwards())
+	id := xid.New()
+	pMoniker := fmt.Sprintf("tssPeer/%s", id.String())
+	partyID := tss.NewPartyID(id.String(), pMoniker, key.ShareID)
+	models.Logger.Infof("key: %+v", key)
+
+	var parties tss.UnSortedPartyIDs
+	parties = append(parties, partyID)
+	sortedPIDs := tss.SortPartyIDs(parties)
+	return key, sortedPIDs[0], nil
+}
+
+// LoadECDSAKeygen Loads the ECDSA keygen data from the file
+func (f *storage) LoadECDSAKeygen(peerHome string) (ecdsaKeygen.LocalPartySaveData, *tss.PartyID, error) {
+	// locating file
+	var keygenFile string
+
+	f.MakefilePath(peerHome, "ecdsa")
+	files, err := ioutil.ReadDir(f.filePath)
+	if err != nil {
+		return ecdsaKeygen.LocalPartySaveData{}, nil, err
+	}
+	if len(files) == 0 {
+		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
+	}
+	for _, File := range files {
+		if strings.Contains(File.Name(), "keygen") {
+			keygenFile = File.Name()
+		}
+	}
+	filePath := filepath.Join(f.filePath, keygenFile)
+	models.Logger.Infof("File: %v", filePath)
+
+	// reading file
+	bz, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(err,
+			"could not open the File for party in the expected location: %s. run keygen first.", filePath)
+	}
+	var key ecdsaKeygen.LocalPartySaveData
+	if err = json.Unmarshal(bz, &key); err != nil {
+		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(err,
+			"could not unmarshal data for party located at: %s", filePath)
+	}
+
+	//creating data from file
+	for _, kbxj := range key.BigXj {
+		kbxj.SetCurve(tss.Edwards())
+	}
+	key.ECDSAPub.SetCurve(tss.Edwards())
 	id := xid.New()
 	pMoniker := fmt.Sprintf("tssPeer/%s", id.String())
 	partyID := tss.NewPartyID(id.String(), pMoniker, key.ShareID)
