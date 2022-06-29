@@ -25,7 +25,14 @@ type operationECDSASign struct {
 
 func NewSignECDSAOperation(signMessage models.SignMessage) _interface.Operation {
 	return &operationECDSASign{
-		OperationSign: sign.OperationSign{SignMessage: signMessage},
+		OperationSign: sign.OperationSign{
+			LocalTssData: models.TssData{
+				Params:  nil,
+				Party:   nil,
+				PartyID: nil,
+			},
+			SignMessage: signMessage,
+		},
 	}
 }
 
@@ -223,21 +230,17 @@ func (s *operationECDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss,
 			if !utils.IsPartyExist(newParty, s.LocalTssData.PartyIds) {
 				s.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(s.LocalTssData.PartyIds.ToUnSorted(), newParty))
-
+				err := s.Init(rosenTss, newParty.Id)
+				if err != nil {
+					return err
+				}
 			}
 			if len(s.LocalTssData.PartyIds) >= meta.Threshold {
-
 				if s.LocalTssData.Params == nil {
 					err := s.setup(rosenTss)
 					if err != nil {
 						return err
 					}
-				}
-
-			} else {
-				err := s.Init(rosenTss, newParty.Id)
-				if err != nil {
-					return err
 				}
 			}
 
