@@ -229,8 +229,7 @@ func (s *operationECDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss,
 				}
 			}
 			if s.LocalTssData.Params == nil {
-				if len(s.LocalTssData.PartyIds) < meta.Threshold {
-				} else {
+				if len(s.LocalTssData.PartyIds) >= meta.Threshold {
 					err := s.setup(rosenTss)
 					if err != nil {
 						return err
