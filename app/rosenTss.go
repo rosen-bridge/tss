@@ -65,7 +65,6 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		messageCh := make(chan models.Message, 100)
 		r.ChannelMap[signDtaHash] = messageCh
 		models.Logger.Infof("creating new channel in StartNewSign: %v", signDtaHash)
-
 	}
 
 	// read loop function
@@ -184,7 +183,7 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 // MessageHandler handles the receiving message from message route
 func (r *rosenTss) MessageHandler(message models.Message) {
 
-	models.Logger.Infof("new message: %+v", message)
+	//models.Logger.Infof("new message: %+v", message)
 	if _, ok := r.ChannelMap[message.Message.MessageId]; !ok {
 		models.Logger.Infof("creating new channel in MessageHandler: %v", message.Message.MessageId)
 		messageCh := make(chan models.Message, 100)
