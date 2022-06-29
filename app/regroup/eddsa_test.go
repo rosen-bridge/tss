@@ -378,29 +378,14 @@ func TestEDDSA_GetClassName(t *testing.T) {
 func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 
 	data, id, _ := mockUtils.LoadEDDSAKeygenFixture(0)
-	conn := mockedNetwork.NewConnection(t)
-	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
-
-	app := mockedInterface.NewRosenTss(t)
-	app.On("GetConnection").Return(conn)
-	app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(models.GossipMessage{
-			Message:    fmt.Sprintf("%s,%s,%d,%s,%d", id.Id, id.Moniker, id.KeyInt(), "fromRegroup", 0),
-			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-			SenderId:   "cahj2pgs4eqvn1eo1tp0",
-			ReceiverId: "",
-			Name:       "partyId",
-		})
-	//priv, _, _, err := utils.GenerateEDDSAKey()
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
 
 	tests := []struct {
 		name          string
 		peerState     int
 		gossipMessage models.GossipMessage
 		wantErr       bool
+		appConfig     func() _interface.RosenTss
+		dataConfig    func() models.TssRegroupData
 	}{
 		{
 			name:      "handling new party with state 0",
@@ -411,6 +396,42 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 				SenderId:   "cahj2pgs4eqvn1eo1tp0",
 				ReceiverId: "",
 				Name:       "partyId",
+			},
+			appConfig: func() _interface.RosenTss {
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				app := mockedInterface.NewRosenTss(t)
+				app.On("GetConnection").Return(conn)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s,%d", id.Id, id.Moniker, id.KeyInt(), "fromRegroup", 0),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
+				return app
+			},
+			dataConfig: func() models.TssRegroupData {
+				localTssData := models.TssRegroupData{
+					PartyID: id,
+				}
+				id1, err := mockUtils.CreateNewEDDSAPartyId()
+				if err != nil {
+					t.Errorf("createNewParty error = %v", err)
+				}
+				id2, err := mockUtils.CreateNewEDDSAPartyId()
+				if err != nil {
+					t.Errorf("createNewParty error = %v", err)
+				}
+				localTssData.NewPartyIds = tss.SortPartyIDs(
+					append(localTssData.NewPartyIds.ToUnSorted(), id1))
+				localTssData.NewPartyIds = tss.SortPartyIDs(
+					append(localTssData.NewPartyIds.ToUnSorted(), id2))
+				localTssData.OldPartyIds = tss.SortPartyIDs(
+					append(localTssData.OldPartyIds.ToUnSorted(), id))
+				return localTssData
 			},
 			wantErr: false,
 		},
@@ -424,6 +445,42 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 				ReceiverId: "",
 				Name:       "partyId",
 			},
+			appConfig: func() _interface.RosenTss {
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				app := mockedInterface.NewRosenTss(t)
+				app.On("GetConnection").Return(conn)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s,%d", id.Id, id.Moniker, id.KeyInt(), "fromRegroup", 0),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
+				return app
+			},
+			dataConfig: func() models.TssRegroupData {
+				localTssData := models.TssRegroupData{
+					PartyID: id,
+				}
+				id1, err := mockUtils.CreateNewEDDSAPartyId()
+				if err != nil {
+					t.Errorf("createNewParty error = %v", err)
+				}
+				id2, err := mockUtils.CreateNewEDDSAPartyId()
+				if err != nil {
+					t.Errorf("createNewParty error = %v", err)
+				}
+				localTssData.NewPartyIds = tss.SortPartyIDs(
+					append(localTssData.NewPartyIds.ToUnSorted(), id))
+				localTssData.OldPartyIds = tss.SortPartyIDs(
+					append(localTssData.OldPartyIds.ToUnSorted(), id1))
+				localTssData.OldPartyIds = tss.SortPartyIDs(
+					append(localTssData.OldPartyIds.ToUnSorted(), id2))
+				return localTssData
+			},
 			wantErr: false,
 		},
 		{
@@ -436,13 +493,24 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 				ReceiverId: "",
 				Name:       "partyId",
 			},
+			appConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
+				return app
+			},
+			dataConfig: func() models.TssRegroupData {
+				localTssData := models.TssRegroupData{
+					PartyID: id,
+				}
+				return localTssData
+			},
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
+			app := tt.appConfig()
+			localTssData := tt.dataConfig()
 			newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
 			if err != nil {
 				t.Errorf("createNewParty error = %v", err)
@@ -451,13 +519,15 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 				savedData: data,
 				OperationRegroup: OperationRegroup{
 					LocalTssData: models.TssRegroupData{
-						PeerState: tt.peerState,
-						PartyID:   newPartyId,
+						PeerState:   tt.peerState,
+						PartyID:     newPartyId,
+						OldPartyIds: localTssData.OldPartyIds,
+						NewPartyIds: localTssData.NewPartyIds,
 					},
 					RegroupMessage: models.RegroupMessage{
 						PeerState:    tt.peerState,
-						NewThreshold: 3,
-						OldThreshold: 2,
+						NewThreshold: 1,
+						OldThreshold: 1,
 						PeersCount:   4,
 						Crypto:       "eddsa",
 					},
@@ -645,9 +715,6 @@ func TestEDDSA_setup(t *testing.T) {
 	}
 	localTssData.NewPartyIds = tss.SortPartyIDs(
 		append(localTssData.NewPartyIds.ToUnSorted(), newParty))
-
-	localTssData.NewPartyIds = tss.SortPartyIDs(
-		append(localTssData.NewPartyIds.ToUnSorted(), oldPartyId))
 
 	// using mocked structs and functions
 	app := mockedInterface.NewRosenTss(t)
