@@ -116,7 +116,6 @@ func (c *connect) Subscribe(port string) error {
 }
 
 // CallBack sends sign data to this url
-
 func (c *connect) CallBack(url string, data models.SignData) error {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
