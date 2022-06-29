@@ -223,17 +223,21 @@ func (s *operationECDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss,
 			if !utils.IsPartyExist(newParty, s.LocalTssData.PartyIds) {
 				s.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(s.LocalTssData.PartyIds.ToUnSorted(), newParty))
-				err := s.Init(rosenTss, newParty.Id)
-				if err != nil {
-					return err
-				}
+
 			}
-			if s.LocalTssData.Params == nil {
-				if len(s.LocalTssData.PartyIds) >= meta.Threshold {
+			if len(s.LocalTssData.PartyIds) >= meta.Threshold {
+
+				if s.LocalTssData.Params == nil {
 					err := s.setup(rosenTss)
 					if err != nil {
 						return err
 					}
+				}
+
+			} else {
+				err := s.Init(rosenTss, newParty.Id)
+				if err != nil {
+					return err
 				}
 			}
 
