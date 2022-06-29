@@ -67,7 +67,7 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 			app := rosenTss{
 				peerHome: peerHome,
 			}
-			err := app.SetMetaData()
+			err := app.SetMetaData("eddsa")
 			if err != nil {
 				t.Error(err)
 			}
