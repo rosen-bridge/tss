@@ -73,7 +73,8 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 	models.Logger.Infof("channel", messageCh)
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
-
+	messageBytes := blake2b.Sum256(signData.Bytes())
+	messageId := hex.EncodeToString(messageBytes[:])
 	errorCh := make(chan error)
 
 	for {
@@ -83,6 +84,10 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 		case message, ok := <-messageCh:
 			if !ok {
 				return fmt.Errorf("channel closed")
+			}
+
+			if message.Message.MessageId != messageId {
+				return fmt.Errorf("messageId is not correct, messageId: %s, expected: %s", message.Message.MessageId, messageId)
 			}
 			msg := message.Message
 			models.Logger.Infof("msg.name: {%s}", msg.Name)
