@@ -391,7 +391,7 @@ func (r *operationEDDSARegroup) setup(rosenTss _interface.RosenTss) error {
 	r.LocalTssData.RegroupingParams = tss.NewReSharingParameters(
 		tss.Edwards(), oldCtx, newCtx, r.LocalTssData.PartyID, r.RegroupMessage.PeersCount, r.RegroupMessage.OldThreshold,
 		len(r.LocalTssData.NewPartyIds), r.RegroupMessage.NewThreshold)
-	jsonMessage := rosenTss.NewMessage("", r.LocalTssData.PartyID.Id, "regroup pre params creates.", "regroup", "regroup")
+	jsonMessage := rosenTss.NewMessage("", r.LocalTssData.PartyID.Id, "start regroup.", "regroup", "regroup")
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err

@@ -2,10 +2,10 @@ package models
 
 import (
 	"github.com/binance-chain/tss-lib/tss"
-	"github.com/labstack/gommon/log"
+	"github.com/ipfs/go-log"
 )
 
-var Logger = log.New("rosen-app")
+var Logger = log.Logger("rosen-tss")
 
 type SignMessage struct {
 	Crypto      string `json:"crypto"`

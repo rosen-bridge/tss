@@ -160,9 +160,9 @@ func (f *storage) LoadECDSAKeygen(peerHome string) (ecdsaKeygen.LocalPartySaveDa
 
 	//creating data from file
 	for _, kbxj := range key.BigXj {
-		kbxj.SetCurve(tss.Edwards())
+		kbxj.SetCurve(tss.S256())
 	}
-	key.ECDSAPub.SetCurve(tss.Edwards())
+	key.ECDSAPub.SetCurve(tss.S256())
 	id := xid.New()
 	pMoniker := fmt.Sprintf("tssPeer/%s", id.String())
 	partyID := tss.NewPartyID(id.String(), pMoniker, key.ShareID)

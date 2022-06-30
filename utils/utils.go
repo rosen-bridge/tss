@@ -58,3 +58,19 @@ func IsPartyExist(newPartyId *tss.PartyID, partyIds tss.SortedPartyIDs) bool {
 	}
 	return false
 }
+
+func HashToInt(hash []byte) *big.Int {
+	c := elliptic.P256()
+	orderBits := c.Params().N.BitLen()
+	orderBytes := (orderBits + 7) / 8
+	if len(hash) > orderBytes {
+		hash = hash[:orderBytes]
+	}
+
+	ret := new(big.Int).SetBytes(hash)
+	excess := len(hash)*8 - orderBits
+	if excess > 0 {
+		ret.Rsh(ret, uint(excess))
+	}
+	return ret
+}

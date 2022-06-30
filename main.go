@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	logging "github.com/ipfs/go-log"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/viper"
 	_ "github.com/swaggo/echo-swagger/example/docs"
@@ -17,6 +18,20 @@ var (
 	cfgFile string
 )
 
+func init() {
+	err := initConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	logLevel := viper.GetString("LOG_LEVEL")
+
+	err = configLog(logLevel)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
 	// parsing cli flags
 	projectPort := flag.String("port", "4000", "project port (e.g. 4000)")
@@ -30,22 +45,17 @@ func main() {
 
 	// creating new instance of echo framework
 	e := echo.New()
-
 	// initiating and reading configs
-	err := initConfig()
-	if err != nil {
-		e.Logger.Fatal(err)
-	}
-	homeAddress := viper.GetString("HOME_ADDRESS")
 
 	// creating connection and storage and app instance
 	conn := network.InitConnection(*publishPath, *subscriptionPath, *p2pPort)
 	localStorage := storage.NewStorage()
+	homeAddress := viper.GetString("HOME_ADDRESS")
 
 	tss := app.NewRosenTss(conn, localStorage, homeAddress)
 
 	// setting up peer home based on configs
-	err = tss.SetPeerHome(homeAddress)
+	err := tss.SetPeerHome(homeAddress)
 	if err != nil {
 		e.Logger.Fatal(err)
 	}
@@ -85,5 +95,14 @@ func initConfig() error {
 	} else {
 		return fmt.Errorf("error using config file: %s", err.Error())
 	}
+	return nil
+}
+
+func configLog(logLevel string) error {
+	lvl, err := logging.LevelFromString(logLevel)
+	if err != nil {
+		panic(err)
+	}
+	logging.SetAllLoggers(lvl)
 	return nil
 }

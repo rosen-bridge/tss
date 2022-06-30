@@ -19,6 +19,7 @@ import (
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
+	"rosen-bridge/tss/utils"
 	"strings"
 )
 
@@ -54,28 +55,27 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	if err != nil {
 		return err
 	}
-
-	msgBytes, _ := hex.DecodeString(signMessage.Message)
-	signData := new(big.Int).SetBytes(msgBytes)
-	signDataBytes := blake2b.Sum256(signData.Bytes())
-	signDtaHash := hex.EncodeToString(signDataBytes[:])
-	log.Printf("signDtaHash: %v", signDtaHash)
-
-	if _, ok := r.ChannelMap[signDtaHash]; !ok {
-		messageCh := make(chan models.Message, 100)
-		r.ChannelMap[signDtaHash] = messageCh
-		models.Logger.Infof("creating new channel in StartNewSign: %v", signDtaHash)
-	}
-
-	// read loop function
 	if signMessage.Crypto == "ecdsa" {
+
+		msgBytes, _ := hex.DecodeString(signMessage.Message)
+		signData := utils.HashToInt(msgBytes)
+		signDataBytes := blake2b.Sum256(signData.Bytes())
+		signDtaHash := hex.EncodeToString(signDataBytes[:])
+		log.Printf("signDtaHash: %v", signDtaHash)
+
+		if _, ok := r.ChannelMap[signDtaHash]; !ok {
+			messageCh := make(chan models.Message, 100)
+			r.ChannelMap[signDtaHash] = messageCh
+			models.Logger.Infof("creating new channel in StartNewSign: %v", signDtaHash)
+		}
+
+		// read loop function
 		ECDSAOperation := ecdsa.NewSignECDSAOperation(signMessage)
 		err := ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
 		}
 		go func() {
-			models.Logger.Info("calling loop")
 			err := ECDSAOperation.Loop(r, r.ChannelMap[signDtaHash])
 			if err != nil {
 				models.Logger.Errorf("en error occurred in ecdsa sign loop, err: %+v", err)
@@ -85,6 +85,18 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		}()
 
 	} else if signMessage.Crypto == "eddsa" {
+		msgBytes, _ := hex.DecodeString(signMessage.Message)
+		signData := new(big.Int).SetBytes(msgBytes)
+		signDataBytes := blake2b.Sum256(signData.Bytes())
+		signDtaHash := hex.EncodeToString(signDataBytes[:])
+		log.Printf("signDtaHash: %v", signDtaHash)
+
+		if _, ok := r.ChannelMap[signDtaHash]; !ok {
+			messageCh := make(chan models.Message, 100)
+			r.ChannelMap[signDtaHash] = messageCh
+			models.Logger.Infof("creating new channel in StartNewSign: %v", signDtaHash)
+		}
+
 		EDDSAOperation := eddsa.NewSignEDDSAOperation(signMessage)
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
@@ -183,7 +195,7 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 // MessageHandler handles the receiving message from message route
 func (r *rosenTss) MessageHandler(message models.Message) {
 
-	//models.Logger.Infof("new message: %+v", message)
+	models.Logger.Infof("new message: %+v", message.Message.Name)
 	if _, ok := r.ChannelMap[message.Message.MessageId]; !ok {
 		models.Logger.Infof("creating new channel in MessageHandler: %v", message.Message.MessageId)
 		messageCh := make(chan models.Message, 100)
