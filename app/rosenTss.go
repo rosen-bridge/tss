@@ -12,7 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"rosen-bridge/tss/app/interface"
-	"rosen-bridge/tss/app/keygen"
+	"rosen-bridge/tss/app/keygen/ecdsa"
+	"rosen-bridge/tss/app/keygen/eddsa"
 	"rosen-bridge/tss/app/regroup"
 	"rosen-bridge/tss/app/sign"
 	"rosen-bridge/tss/models"
@@ -113,10 +114,23 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 
 	// read loop function
 	if keygenMessage.Crypto == "ecdsa" {
-		//TODO: implement this
+		ECDSAOperation := ecdsa.NewKeygenECDSAOperation()
+		err := ECDSAOperation.Init(r, "")
+		if err != nil {
+			return err
+		}
+		go func() {
+			models.Logger.Info("calling loop")
+			err := ECDSAOperation.Loop(r, r.ChannelMap["keygen"])
+			if err != nil {
+				models.Logger.Errorf("en error occurred in ecdsa Keygen loop, err: %+v", err)
+				os.Exit(1)
+			}
+			models.Logger.Info("end of loop")
+		}()
 
 	} else if keygenMessage.Crypto == "eddsa" {
-		EDDSAOperation := keygen.NewKeygenEDDSAOperation()
+		EDDSAOperation := eddsa.NewKeygenEDDSAOperation()
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err

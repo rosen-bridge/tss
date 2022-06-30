@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/ipfs/go-log"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/viper"
 	_ "github.com/swaggo/echo-swagger/example/docs"
@@ -18,6 +19,10 @@ var (
 )
 
 func main() {
+	if err := log.SetLogLevel("rosen-tss", "info"); err != nil {
+		panic(err)
+	}
+
 	// parsing cli flags
 	projectPort := flag.String("port", "4000", "project port (e.g. 4000)")
 	p2pPort := flag.String("p2pPort", "8080", "p2p port (e.g. 8080)")

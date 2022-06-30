@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	keygenFileName = "keygen_data.json"
+	KeygenFileName = "keygen_data.json"
 )
 
 type OperationKeygen struct {

@@ -1,15 +1,18 @@
 package mocks
 
 import (
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/labstack/gommon/log"
+
 	"github.com/rs/xid"
 	"io/ioutil"
 	"math/big"
@@ -156,4 +159,81 @@ func Contains(item string, itemList []string) bool {
 		}
 	}
 	return false
+}
+
+// GenerateECDSAKey generates private and public for edward curve
+func GenerateECDSAKey() ([]byte, *big.Int, *big.Int, error) {
+	return elliptic.GenerateKey(elliptic.P256(), rand.Reader)
+}
+
+// CreateNewEDDSAPartyId creates a new partyId with secp256k1 key
+func CreateNewECDSAPartyId() (*tss.PartyID, error) {
+	private, _, _, err := GenerateECDSAKey()
+	if err != nil {
+		private = nil
+		return nil, err
+	}
+	key := new(big.Int).SetBytes(private)
+	id := xid.New()
+	partyId := tss.NewPartyID(id.String(), "topic"+"/tssPeer", key)
+	return partyId, nil
+}
+
+// CreateNewLocalECDSATSSData creates a new partyId with secp256k1 key and setting it in localTssData
+func CreateNewLocalECDSATSSData() (models.TssData, error) {
+	newPartyId, err := CreateNewECDSAPartyId()
+	if err != nil {
+		return models.TssData{}, err
+	}
+	localTssData := models.TssData{
+		PartyID: newPartyId,
+	}
+	localTssData.PartyIds = tss.SortPartyIDs(
+		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
+
+	return localTssData, nil
+}
+
+// LoadECDSAKeygenFixture reads eddsa keygen fixer file by given index
+func LoadECDSAKeygenFixture(index int) (ecdsaKeygen.LocalPartySaveData, *tss.PartyID, error) {
+	testFixtureDirFormat := "%s/../mocks/_ecdsa_keygen_fixtures"
+
+	_, callerFileName, _, _ := runtime.Caller(0)
+	srcDirName := filepath.Dir(callerFileName)
+	rootFolder := fmt.Sprintf(testFixtureDirFormat, srcDirName)
+	files, err := ioutil.ReadDir(rootFolder)
+
+	keygenFile := files[index].Name()
+
+	if err != nil {
+		log.Error(err)
+	}
+	if len(files) == 0 {
+		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
+	}
+
+	filePath := filepath.Join(rootFolder, keygenFile)
+	log.Infof("File: %v", filePath)
+	bz, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return ecdsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(
+			"could not open the File for party in the expected location: %s. run keygen first.\nerror:{%s}",
+			filePath, err.Error())
+	}
+	var key ecdsaKeygen.LocalPartySaveData
+	if err = json.Unmarshal(bz, &key); err != nil {
+		return ecdsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(
+			"could not unmarshal data for party located at: %s\nerror: {%s}", filePath, err.Error())
+	}
+	for _, kbxj := range key.BigXj {
+		kbxj.SetCurve(tss.Edwards())
+	}
+	key.ECDSAPub.SetCurve(tss.Edwards())
+	id := xid.New()
+	pMoniker := fmt.Sprintf("%s", id.String())
+	partyID := tss.NewPartyID(pMoniker, "tss/tssPeer", key.ShareID)
+	var parties tss.UnSortedPartyIDs
+	parties = append(parties, partyID)
+	sortedPIDs := tss.SortPartyIDs(parties)
+	return key, sortedPIDs[0], nil
 }

@@ -1,13 +1,14 @@
-package keygen
+package ecdsa
 
 import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
+	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/stretchr/testify/mock"
 	"rosen-bridge/tss/app/interface"
+	"rosen-bridge/tss/app/keygen"
 	mockUtils "rosen-bridge/tss/mocks"
 	mockedInterface "rosen-bridge/tss/mocks/app/interface"
 	mockedNetwork "rosen-bridge/tss/mocks/network"
@@ -18,7 +19,7 @@ import (
 	"time"
 )
 
-/*	TestEDDSA_Init
+/*	TestECDSA_Init
 	TestCases:
 	testing message controller, there are 2 testcases.
 	each test case runs as a subtests.
@@ -26,17 +27,17 @@ import (
 	there are _interface.RosenTss, models.TssData, receiverId used as test arguments.
 	Dependencies:
 	- localTssData
-	- eddsaKeygen.LocalPartySaveData
-	- storage.LoadEDDSAKeygen function
+	- ecdsaKeygen.LocalPartySaveData
+	- storage.LoadECDSAKeygen function
 	- network.Publish function
 	- rosenTss GetStorage, GetConnection, GetPrivate, NewMessage functions
 */
-func TestEDDSA_Init(t *testing.T) {
+func TestECDSA_Init(t *testing.T) {
 
 	// creating localTssData
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
-		t.Errorf("CreateNewLocalEDDSATSSData error = %v", err)
+		t.Errorf("CreateNewLocalECDSATSSData error = %v", err)
 	}
 
 	// using mocked structs and functions
@@ -75,8 +76,8 @@ func TestEDDSA_Init(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaKeygenOp := operationEDDSAKeygen{}
-			err := eddsaKeygenOp.Init(tt.app, tt.receiverId)
+			ecdsaKeygenOp := operationECDSAKeygen{}
+			err := ecdsaKeygenOp.Init(tt.app, tt.receiverId)
 			if err != nil {
 
 				t.Errorf("Init failed: %v", err)
@@ -86,7 +87,7 @@ func TestEDDSA_Init(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_Loop
+/*	TestECDSA_Loop
 	TestCases:
 	testing message controller, there are 4 testcases.
 	each test case runs as a subtests.
@@ -94,20 +95,20 @@ func TestEDDSA_Init(t *testing.T) {
 	there is models.Message used as test arguments.
 	Dependencies:
 	- localTssData models.TssData
-	- eddsaKeygen.LocalPartySaveData
-	- tss.Party for eddsaKeygen.NewLocalParty
+	- ecdsaKeygen.LocalPartySaveData
+	- tss.Party for ecdsaKeygen.NewLocalParty
 	- network.Publish function
 	- rosenTss GetMetaData, GetConnection, NewMessage functions
 */
-func TestEDDSA_Loop(t *testing.T) {
+func TestECDSA_Loop(t *testing.T) {
 	// creating localTssDatas and new partyIds
-	_, Id1, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	_, Id1, err := mockUtils.LoadECDSAKeygenFixture(0)
 	if err != nil {
-		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+		t.Errorf("LoadECDSAKeygenFixture error = %v", err)
 	}
-	_, Id2, err := mockUtils.LoadEDDSAKeygenFixture(1)
+	_, Id2, err := mockUtils.LoadECDSAKeygenFixture(1)
 	if err != nil {
-		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+		t.Errorf("LoadECDSAKeygenFixture error = %v", err)
 	}
 
 	localTssData := models.TssData{
@@ -120,13 +121,13 @@ func TestEDDSA_Loop(t *testing.T) {
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), localTssData.PartyID))
 
-	// creating tss.Party for eddsaKeygen
+	// creating tss.Party for ecdsaKeygen
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
 		tss.Edwards(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
-	endCh := make(chan eddsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
-	party := eddsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)
+	endCh := make(chan ecdsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
+	party := ecdsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)
 
 	partyIDMessage := fmt.Sprintf("%s,%s,%d,%s", localTssData.PartyID.Id, localTssData.PartyID.Moniker, localTssData.PartyID.KeyInt(), "fromKeygen")
 
@@ -239,8 +240,8 @@ func TestEDDSA_Loop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.AppConfig()
-			eddsaKeygenOp := operationEDDSAKeygen{
-				OperationKeygen: OperationKeygen{
+			ecdsaKeygenOp := operationECDSAKeygen{
+				OperationKeygen: keygen.OperationKeygen{
 					LocalTssData: localTssData,
 				},
 			}
@@ -252,7 +253,7 @@ func TestEDDSA_Loop(t *testing.T) {
 				close(messageCh)
 			}()
 			errorList := []string{"invalid wire-format", "channel closed"}
-			err := eddsaKeygenOp.Loop(app, messageCh)
+			err := ecdsaKeygenOp.Loop(app, messageCh)
 			if err != nil && !mockUtils.Contains(err.Error(), errorList) {
 				t.Error(err)
 			}
@@ -260,7 +261,7 @@ func TestEDDSA_Loop(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_GetClassName
+/*	TestECDSA_GetClassName
 	TestCases:
 	testing message controller, there is 1 testcase.
 	each test case runs as a subtests.
@@ -268,22 +269,22 @@ func TestEDDSA_Loop(t *testing.T) {
 	Dependencies:
 	-
 */
-func TestEDDSA_GetClassName(t *testing.T) {
+func TestECDSA_GetClassName(t *testing.T) {
 
 	tests := []struct {
 		name     string
 		expected string
 	}{
 		{
-			name:     "get eddsa class name",
-			expected: "eddsaKeygen",
+			name:     "get ecdsa class name",
+			expected: "ecdsaKeygen",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaKeygenOp := operationEDDSAKeygen{}
+			ecdsaKeygenOp := operationECDSAKeygen{}
 
-			result := eddsaKeygenOp.GetClassName()
+			result := ecdsaKeygenOp.GetClassName()
 			if result != tt.expected {
 				t.Errorf("GetClassName error = expected %s, got %s", tt.expected, result)
 			}
@@ -292,7 +293,7 @@ func TestEDDSA_GetClassName(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_partyIdMessageHandler
+/*	TestECDSA_partyIdMessageHandler
 	TestCases:
 	testing message controller, there is 2 testcases.
 	each test case runs as a subtests.
@@ -304,13 +305,13 @@ func TestEDDSA_GetClassName(t *testing.T) {
 	- network.Publish function
 	- rosenTss GetMetaData, GetConnection, NewMessage functions
 */
-func TestEDDSA_partyIdMessageHandler(t *testing.T) {
+func TestECDSA_partyIdMessageHandler(t *testing.T) {
 	// creating new localTssDatas and new partyIds
-	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
+	newPartyId, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
 		t.Error(err)
 	}
-	newPartyId2, err := mockUtils.CreateNewEDDSAPartyId()
+	newPartyId2, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
 		t.Error(err)
 	}
@@ -366,13 +367,13 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(tt.gossipMessage)
-			eddsaKeygenOp := operationEDDSAKeygen{
-				OperationKeygen: OperationKeygen{
+			ecdsaKeygenOp := operationECDSAKeygen{
+				OperationKeygen: keygen.OperationKeygen{
 					LocalTssData: tt.localTssData,
 				},
 			}
 			// partyMessageHandler
-			err := eddsaKeygenOp.partyIdMessageHandler(app, tt.gossipMessage)
+			err := ecdsaKeygenOp.partyIdMessageHandler(app, tt.gossipMessage)
 			if err != nil {
 				t.Error(err)
 			}
@@ -381,7 +382,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_partyUpdate
+/*	TestECDSA_partyUpdate
 	TestCases:
 	testing message controller, there is 4 testcases.
 	each test case runs as a subtests.
@@ -390,29 +391,29 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 	Dependencies:
 	- localTssData models.TssData
 	- tss.PartyId
-	- tss.Party for eddsaKeygen.NewLocalParty
+	- tss.Party for ecdsaKeygen.NewLocalParty
 */
-func TestEDDSA_partyUpdate(t *testing.T) {
+func TestECDSA_partyUpdate(t *testing.T) {
 	// creating localTssData and new partyId
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
 		t.Error(err)
 	}
 
-	newParty, err := mockUtils.CreateNewEDDSAPartyId()
+	newParty, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
 		t.Error(err)
 	}
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newParty))
 
-	// creating new tss party for eddsaKeygen
+	// creating new tss party for ecdsaKeygen
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
 		tss.Edwards(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
-	endCh := make(chan eddsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
-	localTssData.Party = eddsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)
+	endCh := make(chan ecdsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
+	localTssData.Party = ecdsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)
 
 	for _, party := range localTssData.PartyIds {
 		if party.Id == newParty.Id {
@@ -476,15 +477,15 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 		},
 	}
 
-	eddsaKeygenOp := operationEDDSAKeygen{
-		OperationKeygen{
+	ecdsaKeygenOp := operationECDSAKeygen{
+		keygen.OperationKeygen{
 			LocalTssData: localTssData,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := eddsaKeygenOp.partyUpdate(tt.message); (err != nil) != tt.wantErr {
+			if err := ecdsaKeygenOp.partyUpdate(tt.message); (err != nil) != tt.wantErr {
 				if !strings.Contains(err.Error(), "invalid wire-format data") {
 					t.Errorf("PartyUpdate() error = %v, wantErr %v", err, tt.wantErr)
 				}
@@ -494,7 +495,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_setup
+/*	TestECDSA_setup
 	TestCases:
 	testing message controller, there is 2 testcases.
 	each test case runs as a subtests.
@@ -506,16 +507,16 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	- network.Publish function
 	- rosenTss GetMetaData, GetConnection, NewMessage functions
 */
-func TestEDDSA_setup(t *testing.T) {
+func TestECDSA_setup(t *testing.T) {
 
 	// creating localTssData and new partyId
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
-		t.Errorf("createNewLocalEDDSAParty error = %v", err)
+		t.Errorf("createNewLocalECDSAParty error = %v", err)
 	}
-	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
+	newPartyId, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
-		t.Errorf("CreateNewEDDSAPartyId error = %v", err)
+		t.Errorf("CreateNewECDSAPartyId error = %v", err)
 	}
 	localTssDataWith2PartyIds := localTssData
 	localTssDataWith2PartyIds.PartyIds = tss.SortPartyIDs(
@@ -560,12 +561,12 @@ func TestEDDSA_setup(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaKeygenOp := operationEDDSAKeygen{
-				OperationKeygen{
+			ecdsaKeygenOp := operationECDSAKeygen{
+				keygen.OperationKeygen{
 					LocalTssData: tt.localTssData,
 				},
 			}
-			err := eddsaKeygenOp.setup(tt.app)
+			err := ecdsaKeygenOp.setup(tt.app)
 			if err != nil && !tt.wantErr {
 				t.Errorf("Setup error = %v", err)
 			}
@@ -574,7 +575,7 @@ func TestEDDSA_setup(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_handleOutMessage
+/*	TestECDSA_handleOutMessage
 	TestCases:
 	testing message controller, there is 1 testcase.
 	each test case runs as a subtests.
@@ -585,15 +586,15 @@ func TestEDDSA_setup(t *testing.T) {
 	- network.Publish function
 	- rosenTss GetConnection, NewMessage functions
 */
-func TestEDDSA_handleOutMessage(t *testing.T) {
+func TestECDSA_handleOutMessage(t *testing.T) {
 	message := mockUtils.TestUtilsMessage{
 		Broadcast: true,
 		Data:      "cfc72ea72b7e96bcf542ea2e359596031e13134d68a503cb13d3f31d8428ae03",
 	}
 
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
-		t.Errorf("createNewLocalEDDSAParty error = %v", err)
+		t.Errorf("createNewLocalECDSAParty error = %v", err)
 	}
 
 	app := mockedInterface.NewRosenTss(t)
@@ -623,12 +624,12 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaKeygenOp := operationEDDSAKeygen{
-				OperationKeygen{
+			ecdsaKeygenOp := operationECDSAKeygen{
+				keygen.OperationKeygen{
 					LocalTssData: tt.localTssData,
 				},
 			}
-			err := eddsaKeygenOp.handleOutMessage(tt.app, tt.tssMessage)
+			err := ecdsaKeygenOp.handleOutMessage(tt.app, tt.tssMessage)
 			if err != nil {
 				t.Errorf("handleOutMessage error = %v", err)
 			}
@@ -637,29 +638,29 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_handleEndMessage
+/*	TestECDSA_handleEndMessage
 	TestCases:
 	testing message controller, there is 1 testcase.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
-	there is eddsaKeygen.LocalPartySaveData used as test arguments.
+	there is ecdsaKeygen.LocalPartySaveData used as test arguments.
 	Dependencies:
 	- storage.WriteData function
 	- rosenTss GetStorage, GetPeerHome functions
 */
-func TestEDDSA_handleEndMessage(t *testing.T) {
+func TestECDSA_handleEndMessage(t *testing.T) {
 
 	// loading fixture data
-	fixture, _, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	fixture, _, err := mockUtils.LoadECDSAKeygenFixture(0)
 	if err != nil {
 		t.Error(err)
 	}
 
 	tests := []struct {
 		name       string
-		keygenData eddsaKeygen.LocalPartySaveData
+		keygenData ecdsaKeygen.LocalPartySaveData
 	}{
-		{name: "creating eddsa keygen data", keygenData: fixture},
+		{name: "creating ecdsa keygen data", keygenData: fixture},
 	}
 
 	// using mocked structs and functions
@@ -667,7 +668,7 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	store.On("WriteData", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
-	eddsaKeygenOp := operationEDDSAKeygen{}
+	ecdsaKeygenOp := operationECDSAKeygen{}
 
 	app := mockedInterface.NewRosenTss(t)
 	app.On("GetStorage").Return(store)
@@ -675,7 +676,7 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := eddsaKeygenOp.handleEndMessage(app, tt.keygenData)
+			err := ecdsaKeygenOp.handleEndMessage(app, tt.keygenData)
 			if err != nil {
 				t.Errorf("handleEndMessage failed: %v", err)
 			}
@@ -684,22 +685,22 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 
 }
 
-/*	TestEDDSA_handleOutMessage
+/*	TestECDSA_handleOutMessage
 	TestCases:
 	testing message controller, there are 2 testcase.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
-	there are _interface.RosenTss, models.TssData, tss.Message, eddsaKeygen.LocalPartySaveData used as test arguments.
+	there are _interface.RosenTss, models.TssData, tss.Message, ecdsaKeygen.LocalPartySaveData used as test arguments.
 	Dependencies:
-	- eddsaKeygen.LocalPartySaveData
+	- ecdsaKeygen.LocalPartySaveData
 	- localTssData models.TssData
 	- network Publish, CallBack functions
 	- storage WriteData function
 	- rosenTss GetConnection, NewMessage, GetPeerHome, GetStorage  functions
 */
-func TestEDDSA_gossipMessageHandler(t *testing.T) {
+func TestECDSA_gossipMessageHandler(t *testing.T) {
 	// reding fixutre data
-	fixture, _, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	fixture, _, err := mockUtils.LoadECDSAKeygenFixture(0)
 	if err != nil {
 		t.Error(err)
 	}
@@ -710,13 +711,13 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	}
 
 	// creating localTssDatas and new partyIds
-	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	localTssData, err := mockUtils.CreateNewLocalECDSATSSData()
 	if err != nil {
-		t.Errorf("createNewLocalEDDSAParty error = %v", err)
+		t.Errorf("createNewLocalECDSAParty error = %v", err)
 	}
-	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
+	newPartyId, err := mockUtils.CreateNewECDSAPartyId()
 	if err != nil {
-		t.Errorf("CreateNewEDDSAPartyId error = %v", err)
+		t.Errorf("CreateNewECDSAPartyId error = %v", err)
 	}
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
@@ -742,7 +743,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	tests := []struct {
 		name         string
 		app          _interface.RosenTss
-		keygenData   eddsaKeygen.LocalPartySaveData
+		keygenData   ecdsaKeygen.LocalPartySaveData
 		localTssData models.TssData
 		tssMessage   tss.Message
 	}{
@@ -761,18 +762,18 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			eddsaKeygenOp := operationEDDSAKeygen{
-				OperationKeygen{LocalTssData: tt.localTssData},
+			ecdsaKeygenOp := operationECDSAKeygen{
+				keygen.OperationKeygen{LocalTssData: tt.localTssData},
 			}
-			outCh := make(chan tss.Message, len(eddsaKeygenOp.LocalTssData.PartyIds))
-			endCh := make(chan eddsaKeygen.LocalPartySaveData, len(eddsaKeygenOp.LocalTssData.PartyIds))
+			outCh := make(chan tss.Message, len(ecdsaKeygenOp.LocalTssData.PartyIds))
+			endCh := make(chan ecdsaKeygen.LocalPartySaveData, len(ecdsaKeygenOp.LocalTssData.PartyIds))
 			switch tt.name {
 			case "save keygen":
 				endCh <- tt.keygenData
 			case "party message":
 				outCh <- tt.tssMessage
 			}
-			err := eddsaKeygenOp.gossipMessageHandler(tt.app, outCh, endCh)
+			err := ecdsaKeygenOp.gossipMessageHandler(tt.app, outCh, endCh)
 			if err != nil && err.Error() != "message received" {
 				t.Errorf("gossipMessageHandler error = %v", err)
 			}
