@@ -18,7 +18,7 @@ type Storage interface {
 	MakefilePath(peerHome string, protocol string)
 	WriteData(data interface{}, peerHome string, fileFormat string, protocol string) error
 	LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveData, *tss.PartyID, error)
-	LoadPrivate(peerHome string, crypto string) (string, error)
+	LoadPrivate(peerHome string, crypto string) string
 }
 
 type storage struct {
@@ -40,16 +40,17 @@ func (f *storage) MakefilePath(peerHome string, protocol string) {
 // WriteData writing given data to file in given path
 func (f *storage) WriteData(data interface{}, peerHome string, fileFormat string, protocol string) error {
 
-	fmt.Println("write data called")
+	models.Logger.Info("write data called")
 
 	f.MakefilePath(peerHome, protocol)
 	err := os.MkdirAll(f.filePath, os.ModePerm)
 	if err != nil {
 		return err
 	}
+
 	path := filepath.Join(f.filePath, fileFormat)
 
-	fmt.Println(path)
+	models.Logger.Infof("path: %s", path)
 	fd, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	defer func(fd *os.File) {
 		err := fd.Close()
@@ -123,25 +124,28 @@ func (f *storage) LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveDa
 }
 
 // LoadPrivate Loads the private data from the file
-func (f *storage) LoadPrivate(peerHome string, crypto string) (string, error) {
+func (f *storage) LoadPrivate(peerHome string, crypto string) string {
 	// locating file
 	var privateFile string
 
 	f.MakefilePath(peerHome, crypto)
 	files, err := ioutil.ReadDir(f.filePath)
 	if err != nil {
-		return "", err
+		models.Logger.Error(err)
+		return ""
 	}
 	if len(files) == 0 {
-		return "", errors.New("no private data found")
+		models.Logger.Error(fmt.Errorf("no private data found"))
+		return ""
 	}
 	for _, File := range files {
 		if strings.Contains(File.Name(), "private") {
 			privateFile = File.Name()
 		}
 	}
+
 	if privateFile == "" {
-		return "", nil
+		return ""
 	}
 	filePath := filepath.Join(f.filePath, privateFile)
 	models.Logger.Infof("File: %v", filePath)
@@ -149,15 +153,15 @@ func (f *storage) LoadPrivate(peerHome string, crypto string) (string, error) {
 	// reading file
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return "", errors.Wrapf(err,
-			"could not open the File for party in the expected location: %s. import private first.", filePath)
+		models.Logger.Error(fmt.Errorf("could not open the File for party in the expected location: %s. import private first. error: %v", filePath, err))
+		return ""
 	}
 	var key models.Private
 	if err = json.Unmarshal(bz, &key); err != nil {
-		return "", errors.Wrapf(err,
-			"could not unmarshal private data located at: %s", filePath)
+		models.Logger.Error(fmt.Errorf("could not unmarshal private data located at: %s, err: %v", filePath, err))
+		return ""
 	}
 
 	//creating data from file
-	return key.Private, nil
+	return key.Private
 }

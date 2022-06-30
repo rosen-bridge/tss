@@ -18,4 +18,5 @@ func InitRouting(e *echo.Echo, tssController TssController) {
 	e.POST("/keygen", tssController.Keygen())
 	e.POST("/import", tssController.Import())
 	e.GET("/export", tssController.Export())
+	e.POST("/regroup", tssController.Regroup())
 }

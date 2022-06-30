@@ -142,12 +142,10 @@ func TestEDDSA_Loop(t *testing.T) {
 		t.Error("failed to marshal message", err)
 	}
 
-	app := mockedInterface.NewRosenTss(t)
-
 	tests := []struct {
 		name      string
 		message   models.Message
-		AppConfig func()
+		AppConfig func() _interface.RosenTss
 	}{
 		{
 			name: "partyId",
@@ -161,12 +159,14 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "partyId",
 				},
 			},
-			AppConfig: func() {
+			AppConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
 				app.On("GetMetaData").Return(
 					models.MetaData{
 						PeersCount: 3,
 						Threshold:  2,
 					})
+				return app
 			},
 		},
 		{
@@ -181,8 +181,10 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "partyMsg",
 				},
 			},
-			AppConfig: func() {
+			AppConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
 				localTssData.Party = party
+				return app
 			},
 		},
 		{
@@ -197,8 +199,10 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "keygen",
 				},
 			},
-			AppConfig: func() {
+			AppConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
 				localTssData.Party = party
+				return app
 			},
 		},
 		{
@@ -213,8 +217,9 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "keygen",
 				},
 			},
-			AppConfig: func() {
+			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = nil
+				app := mockedInterface.NewRosenTss(t)
 				conn := mockedNetwork.NewConnection(t)
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 				app.On("GetConnection").Return(conn)
@@ -226,13 +231,14 @@ func TestEDDSA_Loop(t *testing.T) {
 						ReceiverId: "",
 						Name:       "keygen",
 					})
+				return app
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.AppConfig()
+			app := tt.AppConfig()
 			eddsaKeygenOp := operationEDDSAKeygen{
 				OperationKeygen: OperationKeygen{
 					LocalTssData: localTssData,
@@ -403,7 +409,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	// creating new tss party for eddsaKeygen
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
-		tss.S256(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
+		tss.Edwards(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
 	endCh := make(chan eddsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
 	localTssData.Party = eddsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)

@@ -155,7 +155,7 @@ func TestRosenTss_GetPeerHome(t *testing.T) {
 		},
 		storage:    storage,
 		connection: conn,
-		peerHome:   ".rosenTss",
+		peerHome:   "/tmp/.rosenTss",
 	}
 
 	home := app.GetPeerHome()
@@ -196,8 +196,8 @@ func TestRosenTss_SetPeerHome(t *testing.T) {
 		},
 		{
 			name:        "user home address, should be equal to expected",
-			homeAddress: "~/.rosenTss",
-			expected:    fmt.Sprintf("%s/.rosenTss", userHome),
+			homeAddress: "~/tmp/.rosenTss",
+			expected:    fmt.Sprintf("%s/tmp/.rosenTss", userHome),
 		},
 	}
 
@@ -296,7 +296,7 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 		},
 		storage:    storage,
 		connection: conn,
-		peerHome:   ".rosenTss",
+		peerHome:   "/tmp/.rosenTss",
 	}
 	messageCh := make(chan models.Message, 100)
 	channelMap := make(map[string]chan models.Message)
@@ -599,11 +599,148 @@ func TestRosenTss_GetPrivate(t *testing.T) {
 				peerHome: peerHome,
 				storage:  store,
 			}
-			private, err := app.GetPrivate(tt.private.Crypto)
+			private := app.GetPrivate(tt.private.Crypto)
+			assert.Equal(t, private, tt.private.Private)
+		})
+	}
+}
+
+/*	TestRosenTss_StartNewRegroup
+	TestCases:
+	testing message controller, there are 4 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- storage LoadPrivate, WriteData, LoadEDDSAKeygen function
+	- network Publish function
+*/
+func TestRosenTss_StartNewRegroup(t *testing.T) {
+	peerHome := "/tmp/.rosenTss"
+	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// reading eddsaKeygen.LocalPartySaveData data from fixtures
+	data, id, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
+	priv, _, _, err := utils.GenerateEDDSAKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	messageCh := make(chan models.Message, 100)
+	channelMapWithRegroup := make(map[string]chan models.Message)
+	channelMapWithoutRegroup := make(map[string]chan models.Message)
+	channelMapWithRegroup["regroup"] = messageCh
+	channelMapWithoutRegroup["no regroup"] = messageCh
+
+	tests := []struct {
+		name       string
+		channelMap map[string]chan models.Message
+		message    models.RegroupMessage
+		appConfig  func() rosenTss
+	}{
+		{
+			name:       "with channel id, peerStare 0",
+			channelMap: channelMapWithRegroup,
+			message: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeersCount:   3,
+				PeerState:    0,
+				Crypto:       "eddsa",
+			},
+			appConfig: func() rosenTss {
+				store := mockedStorage.NewStorage(t)
+				store.On("LoadEDDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.Message),
+					storage:    store,
+					connection: conn,
+					peerHome:   peerHome,
+				}
+			},
+		},
+		{
+			name:       "without channel id, peerStare 1 with private",
+			channelMap: channelMapWithoutRegroup,
+			message: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeersCount:   3,
+				PeerState:    1,
+				Crypto:       "eddsa",
+			},
+			appConfig: func() rosenTss {
+				store := mockedStorage.NewStorage(t)
+				store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
+
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.Message),
+					storage:    store,
+					connection: conn,
+					peerHome:   peerHome,
+				}
+			},
+		},
+		{
+			name:       "without channel id, peerStare 1 without private",
+			channelMap: channelMapWithoutRegroup,
+			message: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeersCount:   3,
+				PeerState:    1,
+				Crypto:       "eddsa",
+			},
+			appConfig: func() rosenTss {
+				store := mockedStorage.NewStorage(t)
+				store.On("WriteData",
+					mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+				store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", nil)
+
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.Message),
+					storage:    store,
+					connection: conn,
+					peerHome:   peerHome,
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := tt.appConfig()
+			app.ChannelMap = tt.channelMap
+			if tt.name == "error in loop" {
+				app.ChannelMap["keygen"] <- models.Message{
+					Topic: "tss",
+					Message: models.GossipMessage{
+						Message:    "generate key",
+						MessageId:  "keygen",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "keygen",
+					},
+				}
+			}
+			err := app.StartNewRegroup(tt.message)
 			if err != nil {
 				t.Error(err)
 			}
-			assert.Equal(t, private, tt.private.Private)
 		})
 	}
 }

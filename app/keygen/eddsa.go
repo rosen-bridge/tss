@@ -30,10 +30,7 @@ func (k *operationEDDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId str
 
 	if k.LocalTssData.PartyID == nil {
 		var private []byte
-		localPriv, err := rosenTss.GetPrivate("eddsa")
-		if err != nil {
-			return err
-		}
+		localPriv := rosenTss.GetPrivate("eddsa")
 		if localPriv == "" {
 			priv, _, _, err := utils.GenerateEDDSAKey()
 			if err != nil {
@@ -113,7 +110,7 @@ func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 					return err
 				}
 			case "keygen":
-				models.Logger.Info("received sign message: ",
+				models.Logger.Info("received keygen message: ",
 					fmt.Sprintf("from: %s", msg.SenderId))
 				outCh := make(chan tss.Message, len(k.LocalTssData.PartyIds))
 				endCh := make(chan eddsaKeygen.LocalPartySaveData, len(k.LocalTssData.PartyIds))
@@ -286,7 +283,7 @@ func (k *operationEDDSAKeygen) partyUpdate(partyMsg models.PartyMessage) error {
 	return nil
 }
 
-// Setup called after if Init up was successful. it used to create party params and sign message
+// Setup called after if Init up was successful. it used to create party params and keygen message
 func (k *operationEDDSAKeygen) setup(rosenTss _interface.RosenTss) error {
 	meta := rosenTss.GetMetaData()
 

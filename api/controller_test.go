@@ -298,3 +298,68 @@ func TestController_Keygen(t *testing.T) {
 	}
 
 }
+
+/*	TestController_Regroup
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are models.RegroupMessage used as test arguments.
+	Dependencies:
+	- rosenTss StartNewRegroup function
+*/
+func TestController_Regroup(t *testing.T) {
+	// Setup
+
+	tests := []struct {
+		name           string
+		regroupMessage models.RegroupMessage
+	}{
+		{
+			name: "new eddsa RegroupMessage",
+			regroupMessage: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeerState:    0,
+				PeersCount:   4,
+				Crypto:       "eddsa",
+			},
+		},
+		{
+			name: "success ecdsa RegroupMessage",
+			regroupMessage: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeerState:    0,
+				PeersCount:   4,
+				Crypto:       "ecdsa",
+			},
+		},
+	}
+
+	e := echo.New()
+	app := mockedApp.NewRosenTss(t)
+	app.On("StartNewRegroup", mock.AnythingOfType("models.RegroupMessage")).Return(nil)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			controller := NewTssController(app)
+			regroupHandler := controller.Regroup()
+			marshal, err := json.Marshal(tt.regroupMessage)
+			if err != nil {
+				return
+			}
+			req := httptest.NewRequest(http.MethodPost, "/regroup", bytes.NewBuffer(marshal))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			// Assertions
+			if assert.NoError(t, regroupHandler(c)) {
+				assert.Equal(t, http.StatusOK, rec.Code)
+			} else {
+				assert.Equal(t, http.StatusInternalServerError, rec.Code)
+			}
+		})
+	}
+
+}

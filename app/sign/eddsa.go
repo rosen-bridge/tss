@@ -123,6 +123,7 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 					}
 					models.Logger.Info("party started")
 					go func() {
+
 						err := s.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
@@ -228,6 +229,7 @@ func (s *operationEDDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss,
 						return err
 					}
 				} else {
+
 					err := s.setup(rosenTss)
 					if err != nil {
 						return err

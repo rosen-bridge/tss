@@ -169,14 +169,13 @@ func TestEDDSA_Loop(t *testing.T) {
 	}
 
 	// creating new app from mocked rosenTss, handling mock function done in each case separately
-	app := mockedInterface.NewRosenTss(t)
 
 	// test cases
 	tests := []struct {
 		name      string
 		expected  string
 		message   models.Message
-		AppConfig func()
+		AppConfig func() _interface.RosenTss
 	}{
 		{
 			name:     "partyId",
@@ -191,12 +190,14 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "partyId",
 				},
 			},
-			AppConfig: func() {
+			AppConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
 				app.On("GetMetaData").Return(
 					models.MetaData{
 						PeersCount: 3,
 						Threshold:  2,
 					})
+				return app
 			},
 		},
 		{
@@ -212,8 +213,10 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "partyMsg",
 				},
 			},
-			AppConfig: func() {
+			AppConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
 				localTssData.Party = party
+				return app
 			},
 		},
 		{
@@ -229,8 +232,10 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "sign",
 				},
 			},
-			AppConfig: func() {
+			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = party
+				app := mockedInterface.NewRosenTss(t)
+				return app
 			},
 		},
 		{
@@ -246,8 +251,9 @@ func TestEDDSA_Loop(t *testing.T) {
 					Name:       "sign",
 				},
 			},
-			AppConfig: func() {
+			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = nil
+				app := mockedInterface.NewRosenTss(t)
 				conn := mockedNetwork.NewConnection(t)
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 				app.On("GetConnection").Return(conn)
@@ -259,13 +265,14 @@ func TestEDDSA_Loop(t *testing.T) {
 						ReceiverId: "",
 						Name:       "sign",
 					})
+				return app
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.AppConfig()
+			app := tt.AppConfig()
 			eddsaSignOp := operationEDDSASign{
 				savedData: saveData,
 				OperationSign: OperationSign{
@@ -474,7 +481,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	// creating new tss.Party for eddsa sign
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
-		tss.S256(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
+		tss.Edwards(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
 	endCh := make(chan eddsaKeygen.LocalPartySaveData, len(localTssData.PartyIds))
 	localTssData.Party = eddsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)

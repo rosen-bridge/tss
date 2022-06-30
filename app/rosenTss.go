@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/keygen"
+	"rosen-bridge/tss/app/regroup"
 	"rosen-bridge/tss/app/sign"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
@@ -133,10 +134,43 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 	return nil
 }
 
+// StartNewRegroup starts Regroup scenario for app based on given protocol.
+func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
+	log.Printf("Starting New regroup process")
+
+	if _, ok := r.ChannelMap["regroup"]; !ok {
+		messageCh := make(chan models.Message, 100)
+		r.ChannelMap["regroup"] = messageCh
+		models.Logger.Infof("creating new channel in StartNewRegroup: %v", "regroup")
+	}
+
+	// read loop function
+	if regroupMessage.Crypto == "ecdsa" {
+		//TODO: implement this
+
+	} else if regroupMessage.Crypto == "eddsa" {
+		EDDSAOperation := regroup.NewRegroupEDDSAOperation(regroupMessage)
+		err := EDDSAOperation.Init(r, "")
+		if err != nil {
+			return err
+		}
+		go func() {
+			models.Logger.Info("calling loop")
+			err := EDDSAOperation.Loop(r, r.ChannelMap["regroup"])
+			if err != nil {
+				models.Logger.Errorf("en error occurred in eddsa regroup loop, err: %+v", err)
+				os.Exit(1)
+			}
+			models.Logger.Info("end of loop")
+		}()
+	}
+	return nil
+}
+
 // MessageHandler handles the receiving message from message route
 func (r *rosenTss) MessageHandler(message models.Message) {
 
-	models.Logger.Infof("new message: %v", message)
+	models.Logger.Infof("new message: %+v", message)
 	if _, ok := r.ChannelMap[message.Message.MessageId]; !ok {
 		models.Logger.Infof("creating new channel in MessageHandler: %v", message.Message.MessageId)
 		messageCh := make(chan models.Message, 100)
@@ -242,6 +276,7 @@ func (r *rosenTss) NewMessage(receiverId string, senderId string, message string
 	return m
 }
 
+// SetPrivate writes private data in a file in peer home folder
 func (r *rosenTss) SetPrivate(private models.Private) error {
 	err := r.GetStorage().WriteData(private, r.GetPeerHome(), privateFileFormat, private.Crypto)
 	if err != nil {
@@ -250,10 +285,8 @@ func (r *rosenTss) SetPrivate(private models.Private) error {
 	return nil
 }
 
-func (r *rosenTss) GetPrivate(crypto string) (string, error) {
-	private, err := r.GetStorage().LoadPrivate(r.GetPeerHome(), crypto)
-	if err != nil {
-		return "", err
-	}
-	return private, nil
+// GetPrivate returns private data from peer home folder
+func (r *rosenTss) GetPrivate(crypto string) string {
+	private := r.GetStorage().LoadPrivate(r.GetPeerHome(), crypto)
+	return private
 }

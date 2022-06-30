@@ -47,7 +47,7 @@ func (_m *Storage) LoadEDDSAKeygen(peerHome string) (keygen.LocalPartySaveData, 
 }
 
 // LoadPrivate provides a mock function with given fields: peerHome, crypto
-func (_m *Storage) LoadPrivate(peerHome string, crypto string) (string, error) {
+func (_m *Storage) LoadPrivate(peerHome string, crypto string) string {
 	ret := _m.Called(peerHome, crypto)
 
 	var r0 string
@@ -57,14 +57,7 @@ func (_m *Storage) LoadPrivate(peerHome string, crypto string) (string, error) {
 		r0 = ret.Get(0).(string)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(string, string) error); ok {
-		r1 = rf(peerHome, crypto)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // MakefilePath provides a mock function with given fields: peerHome, protocol

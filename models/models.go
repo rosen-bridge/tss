@@ -53,10 +53,9 @@ type TssData struct {
 
 type TssRegroupData struct {
 	PartyID          *tss.PartyID
-	Params           *tss.Parameters
 	RegroupingParams *tss.ReSharingParameters
-	NewParties       tss.SortedPartyIDs
-	OldParties       tss.SortedPartyIDs
+	NewPartyIds      tss.SortedPartyIDs
+	OldPartyIds      tss.SortedPartyIDs
 	Party            tss.Party
 	PeerState        int
 }
@@ -68,6 +67,14 @@ type PartyMessage struct {
 	IsBroadcast             bool
 	IsToOldCommittee        bool
 	IsToOldAndNewCommittees bool
+}
+
+type RegroupMessage struct {
+	PeerState    int    `json:"peerState"` // 0 for old and 1 for new
+	Crypto       string `json:"crypto"`
+	NewThreshold int    `json:"newThreshold"`
+	OldThreshold int    `json:"oldThreshold"`
+	PeersCount   int    `json:"peersCount"`
 }
 
 type KeygenMessage struct {

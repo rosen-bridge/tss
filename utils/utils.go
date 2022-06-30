@@ -3,6 +3,7 @@ package utils
 import (
 	"crypto/elliptic"
 	"crypto/rand"
+
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/mr-tron/base58"

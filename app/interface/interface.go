@@ -18,6 +18,7 @@ type RosenTss interface {
 	NewMessage(receiverId string, senderId string, message string, messageId string, name string) models.GossipMessage
 
 	StartNewSign(models.SignMessage) error
+	StartNewRegroup(models.RegroupMessage) error
 	StartNewKeygen(models.KeygenMessage) error
 	MessageHandler(models.Message)
 
@@ -31,5 +32,5 @@ type RosenTss interface {
 	GetPeerHome() string
 
 	SetPrivate(private models.Private) error
-	GetPrivate(string) (string, error)
+	GetPrivate(string) string
 }
