@@ -149,11 +149,11 @@ func TestECDSA_Loop(t *testing.T) {
 
 	// creating new tss party for ecdsa sign
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
-	localTssData.Params = tss.NewParameters(
+	params := tss.NewParameters(
 		tss.S256(), ctx, localTssData.PartyID, len(localTssData.PartyIds), 1)
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
 	endCh := make(chan common.SignatureData, len(localTssData.PartyIds))
-	party := ecdsaSign.NewLocalParty(signData, localTssData.Params, saveData, outCh, endCh)
+	party := ecdsaSign.NewLocalParty(signData, params, saveData, outCh, endCh)
 
 	partyIDMessage := fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign")
 
@@ -198,6 +198,17 @@ func TestECDSA_Loop(t *testing.T) {
 						PeersCount: 3,
 						Threshold:  2,
 					})
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(fmt.Errorf("message received"))
+				app.On("GetConnection").Return(conn)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign"),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
 				return app
 			},
 		},
@@ -217,6 +228,7 @@ func TestECDSA_Loop(t *testing.T) {
 			AppConfig: func() _interface.RosenTss {
 				app := mockedInterface.NewRosenTss(t)
 				localTssData.Party = party
+				localTssData.Params = params
 				return app
 			},
 		},
@@ -235,6 +247,7 @@ func TestECDSA_Loop(t *testing.T) {
 			},
 			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = party
+				localTssData.Params = params
 				app := mockedInterface.NewRosenTss(t)
 				return app
 			},
@@ -254,6 +267,7 @@ func TestECDSA_Loop(t *testing.T) {
 			},
 			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = nil
+				localTssData.Params = params
 				app := mockedInterface.NewRosenTss(t)
 				conn := mockedNetwork.NewConnection(t)
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
@@ -285,14 +299,16 @@ func TestECDSA_Loop(t *testing.T) {
 					},
 				},
 			}
-			messageCh := make(chan models.Message, 100)
+			messageCh := make(chan models.Message, 1)
 
 			messageCh <- tt.message
 			go func() {
 				time.Sleep(time.Second)
-				close(messageCh)
+				if len(messageCh) == 0 {
+					close(messageCh)
+				}
 			}()
-			errorList := []string{"invalid wire-format", "channel closed"}
+			errorList := []string{"invalid wire-format", "channel closed", "message received"}
 			err := ecdsaSignOp.Loop(app, messageCh)
 			if err != nil && !mockUtils.Contains(err.Error(), errorList) {
 				t.Error(err)

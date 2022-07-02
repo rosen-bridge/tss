@@ -24,7 +24,6 @@ type operationECDSASign struct {
 }
 
 func NewSignECDSAOperation(signMessage models.SignMessage) _interface.Operation {
-	fmt.Printf("signMessage: %+v", signMessage)
 	return &operationECDSASign{
 		OperationSign: sign.OperationSign{SignMessage: signMessage},
 	}
@@ -68,7 +67,6 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 	signData := utils.HashToInt(msgBytes)
-	fmt.Printf("signData: %+v\n", signData)
 
 	errorCh := make(chan error)
 
@@ -76,7 +74,10 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 		select {
 		case err := <-errorCh:
 			return err
-		case message := <-messageCh:
+		case message, ok := <-messageCh:
+			if !ok {
+				return fmt.Errorf("channel closed")
+			}
 			msg := message.Message
 			models.Logger.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {
@@ -120,6 +121,8 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				if s.LocalTssData.Party == nil {
 					s.LocalTssData.Party = ecdsaSigning.NewLocalParty(signData, s.LocalTssData.Params, s.savedData, outCh, endCh)
 					models.Logger.Infof("partyIds: %+v", s.LocalTssData.PartyIds)
+				}
+				if !s.LocalTssData.Party.Running() {
 					go func() {
 						if err := s.LocalTssData.Party.Start(); err != nil {
 							models.Logger.Error(err)
