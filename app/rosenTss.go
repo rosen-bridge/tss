@@ -19,7 +19,6 @@ import (
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
-	"rosen-bridge/tss/utils"
 	"strings"
 )
 
@@ -58,7 +57,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	if signMessage.Crypto == "ecdsa" {
 
 		msgBytes, _ := hex.DecodeString(signMessage.Message)
-		signData := utils.HashToInt(msgBytes)
+		signData := new(big.Int).SetBytes(msgBytes)
 		signDataBytes := blake2b.Sum256(signData.Bytes())
 		signDtaHash := hex.EncodeToString(signDataBytes[:])
 		log.Printf("signDtaHash: %v", signDtaHash)

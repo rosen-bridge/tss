@@ -47,11 +47,10 @@ func (s *operationECDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 		s.savedData = data
 		s.LocalTssData.PartyID = pID
 	}
-	models.Logger.Debugf("partyId: %+v\n", s.LocalTssData.PartyID)
 	message := fmt.Sprintf("%s,%s,%d,%s", s.LocalTssData.PartyID.Id, s.LocalTssData.PartyID.Moniker, s.LocalTssData.PartyID.KeyInt(), "fromSign")
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 
-	signData := utils.HashToInt(msgBytes)
+	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := hex.EncodeToString(signDataBytes[:])
 	jsonMessage := rosenTss.NewMessage(receiverId, s.LocalTssData.PartyID.Id, message, messageId, "partyId")
@@ -66,7 +65,7 @@ func (s *operationECDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
 
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
-	signData := utils.HashToInt(msgBytes)
+	signData := new(big.Int).SetBytes(msgBytes)
 
 	errorCh := make(chan error)
 
@@ -89,8 +88,7 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 					}
 				}
 			case "partyMsg":
-				models.Logger.Info("received party message:",
-					fmt.Sprintf("from: %s", msg.SenderId))
+				models.Logger.Info("received party message:", fmt.Sprintf("from: %s", msg.SenderId))
 				msgBytes, err := hex.DecodeString(msg.Message)
 				if err != nil {
 					return err
@@ -105,8 +103,7 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 					return err
 				}
 			case "sign":
-				models.Logger.Info("received sign message: ",
-					fmt.Sprintf("from: %s", msg.SenderId))
+				models.Logger.Info("received sign message: ", fmt.Sprintf("from: %s", msg.SenderId))
 				outCh := make(chan tss.Message, len(s.LocalTssData.PartyIds))
 				endCh := make(chan common.SignatureData, len(s.LocalTssData.PartyIds))
 				for {
@@ -120,7 +117,6 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 
 				if s.LocalTssData.Party == nil {
 					s.LocalTssData.Party = ecdsaSigning.NewLocalParty(signData, s.LocalTssData.Params, s.savedData, outCh, endCh)
-					models.Logger.Infof("partyIds: %+v", s.LocalTssData.PartyIds)
 				}
 				if !s.LocalTssData.Party.Running() {
 					go func() {
@@ -154,7 +150,7 @@ func (s *operationECDSASign) GetClassName() string {
 // HandleOutMessage handling party messages on out channel
 func (s *operationECDSASign) handleOutMessage(rosenTss _interface.RosenTss, partyMsg tss.Message) error {
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
-	signData := utils.HashToInt(msgBytes)
+	signData := new(big.Int).SetBytes(msgBytes)
 	msgHex, err := s.PartyMessageHandler(partyMsg)
 	if err != nil {
 		return err
@@ -172,18 +168,17 @@ func (s *operationECDSASign) handleOutMessage(rosenTss _interface.RosenTss, part
 // HandleEndMessage handling save data on end cahnnel of party
 func (s *operationECDSASign) handleEndMessage(rosenTss _interface.RosenTss, saveData *common.SignatureData) error {
 
-	sign := models.SignData{
+	signData := models.SignData{
 		Signature: hex.EncodeToString(saveData.Signature),
 		R:         hex.EncodeToString(saveData.R),
 		S:         hex.EncodeToString(saveData.S),
 		M:         hex.EncodeToString(saveData.M),
 	}
 
-	models.Logger.Infof("sign result: R: {%s}, S: {%s}, M:{%s}\n", sign.R, sign.S, sign.M)
-	models.Logger.Infof("signature: %v", sign.Signature)
-	models.Logger.Info("ECDSA signing test done.")
+	models.Logger.Infof("sign result: R: {%s}, S: {%s}, M:{%s}\n", signData.R, signData.S, signData.M)
+	models.Logger.Infof("signature: %v", signData.Signature)
 
-	err := rosenTss.GetConnection().CallBack(s.SignMessage.CallBackUrl, sign)
+	err := rosenTss.GetConnection().CallBack(s.SignMessage.CallBackUrl, signData)
 	if err != nil {
 		return err
 	}
@@ -216,10 +211,8 @@ func (s *operationECDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss,
 	if gossipMessage.SenderId != s.LocalTssData.PartyID.Id &&
 		(gossipMessage.ReceiverId == "" || gossipMessage.ReceiverId == s.LocalTssData.PartyID.Id) {
 
-		models.Logger.Info("received partyId message ",
-			fmt.Sprintf("from: %s", gossipMessage.SenderId))
+		models.Logger.Info("received partyId message ", fmt.Sprintf("from: %s", gossipMessage.SenderId))
 		partyIdParams := strings.Split(gossipMessage.Message, ",")
-		models.Logger.Infof("partyIdParams: %v", partyIdParams)
 		key, _ := new(big.Int).SetString(partyIdParams[2], 10)
 		newParty := tss.NewPartyID(partyIdParams[0], partyIdParams[1], key)
 
@@ -286,8 +279,10 @@ func (s *operationECDSASign) partyUpdate(partyMsg models.PartyMessage) error {
 
 // Setup called after if Init up was successful. it used to create party params and sign message
 func (s *operationECDSASign) setup(rosenTss _interface.RosenTss) error {
+	models.Logger.Info("setup called")
+
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
-	signData := utils.HashToInt(msgBytes)
+	signData := new(big.Int).SetBytes(msgBytes)
 
 	meta := rosenTss.GetMetaData()
 	models.Logger.Infof("meta %+v", meta)
@@ -299,17 +294,11 @@ func (s *operationECDSASign) setup(rosenTss _interface.RosenTss) error {
 	s.LocalTssData.PartyIds = tss.SortPartyIDs(
 		append(s.LocalTssData.PartyIds.ToUnSorted(), s.LocalTssData.PartyID))
 
-	models.Logger.Infof("partyIds {%+v}", s.LocalTssData.PartyIds)
-	models.Logger.Infof("partyIds count {%+v}", len(s.LocalTssData.PartyIds))
+	models.Logger.Infof("partyIds {%+v}, local partyId index {%d}", s.LocalTssData.PartyIds, s.LocalTssData.PartyID.Index)
 
 	ctx := tss.NewPeerContext(s.LocalTssData.PartyIds)
-	models.Logger.Info("creating params")
-	models.Logger.Infof("PartyID: %d, peerId: %s", s.LocalTssData.PartyID.Index, s.LocalTssData.PartyID.Id)
-
 	s.LocalTssData.Params = tss.NewParameters(
 		tss.S256(), ctx, s.LocalTssData.PartyID, len(s.LocalTssData.PartyIds), meta.Threshold)
-
-	models.Logger.Infof("params created: %v", s.LocalTssData.Params.EC().Params().N)
 	models.Logger.Infof("localECDSAData params: %v\n", *s.LocalTssData.Params)
 
 	messageBytes := blake2b.Sum256(signData.Bytes())
