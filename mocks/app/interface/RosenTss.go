@@ -112,13 +112,13 @@ func (_m *RosenTss) NewMessage(receiverId string, senderId string, message strin
 	return r0
 }
 
-// SetMetaData provides a mock function with given fields:
-func (_m *RosenTss) SetMetaData() error {
-	ret := _m.Called()
+// SetMetaData provides a mock function with given fields: _a0
+func (_m *RosenTss) SetMetaData(_a0 string) error {
+	ret := _m.Called(_a0)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
+	if rf, ok := ret.Get(0).(func(string) error); ok {
+		r0 = rf(_a0)
 	} else {
 		r0 = ret.Error(0)
 	}

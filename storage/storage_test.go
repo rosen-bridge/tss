@@ -3,6 +3,7 @@ package storage
 import (
 	"encoding/hex"
 	"fmt"
+	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/blake2b"
@@ -120,6 +121,58 @@ func TestStorage_LoadEDDSAKeygen(t *testing.T) {
 				t.Error(err)
 			}
 			assert.NotEqual(t, keygen, eddsaKeygen.LocalPartySaveData{})
+		})
+	}
+
+}
+
+/*	TestStorage_LoadECDSAKeygen
+	TestCases:
+	testing message controller, there is 1 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	-
+*/
+func TestStorage_LoadECDSAKeygen(t *testing.T) {
+	// creating peerHome
+	peerHome := "/tmp/.rosenTss"
+	path := fmt.Sprintf("%s/%s", peerHome, "ecdsa")
+
+	if err := os.MkdirAll(path, os.ModePerm); err != nil {
+		t.Error(err)
+	}
+
+	_, err := exec.Command("cp", "../mocks/_ecdsa_keygen_fixtures/keygen_data_00.json", "/tmp/.rosenTss/ecdsa/keygen_data.json").Output()
+	if err != nil {
+		t.Error(err)
+	}
+
+	tests := []struct {
+		name     string
+		peerHome string
+	}{
+		{
+			name:     "load ecdsa keygen data from home address, the result must have correct data",
+			peerHome: peerHome,
+		},
+	}
+
+	t.Cleanup(func() {
+		_, err = exec.Command("rm", "-rf", peerHome).Output()
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := storage{}
+			keygen, _, err := s.LoadECDSAKeygen(tt.peerHome)
+			if err != nil {
+				t.Error(err)
+			}
+			assert.NotEqual(t, keygen, ecdsaKeygen.LocalPartySaveData{})
 		})
 	}
 

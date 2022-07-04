@@ -1,4 +1,4 @@
-package sign
+package eddsa
 
 import (
 	"encoding/hex"
@@ -11,6 +11,7 @@ import (
 	"golang.org/x/crypto/blake2b"
 	"math/big"
 	"rosen-bridge/tss/app/interface"
+	"rosen-bridge/tss/app/sign"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/utils"
 	"strings"
@@ -18,13 +19,13 @@ import (
 )
 
 type operationEDDSASign struct {
-	OperationSign
+	sign.OperationSign
 	savedData eddsaKeygen.LocalPartySaveData
 }
 
 func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation {
 	return &operationEDDSASign{
-		OperationSign: OperationSign{SignMessage: signMessage},
+		OperationSign: sign.OperationSign{SignMessage: signMessage},
 	}
 }
 

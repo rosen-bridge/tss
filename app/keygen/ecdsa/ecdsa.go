@@ -125,10 +125,16 @@ func (k *operationECDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 
 				if k.LocalTssData.Party == nil {
 					k.LocalTssData.Party = ecdsaKeygen.NewLocalParty(k.LocalTssData.Params, outCh, endCh)
-					if err := k.LocalTssData.Party.Start(); err != nil {
-						return err
-					}
-					models.Logger.Info("party started")
+				}
+				if !k.LocalTssData.Party.Running() {
+					go func() {
+						if err := k.LocalTssData.Party.Start(); err != nil {
+							models.Logger.Error(err)
+							errorCh <- err
+							return
+						}
+						models.Logger.Info("party started")
+					}()
 					go func() {
 						err := k.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
