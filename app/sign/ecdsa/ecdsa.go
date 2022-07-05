@@ -37,11 +37,11 @@ func (s *operationECDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 	if s.LocalTssData.PartyID == nil {
 		data, pID, err := rosenTss.GetStorage().LoadECDSAKeygen(rosenTss.GetPeerHome())
 		if err != nil {
-			models.Logger.Info(err)
+			models.Logger.Error(err)
 			return err
 		}
 		if pID == nil {
-			models.Logger.Info("pIDs is nil")
+			models.Logger.Error("pIDs is nil")
 			return err
 		}
 		s.savedData = data

@@ -8,12 +8,15 @@ before_script:
   - mkdir -p .go
   - go env -w GO111MODULE=on
   - go env -w GOPROXY="https://goproxy.io,direct"
+  - go install github.com/vektra/mockery/v2@latest
 
 format:
   stage: test
   script:
+    - mockery --all --keeptree
     - go fmt $(go list ./...)
     # - go vet $(go list ./...)
+
 
 
 code_coverage:
