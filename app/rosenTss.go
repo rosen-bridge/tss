@@ -54,28 +54,27 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	if err != nil {
 		return err
 	}
+
+	msgBytes, _ := hex.DecodeString(signMessage.Message)
+	signData := new(big.Int).SetBytes(msgBytes)
+	signDataBytes := blake2b.Sum256(signData.Bytes())
+	signDataHash := hex.EncodeToString(signDataBytes[:])
+	log.Printf("signDtaHash: %v", signDataHash)
+
+	if _, ok := r.ChannelMap[signDataHash]; !ok {
+		messageCh := make(chan models.Message, 100)
+		r.ChannelMap[signDataHash] = messageCh
+		models.Logger.Infof("creating new channel in StartNewSign: %v", signDataHash)
+	}
+
 	if signMessage.Crypto == "ecdsa" {
-
-		msgBytes, _ := hex.DecodeString(signMessage.Message)
-		signData := new(big.Int).SetBytes(msgBytes)
-		signDataBytes := blake2b.Sum256(signData.Bytes())
-		signDtaHash := hex.EncodeToString(signDataBytes[:])
-		log.Printf("signDtaHash: %v", signDtaHash)
-
-		if _, ok := r.ChannelMap[signDtaHash]; !ok {
-			messageCh := make(chan models.Message, 100)
-			r.ChannelMap[signDtaHash] = messageCh
-			models.Logger.Infof("creating new channel in StartNewSign: %v", signDtaHash)
-		}
-
-		// read loop function
 		ECDSAOperation := ecdsa.NewSignECDSAOperation(signMessage)
 		err := ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
 		}
 		go func() {
-			err := ECDSAOperation.Loop(r, r.ChannelMap[signDtaHash])
+			err := ECDSAOperation.Loop(r, r.ChannelMap[signDataHash])
 			if err != nil {
 				models.Logger.Errorf("en error occurred in ecdsa sign loop, err: %+v", err)
 				os.Exit(1)
@@ -84,18 +83,6 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		}()
 
 	} else if signMessage.Crypto == "eddsa" {
-		msgBytes, _ := hex.DecodeString(signMessage.Message)
-		signData := new(big.Int).SetBytes(msgBytes)
-		signDataBytes := blake2b.Sum256(signData.Bytes())
-		signDtaHash := hex.EncodeToString(signDataBytes[:])
-		log.Printf("signDtaHash: %v", signDtaHash)
-
-		if _, ok := r.ChannelMap[signDtaHash]; !ok {
-			messageCh := make(chan models.Message, 100)
-			r.ChannelMap[signDtaHash] = messageCh
-			models.Logger.Infof("creating new channel in StartNewSign: %v", signDtaHash)
-		}
-
 		EDDSAOperation := eddsa.NewSignEDDSAOperation(signMessage)
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
@@ -103,7 +90,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		}
 		go func() {
 			models.Logger.Info("calling loop")
-			err := EDDSAOperation.Loop(r, r.ChannelMap[signDtaHash])
+			err := EDDSAOperation.Loop(r, r.ChannelMap[signDataHash])
 			if err != nil {
 				models.Logger.Errorf("en error occurred in eddsa sign loop, err: %+v", err)
 				os.Exit(1)

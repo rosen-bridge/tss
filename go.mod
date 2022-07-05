@@ -1,6 +1,6 @@
 module rosen-bridge/tss
 
-go 1.17
+go 1.18
 
 require (
 	github.com/binance-chain/tss-lib v1.3.3
