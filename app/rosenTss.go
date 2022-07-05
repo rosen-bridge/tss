@@ -12,11 +12,11 @@ import (
 	"os"
 	"path/filepath"
 	"rosen-bridge/tss/app/interface"
-	"rosen-bridge/tss/app/keygen/ecdsa"
-	"rosen-bridge/tss/app/keygen/eddsa"
+	ecdsaKeygen "rosen-bridge/tss/app/keygen/ecdsa"
+	eddsaKeygen "rosen-bridge/tss/app/keygen/eddsa"
 	"rosen-bridge/tss/app/regroup"
-	"rosen-bridge/tss/app/sign/ecdsa"
-	"rosen-bridge/tss/app/sign/eddsa"
+	ecdsaSign "rosen-bridge/tss/app/sign/ecdsa"
+	eddsaSign "rosen-bridge/tss/app/sign/eddsa"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
@@ -70,7 +70,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		}
 
 		// read loop function
-		ECDSAOperation := ecdsa.NewSignECDSAOperation(signMessage)
+		ECDSAOperation := ecdsaSign.NewSignECDSAOperation(signMessage)
 		err := ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -97,7 +97,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 			models.Logger.Infof("creating new channel in StartNewSign: %v", signDtaHash)
 		}
 
-		EDDSAOperation := eddsa.NewSignEDDSAOperation(signMessage)
+		EDDSAOperation := eddsaSign.NewSignEDDSAOperation(signMessage)
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -138,7 +138,7 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 
 	// read loop function
 	if keygenMessage.Crypto == "ecdsa" {
-		ECDSAOperation := ecdsa.NewKeygenECDSAOperation()
+		ECDSAOperation := ecdsaKeygen.NewKeygenECDSAOperation()
 		err := ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -154,7 +154,7 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		}()
 
 	} else if keygenMessage.Crypto == "eddsa" {
-		EDDSAOperation := eddsa.NewKeygenEDDSAOperation()
+		EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation()
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err

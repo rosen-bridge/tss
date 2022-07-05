@@ -72,7 +72,6 @@ func (k *operationECDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId str
 
 // Loop listens to the given channel and parsing the message based on the name
 func (k *operationECDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
-	models.Logger.Infof("channel", messageCh)
 	errorCh := make(chan error)
 
 	for {
@@ -222,7 +221,7 @@ func (k *operationECDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 	if gossipMessage.SenderId != k.LocalTssData.PartyID.Id &&
 		(gossipMessage.ReceiverId == "" || gossipMessage.ReceiverId == k.LocalTssData.PartyID.Id) {
 
-		models.Logger.Infof("received partyId message ",
+		models.Logger.Info("received partyId message ",
 			fmt.Sprintf("from: %s", gossipMessage.SenderId))
 		partyIdParams := strings.Split(gossipMessage.Message, ",")
 		models.Logger.Infof("partyIdParams: %v", partyIdParams)
@@ -235,17 +234,17 @@ func (k *operationECDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 
 		case "fromKeygen":
 			if !utils.IsPartyExist(newParty, k.LocalTssData.PartyIds) {
-
 				k.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(k.LocalTssData.PartyIds.ToUnSorted(), newParty))
-
-				if len(k.LocalTssData.PartyIds) < meta.Threshold {
-					err := k.Init(rosenTss, newParty.Id)
+			}
+			if k.LocalTssData.Params == nil {
+				if len(k.LocalTssData.PartyIds) >= meta.Threshold {
+					err := k.setup(rosenTss)
 					if err != nil {
 						return err
 					}
 				} else {
-					err := k.setup(rosenTss)
+					err := k.Init(rosenTss, "")
 					if err != nil {
 						return err
 					}
