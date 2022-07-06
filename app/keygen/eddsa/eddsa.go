@@ -72,7 +72,6 @@ func (k *operationEDDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId str
 
 // Loop listens to the given channel and parsing the message based on the name
 func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
-	models.Logger.Infof("channel", messageCh)
 	errorCh := make(chan error)
 
 	for {

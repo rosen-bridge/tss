@@ -37,16 +37,17 @@ func (s *operationECDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 	if s.LocalTssData.PartyID == nil {
 		data, pID, err := rosenTss.GetStorage().LoadECDSAKeygen(rosenTss.GetPeerHome())
 		if err != nil {
-			models.Logger.Info(err)
+			models.Logger.Error(err)
 			return err
 		}
 		if pID == nil {
-			models.Logger.Info("pIDs is nil")
+			models.Logger.Error("pIDs is nil")
 			return err
 		}
 		s.savedData = data
 		s.LocalTssData.PartyID = pID
 	}
+	fmt.Printf("saveData:%v\n", s.savedData.BigXj)
 	message := fmt.Sprintf("%s,%s,%d,%s", s.LocalTssData.PartyID.Id, s.LocalTssData.PartyID.Moniker, s.LocalTssData.PartyID.KeyInt(), "fromSign")
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 
@@ -116,6 +117,7 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				}
 
 				if s.LocalTssData.Party == nil {
+					fmt.Printf("here\n")
 					s.LocalTssData.Party = ecdsaSigning.NewLocalParty(signData, s.LocalTssData.Params, s.savedData, outCh, endCh)
 				}
 				if !s.LocalTssData.Party.Running() {
@@ -128,7 +130,6 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 						models.Logger.Info("party started")
 					}()
 					go func() {
-
 						err := s.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
@@ -299,7 +300,7 @@ func (s *operationECDSASign) setup(rosenTss _interface.RosenTss) error {
 	ctx := tss.NewPeerContext(s.LocalTssData.PartyIds)
 	s.LocalTssData.Params = tss.NewParameters(
 		tss.S256(), ctx, s.LocalTssData.PartyID, len(s.LocalTssData.PartyIds), meta.Threshold)
-	models.Logger.Infof("localECDSAData params: %v\n", *s.LocalTssData.Params)
+	models.Logger.Infof("localECDSAData params: %v\n", *s.LocalTssData.Params.EC().Params())
 
 	messageBytes := blake2b.Sum256(signData.Bytes())
 	messageId := hex.EncodeToString(messageBytes[:])

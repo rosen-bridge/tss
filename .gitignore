@@ -19,7 +19,13 @@ vendor/
 .idea/
 coverage.*
 *.log
-Taskfile.yaml
+
+# mocks created by mockery
+mocks/api
+mocks/app
+mocks/network
+mocks/storage
+mocks/vendor
 
 # mocks created by mockery
 mocks/api
