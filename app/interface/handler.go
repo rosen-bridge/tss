@@ -17,7 +17,7 @@ func (o *OperationHandler) PartyMessageHandler(partyMsg tss.Message) (string, er
 	if err != nil {
 		return "", err
 	}
-	models.Logger.Infof("outch string: {%s}", partyMsg.String())
+	models.Logger.Infof("outCh data: {%s}", partyMsg.String())
 	partyMessage := models.PartyMessage{
 		Message:                 msgBytes,
 		IsBroadcast:             partyMsg.IsBroadcast(),

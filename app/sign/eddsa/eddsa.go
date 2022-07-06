@@ -1,4 +1,4 @@
-package sign
+package eddsa
 
 import (
 	"encoding/hex"
@@ -11,6 +11,7 @@ import (
 	"golang.org/x/crypto/blake2b"
 	"math/big"
 	"rosen-bridge/tss/app/interface"
+	"rosen-bridge/tss/app/sign"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/utils"
 	"strings"
@@ -18,13 +19,13 @@ import (
 )
 
 type operationEDDSASign struct {
-	OperationSign
+	sign.OperationSign
 	savedData eddsaKeygen.LocalPartySaveData
 }
 
 func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation {
 	return &operationEDDSASign{
-		OperationSign: OperationSign{SignMessage: signMessage},
+		OperationSign: sign.OperationSign{SignMessage: signMessage},
 	}
 }
 
@@ -36,11 +37,11 @@ func (s *operationEDDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 	if s.LocalTssData.PartyID == nil {
 		data, pID, err := rosenTss.GetStorage().LoadEDDSAKeygen(rosenTss.GetPeerHome())
 		if err != nil {
-			models.Logger.Info(err)
+			models.Logger.Error(err)
 			return err
 		}
 		if pID == nil {
-			models.Logger.Info("pIDs is nil")
+			models.Logger.Error("pIDs is nil")
 			return err
 		}
 		s.savedData = data
@@ -62,7 +63,6 @@ func (s *operationEDDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 // Loop listens to the given channel and parsing the message based on the name
 func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
 
-	models.Logger.Infof("channel", messageCh)
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 

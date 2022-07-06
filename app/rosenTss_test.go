@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/hex"
 	"fmt"
+	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -67,7 +68,7 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 			app := rosenTss{
 				peerHome: peerHome,
 			}
-			err := app.SetMetaData()
+			err := app.SetMetaData("eddsa")
 			if err != nil {
 				t.Error(err)
 			}
@@ -357,7 +358,88 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 	- storage.LoadEDDSAKeygen function
 	- network struct
 */
-func TestRosenTss_StartNewSign(t *testing.T) {
+func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
+	// creating peer home folder and files
+	peerHome := "/tmp/.rosenTss"
+	err := os.MkdirAll(fmt.Sprintf("%s/ecdsa", peerHome), os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = exec.Command("cp", "../mocks/_config_fixtures/config.json", "/tmp/.rosenTss/ecdsa/config.json").Output()
+	if err != nil {
+		t.Error(err)
+	}
+
+	// using mocked structs and functions
+	storage := mockedStorage.NewStorage(t)
+	storage.On("LoadECDSAKeygen", mock.AnythingOfType("string")).Return(
+		ecdsaKeygen.LocalPartySaveData{}, nil, nil)
+	conn := mockedNetwork.NewConnection(t)
+
+	app := rosenTss{
+		ChannelMap: make(map[string]chan models.Message),
+		metaData: models.MetaData{
+			Threshold:  2,
+			PeersCount: 3,
+		},
+		storage:    storage,
+		connection: conn,
+		peerHome:   peerHome,
+	}
+
+	// creating fake channels and sign data
+	message := models.SignMessage{
+		Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+		Crypto:      "ecdsa",
+		CallBackUrl: "http://localhost:5050/callback/sign",
+	}
+	msgBytes, _ := hex.DecodeString(message.Message)
+	signData := new(big.Int).SetBytes(msgBytes)
+	signDataBytes := blake2b.Sum256(signData.Bytes())
+	messageId := hex.EncodeToString(signDataBytes[:])
+
+	messageCh := make(chan models.Message, 100)
+	channelMap := make(map[string]chan models.Message)
+	channelMapWithoutMessageId := make(map[string]chan models.Message)
+	channelMapWithoutMessageId["no sign"] = messageCh
+	channelMap[messageId] = messageCh
+
+	tests := []struct {
+		name       string
+		channelMap map[string]chan models.Message
+		messageId  string
+	}{
+		{
+			name:       "there is an channel map to messageId in channel map",
+			channelMap: channelMap,
+		},
+		{
+			name:       "there is no channel map to messageId in channel map",
+			channelMap: channelMapWithoutMessageId,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app.ChannelMap = tt.channelMap
+			err := app.StartNewSign(message)
+			if err != nil && err.Error() != "successful" {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+/*	TestRosenTss_StartNewSign
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- storage.LoadEDDSAKeygen function
+	- network struct
+*/
+func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 	// creating peer home folder and files
 	peerHome := "/tmp/.rosenTss"
 	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)

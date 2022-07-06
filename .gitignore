@@ -20,5 +20,12 @@ vendor/
 coverage.*
 *.log
 
+# mocks created by mockery
+mocks/api
+mocks/app
+mocks/network
+mocks/storage
+mocks/vendor
+
 # Go workspace file
 go.work

@@ -14,7 +14,8 @@ import (
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/keygen"
 	"rosen-bridge/tss/app/regroup"
-	"rosen-bridge/tss/app/sign"
+	"rosen-bridge/tss/app/sign/ecdsa"
+	"rosen-bridge/tss/app/sign/eddsa"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
@@ -49,7 +50,7 @@ func NewRosenTss(connection network.Connection, storage storage.Storage, homeAdd
 // StartNewSign starts sign scenario for app based on given protocol.
 func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	log.Printf("Starting New Sign process")
-	err := r.SetMetaData()
+	err := r.SetMetaData(signMessage.Crypto)
 	if err != nil {
 		return err
 	}
@@ -57,29 +58,39 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	msgBytes, _ := hex.DecodeString(signMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
-	signDtaHash := hex.EncodeToString(signDataBytes[:])
-	log.Printf("signDtaHash: %v", signDtaHash)
+	signDataHash := hex.EncodeToString(signDataBytes[:])
+	log.Printf("signDtaHash: %v", signDataHash)
 
-	if _, ok := r.ChannelMap[signDtaHash]; !ok {
+	if _, ok := r.ChannelMap[signDataHash]; !ok {
 		messageCh := make(chan models.Message, 100)
-		r.ChannelMap[signDtaHash] = messageCh
-		models.Logger.Infof("creating new channel in StartNewSign: %v", signDtaHash)
-
+		r.ChannelMap[signDataHash] = messageCh
+		models.Logger.Infof("creating new channel in StartNewSign: %v", signDataHash)
 	}
 
-	// read loop function
 	if signMessage.Crypto == "ecdsa" {
-		//TODO: implement this
+		ECDSAOperation := ecdsa.NewSignECDSAOperation(signMessage)
+		err := ECDSAOperation.Init(r, "")
+		if err != nil {
+			return err
+		}
+		go func() {
+			err := ECDSAOperation.Loop(r, r.ChannelMap[signDataHash])
+			if err != nil {
+				models.Logger.Errorf("en error occurred in ecdsa sign loop, err: %+v", err)
+				os.Exit(1)
+			}
+			models.Logger.Info("end of loop")
+		}()
 
 	} else if signMessage.Crypto == "eddsa" {
-		EDDSAOperation := sign.NewSignEDDSAOperation(signMessage)
+		EDDSAOperation := eddsa.NewSignEDDSAOperation(signMessage)
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err
 		}
 		go func() {
 			models.Logger.Info("calling loop")
-			err := EDDSAOperation.Loop(r, r.ChannelMap[signDtaHash])
+			err := EDDSAOperation.Loop(r, r.ChannelMap[signDataHash])
 			if err != nil {
 				models.Logger.Errorf("en error occurred in eddsa sign loop, err: %+v", err)
 				os.Exit(1)
@@ -170,7 +181,7 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 // MessageHandler handles the receiving message from message route
 func (r *rosenTss) MessageHandler(message models.Message) {
 
-	models.Logger.Infof("new message: %+v", message)
+	models.Logger.Infof("new message: %+v", message.Message.Name)
 	if _, ok := r.ChannelMap[message.Message.MessageId]; !ok {
 		models.Logger.Infof("creating new channel in MessageHandler: %v", message.Message.MessageId)
 		messageCh := make(chan models.Message, 100)
@@ -222,10 +233,10 @@ func (r *rosenTss) GetPeerHome() string {
 }
 
 // SetMetaData setting ups metadata from given file in the home directory
-func (r *rosenTss) SetMetaData() error {
+func (r *rosenTss) SetMetaData(crypto string) error {
 	// locating file
 	var configFile string
-	rootFolder := filepath.Join(r.peerHome, "eddsa")
+	rootFolder := filepath.Join(r.peerHome, crypto)
 	files, err := ioutil.ReadDir(rootFolder)
 	if err != nil {
 		log.Error(err)
