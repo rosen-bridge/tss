@@ -221,17 +221,6 @@ func TestECDSA_Loop(t *testing.T) {
 			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = nil
 				app := mockedInterface.NewRosenTss(t)
-				conn := mockedNetwork.NewConnection(t)
-				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
-				app.On("GetConnection").Return(conn)
-				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return(models.GossipMessage{
-						Message:    "generate key",
-						MessageId:  "keygen",
-						SenderId:   "cahj2pgs4eqvn1eo1tp0",
-						ReceiverId: "",
-						Name:       "keygen",
-					})
 				return app
 			},
 		},
@@ -245,11 +234,11 @@ func TestECDSA_Loop(t *testing.T) {
 					LocalTssData: localTssData,
 				},
 			}
-			messageCh := make(chan models.Message, 100)
+			messageCh := make(chan models.Message, 1)
 
 			messageCh <- tt.message
 			go func() {
-				time.Sleep(time.Millisecond * 100)
+				time.Sleep(time.Second)
 				close(messageCh)
 			}()
 			errorList := []string{"invalid wire-format", "channel closed"}

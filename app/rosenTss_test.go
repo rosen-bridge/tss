@@ -349,13 +349,13 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 	}
 }
 
-/*	TestRosenTss_StartNewSign
+/*	TestRosenTss_StartNewSign_ECDSA
 	TestCases:
 	testing message controller, there are 2 testcases.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
 	Dependencies:
-	- storage.LoadEDDSAKeygen function
+	- storage.LoadECDSAKeygen function
 	- network struct
 */
 func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
@@ -430,7 +430,7 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 	}
 }
 
-/*	TestRosenTss_StartNewSign
+/*	TestRosenTss_StartNewSign_EDDSA
 	TestCases:
 	testing message controller, there are 2 testcases.
 	each test case runs as a subtests.
@@ -511,7 +511,7 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 	}
 }
 
-/*	TestRosenTss_StartNewKeygen
+/*	TestRosenTss_StartNewKeygen_ECDSA
 	TestCases:
 	testing message controller, there are 2 testcases.
 	each test case runs as a subtests.
@@ -520,7 +520,98 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 	- storage LoadPrivate, WriteData function
 	- network Publish function
 */
-func TestRosenTss_StartNewKeygen(t *testing.T) {
+func TestRosenTss_StartNewKeygen_ECDSA(t *testing.T) {
+	peerHome := "/tmp/.rosenTss"
+	err := os.MkdirAll(fmt.Sprintf("%s/ecdsa", peerHome), os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	priv, _, _, err := utils.GenerateECDSAKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	storage := mockedStorage.NewStorage(t)
+	storage.On("WriteData",
+		mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+	storage.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
+
+	conn := mockedNetwork.NewConnection(t)
+	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+	app := rosenTss{
+		ChannelMap: make(map[string]chan models.Message),
+		metaData: models.MetaData{
+			Threshold:  2,
+			PeersCount: 3,
+		},
+		storage:    storage,
+		connection: conn,
+		peerHome:   peerHome,
+	}
+	messageCh := make(chan models.Message, 100)
+	channelMapWithKeygen := make(map[string]chan models.Message)
+	channelMapWithoutKeygen := make(map[string]chan models.Message)
+	channelMapWithKeygen["keygen"] = messageCh
+	channelMapWithoutKeygen["no keygen"] = messageCh
+	message := models.KeygenMessage{
+		Threshold:  2,
+		PeersCount: 3,
+		Crypto:     "ecdsa",
+	}
+
+	tests := []struct {
+		name       string
+		channelMap map[string]chan models.Message
+	}{
+		{
+			name:       "with channel id",
+			channelMap: channelMapWithKeygen,
+		},
+		{
+			name:       "without channel id",
+			channelMap: channelMapWithoutKeygen,
+		},
+		{
+			name:       "error in loop",
+			channelMap: channelMapWithKeygen,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app.ChannelMap = tt.channelMap
+			if tt.name == "error in loop" {
+				app.ChannelMap["keygen"] <- models.Message{
+					Topic: "tss",
+					Message: models.GossipMessage{
+						Message:    "generate key",
+						MessageId:  "keygen",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "keygen",
+					},
+				}
+			}
+			err := app.StartNewKeygen(message)
+			if err != nil && err.Error() != "successful" {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+/*	TestRosenTss_StartNewKeygen_EDDSA
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- storage LoadPrivate, WriteData function
+	- network Publish function
+*/
+func TestRosenTss_StartNewKeygen_EDDSA(t *testing.T) {
 	peerHome := "/tmp/.rosenTss"
 	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
 	if err != nil {
