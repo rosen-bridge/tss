@@ -1,12 +1,12 @@
 package ecdsa
 
 import (
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
-	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/mr-tron/base58"
 	"github.com/rs/xid"
 	"math/big"
@@ -179,8 +179,8 @@ func (k *operationECDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 	models.Logger.Infof("data index %v", index)
 
 	pkX, pkY := saveData.ECDSAPub.X(), saveData.ECDSAPub.Y()
-	pk := edwards.PublicKey{
-		Curve: tss.Edwards(),
+	pk := ecdsa.PublicKey{
+		Curve: tss.S256(),
 		X:     pkX,
 		Y:     pkY,
 	}
@@ -312,7 +312,7 @@ func (k *operationECDSAKeygen) setup(rosenTss _interface.RosenTss) error {
 	models.Logger.Info("creating params")
 	models.Logger.Infof("PartyID: %d, peerId: %s", k.LocalTssData.PartyID.Index, k.LocalTssData.PartyID.Id)
 	k.LocalTssData.Params = tss.NewParameters(
-		tss.Edwards(), ctx, k.LocalTssData.PartyID, len(k.LocalTssData.PartyIds), meta.Threshold)
+		tss.S256(), ctx, k.LocalTssData.PartyID, len(k.LocalTssData.PartyIds), meta.Threshold)
 	models.Logger.Infof("k.LocalTssData params: %v\n", *k.LocalTssData.Params)
 
 	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, "generate key", "keygen", "keygen")
