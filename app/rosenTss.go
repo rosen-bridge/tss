@@ -14,7 +14,8 @@ import (
 	"rosen-bridge/tss/app/interface"
 	ecdsaKeygen "rosen-bridge/tss/app/keygen/ecdsa"
 	eddsaKeygen "rosen-bridge/tss/app/keygen/eddsa"
-	"rosen-bridge/tss/app/regroup"
+	ecdsaRegroup "rosen-bridge/tss/app/regroup/ecdsa"
+	eddsaRegroup "rosen-bridge/tss/app/regroup/eddsa"
 	ecdsaSign "rosen-bridge/tss/app/sign/ecdsa"
 	eddsaSign "rosen-bridge/tss/app/sign/eddsa"
 	"rosen-bridge/tss/models"
@@ -176,10 +177,23 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 
 	// read loop function
 	if regroupMessage.Crypto == "ecdsa" {
-		//TODO: implement this
+		ECDSAOperation := ecdsaRegroup.NewRegroupECDSAOperation(regroupMessage)
+		err := ECDSAOperation.Init(r, "")
+		if err != nil {
+			return err
+		}
+		go func() {
+			models.Logger.Info("calling loop")
+			err := ECDSAOperation.Loop(r, r.ChannelMap["regroup"])
+			if err != nil {
+				models.Logger.Errorf("en error occurred in ecdsa regroup loop, err: %+v", err)
+				os.Exit(1)
+			}
+			models.Logger.Info("end of loop")
+		}()
 
 	} else if regroupMessage.Crypto == "eddsa" {
-		EDDSAOperation := regroup.NewRegroupEDDSAOperation(regroupMessage)
+		EDDSAOperation := eddsaRegroup.NewRegroupEDDSAOperation(regroupMessage)
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err

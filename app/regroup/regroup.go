@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	regroupFileName = "keygen_data.json"
+	RegroupFileName = "keygen_data.json"
 )
 
 type OperationRegroup struct {

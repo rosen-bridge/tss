@@ -1,4 +1,4 @@
-package regroup
+package eddsa
 
 import (
 	"encoding/hex"
@@ -9,6 +9,7 @@ import (
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/stretchr/testify/mock"
 	_interface "rosen-bridge/tss/app/interface"
+	"rosen-bridge/tss/app/regroup"
 	mockUtils "rosen-bridge/tss/mocks"
 	mockedNetwork "rosen-bridge/tss/mocks/network"
 	mockedStorage "rosen-bridge/tss/mocks/storage"
@@ -136,7 +137,7 @@ func TestEDDSA_Init(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 				},
 			}
@@ -303,7 +304,7 @@ func TestEDDSA_Loop(t *testing.T) {
 
 			eddsaRegroupOp := operationEDDSARegroup{
 				savedData: saveData,
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: localTssData,
 					RegroupMessage: models.RegroupMessage{
 						PeerState:    0,
@@ -517,7 +518,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			}
 			eddsaRegroupOp := operationEDDSARegroup{
 				savedData: data,
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState:   tt.peerState,
 						PartyID:     newPartyId,
@@ -658,7 +659,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 					RegroupMessage: models.RegroupMessage{
 						PeerState:    tt.localTssData.PeerState,
@@ -746,7 +747,7 @@ func TestEDDSA_setup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState:   tt.peerState,
 						OldPartyIds: localTssData.OldPartyIds,
@@ -826,7 +827,7 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PartyID: tt.localTssData.PartyID,
 					},
@@ -887,7 +888,7 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState: tt.peerState,
 					},
@@ -993,7 +994,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 				},
 			}
