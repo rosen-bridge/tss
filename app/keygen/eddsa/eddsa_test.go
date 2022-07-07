@@ -40,44 +40,86 @@ func TestEDDSA_Init(t *testing.T) {
 		t.Errorf("CreateNewLocalEDDSATSSData error = %v", err)
 	}
 
-	// using mocked structs and functions
-	app := mockedInterface.NewRosenTss(t)
-	conn := mockedNetwork.NewConnection(t)
-	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
-	app.On("GetConnection").Return(conn)
-	app.On("GetPrivate", mock.AnythingOfType("string")).Return("4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d", nil)
-	app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(models.GossipMessage{
-			Message:    fmt.Sprintf("%s,%s,%d,%s", localTssData.PartyID.Id, localTssData.PartyID.Moniker, localTssData.PartyID.KeyInt(), "fromKeygen"),
-			MessageId:  "keygen",
-			SenderId:   "cahj2pgs4eqvn1eo1tp0",
-			ReceiverId: "",
-			Name:       "partyId",
-		})
 	tests := []struct {
 		name         string
-		app          _interface.RosenTss
 		receiverId   string
 		localTssData models.TssData
+		appConfig    func() _interface.RosenTss
 	}{
 		{
 			name:         "creating partyId message with localTssData",
-			app:          app,
 			receiverId:   "",
 			localTssData: localTssData,
+			appConfig: func() _interface.RosenTss {
+				// using mocked structs and functions
+				app := mockedInterface.NewRosenTss(t)
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+				app.On("GetConnection").Return(conn)
+				app.On("GetPrivate", mock.AnythingOfType("string")).Return("4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d", nil)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s", localTssData.PartyID.Id, localTssData.PartyID.Moniker, localTssData.PartyID.KeyInt(), "fromKeygen"),
+						MessageId:  "keygen",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
+				return app
+			},
 		},
 		{
 			name:         "creating partyId message without localTssData",
-			app:          app,
 			receiverId:   "cahj2pgs4eqvn1eo1tp0",
 			localTssData: models.TssData{},
+			appConfig: func() _interface.RosenTss {
+				// using mocked structs and functions
+				app := mockedInterface.NewRosenTss(t)
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+				app.On("GetConnection").Return(conn)
+				app.On("GetPrivate", mock.AnythingOfType("string")).Return("4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d", nil)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s", localTssData.PartyID.Id, localTssData.PartyID.Moniker, localTssData.PartyID.KeyInt(), "fromKeygen"),
+						MessageId:  "keygen",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
+				return app
+			},
+		},
+		{
+			name:         "creating partyId message without localTssData and without private",
+			receiverId:   "cahj2pgs4eqvn1eo1tp0",
+			localTssData: models.TssData{},
+			appConfig: func() _interface.RosenTss {
+				// using mocked structs and functions
+				app := mockedInterface.NewRosenTss(t)
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+				app.On("GetConnection").Return(conn)
+				app.On("GetPrivate", mock.AnythingOfType("string")).Return("", nil)
+				app.On("SetPrivate", mock.AnythingOfType("models.Private")).Return(nil)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s", localTssData.PartyID.Id, localTssData.PartyID.Moniker, localTssData.PartyID.KeyInt(), "fromKeygen"),
+						MessageId:  "keygen",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
+				return app
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			app := tt.appConfig()
 			eddsaKeygenOp := operationEDDSAKeygen{}
-			err := eddsaKeygenOp.Init(tt.app, tt.receiverId)
+			err := eddsaKeygenOp.Init(app, tt.receiverId)
 			if err != nil {
 
 				t.Errorf("Init failed: %v", err)
