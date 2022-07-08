@@ -12,10 +12,11 @@ import (
 	"os"
 	"path/filepath"
 	"rosen-bridge/tss/app/interface"
-	"rosen-bridge/tss/app/keygen"
+	ecdsaKeygen "rosen-bridge/tss/app/keygen/ecdsa"
+	eddsaKeygen "rosen-bridge/tss/app/keygen/eddsa"
 	"rosen-bridge/tss/app/regroup"
-	"rosen-bridge/tss/app/sign/ecdsa"
-	"rosen-bridge/tss/app/sign/eddsa"
+	ecdsaSign "rosen-bridge/tss/app/sign/ecdsa"
+	eddsaSign "rosen-bridge/tss/app/sign/eddsa"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
@@ -68,7 +69,10 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	}
 
 	if signMessage.Crypto == "ecdsa" {
-		ECDSAOperation := ecdsa.NewSignECDSAOperation(signMessage)
+
+		// read loop function
+		ECDSAOperation := ecdsaSign.NewSignECDSAOperation(signMessage)
+
 		err := ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -83,7 +87,9 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		}()
 
 	} else if signMessage.Crypto == "eddsa" {
-		EDDSAOperation := eddsa.NewSignEDDSAOperation(signMessage)
+
+		EDDSAOperation := eddsaSign.NewSignEDDSAOperation(signMessage)
+
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -124,10 +130,23 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 
 	// read loop function
 	if keygenMessage.Crypto == "ecdsa" {
-		//TODO: implement this
+		ECDSAOperation := ecdsaKeygen.NewKeygenECDSAOperation()
+		err := ECDSAOperation.Init(r, "")
+		if err != nil {
+			return err
+		}
+		go func() {
+			models.Logger.Info("calling loop")
+			err := ECDSAOperation.Loop(r, r.ChannelMap["keygen"])
+			if err != nil {
+				models.Logger.Errorf("en error occurred in ecdsa Keygen loop, err: %+v", err)
+				os.Exit(1)
+			}
+			models.Logger.Info("end of loop")
+		}()
 
 	} else if keygenMessage.Crypto == "eddsa" {
-		EDDSAOperation := keygen.NewKeygenEDDSAOperation()
+		EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation()
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err

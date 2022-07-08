@@ -1,45 +1,46 @@
-package keygen
+package ecdsa
 
 import (
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
+	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
-	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/mr-tron/base58"
 	"github.com/rs/xid"
 	"math/big"
 	_interface "rosen-bridge/tss/app/interface"
+	"rosen-bridge/tss/app/keygen"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/utils"
 	"strings"
 	"time"
 )
 
-type operationEDDSAKeygen struct {
-	OperationKeygen
+type operationECDSAKeygen struct {
+	keygen.OperationKeygen
 }
 
-func NewKeygenEDDSAOperation() _interface.Operation {
-	return &operationEDDSAKeygen{}
+func NewKeygenECDSAOperation() _interface.Operation {
+	return &operationECDSAKeygen{}
 }
 
-func (k *operationEDDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId string) error {
+func (k *operationECDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId string) error {
 	models.Logger.Info("Init called")
 
 	if k.LocalTssData.PartyID == nil {
 		var private []byte
-		localPriv := rosenTss.GetPrivate("eddsa")
+		localPriv := rosenTss.GetPrivate("ecdsa")
 		if localPriv == "" {
-			priv, _, _, err := utils.GenerateEDDSAKey()
+			priv, _, _, err := utils.GenerateECDSAKey()
 			if err != nil {
 				private = nil
 				return err
 			}
 			err = rosenTss.SetPrivate(models.Private{
 				Private: hex.EncodeToString(priv),
-				Crypto:  "eddsa",
+				Crypto:  "ecdsa",
 			})
 			if err != nil {
 				return err
@@ -70,7 +71,7 @@ func (k *operationEDDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId str
 }
 
 // Loop listens to the given channel and parsing the message based on the name
-func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
+func (k *operationECDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
 	errorCh := make(chan error)
 
 	for {
@@ -112,7 +113,7 @@ func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 				models.Logger.Info("received keygen message: ",
 					fmt.Sprintf("from: %s", msg.SenderId))
 				outCh := make(chan tss.Message, len(k.LocalTssData.PartyIds))
-				endCh := make(chan eddsaKeygen.LocalPartySaveData, len(k.LocalTssData.PartyIds))
+				endCh := make(chan ecdsaKeygen.LocalPartySaveData, len(k.LocalTssData.PartyIds))
 				for {
 					if k.LocalTssData.Params == nil {
 						time.Sleep(time.Second)
@@ -122,11 +123,17 @@ func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 				}
 
 				if k.LocalTssData.Party == nil {
-					k.LocalTssData.Party = eddsaKeygen.NewLocalParty(k.LocalTssData.Params, outCh, endCh)
-					if err := k.LocalTssData.Party.Start(); err != nil {
-						return err
-					}
-					models.Logger.Info("party started")
+					k.LocalTssData.Party = ecdsaKeygen.NewLocalParty(k.LocalTssData.Params, outCh, endCh)
+				}
+				if !k.LocalTssData.Party.Running() {
+					go func() {
+						if err := k.LocalTssData.Party.Start(); err != nil {
+							models.Logger.Error(err)
+							errorCh <- err
+							return
+						}
+						models.Logger.Info("party started")
+					}()
 					go func() {
 						err := k.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
@@ -143,12 +150,12 @@ func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 }
 
 // GetClassName returns the class name
-func (k *operationEDDSAKeygen) GetClassName() string {
-	return "eddsaKeygen"
+func (k *operationECDSAKeygen) GetClassName() string {
+	return "ecdsaKeygen"
 }
 
 // HandleOutMessage handling party messages on out channel
-func (k *operationEDDSAKeygen) handleOutMessage(rosenTss _interface.RosenTss, partyMsg tss.Message) error {
+func (k *operationECDSAKeygen) handleOutMessage(rosenTss _interface.RosenTss, partyMsg tss.Message) error {
 	msgHex, err := k.PartyMessageHandler(partyMsg)
 	if err != nil {
 		return err
@@ -164,26 +171,26 @@ func (k *operationEDDSAKeygen) handleOutMessage(rosenTss _interface.RosenTss, pa
 }
 
 // HandleEndMessage handling save data on end cahnnel of party
-func (k *operationEDDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, saveData eddsaKeygen.LocalPartySaveData) error {
+func (k *operationECDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, saveData ecdsaKeygen.LocalPartySaveData) error {
 	index, err := saveData.OriginalIndex()
 	if err != nil {
 		return fmt.Errorf("should not be an error getting a party's index from save data %v", err)
 	}
 	models.Logger.Infof("data index %v", index)
 
-	pkX, pkY := saveData.EDDSAPub.X(), saveData.EDDSAPub.Y()
-	pk := edwards.PublicKey{
-		Curve: tss.Edwards(),
+	pkX, pkY := saveData.ECDSAPub.X(), saveData.ECDSAPub.Y()
+	pk := ecdsa.PublicKey{
+		Curve: tss.S256(),
 		X:     pkX,
 		Y:     pkY,
 	}
 
-	public := utils.GetPKFromEDDSAPub(pk.X, pk.Y)
+	public := utils.GetPKFromECDSAPub(pk.X, pk.Y)
 	encodedPK := base58.Encode(public)
 	models.Logger.Infof("pk length: %d", len(public))
 	models.Logger.Infof("base58 pk: %v", encodedPK)
 
-	err = rosenTss.GetStorage().WriteData(saveData, rosenTss.GetPeerHome(), keygenFileName, "eddsa")
+	err = rosenTss.GetStorage().WriteData(saveData, rosenTss.GetPeerHome(), keygen.KeygenFileName, "ecdsa")
 	if err != nil {
 		return err
 	}
@@ -191,7 +198,7 @@ func (k *operationEDDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 }
 
 // GossipMessageHandler handling all party messages on outCH and endCh
-func (k *operationEDDSAKeygen) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan eddsaKeygen.LocalPartySaveData) error {
+func (k *operationECDSAKeygen) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan ecdsaKeygen.LocalPartySaveData) error {
 	for {
 		select {
 		case partyMsg := <-outCh:
@@ -209,12 +216,12 @@ func (k *operationEDDSAKeygen) gossipMessageHandler(rosenTss _interface.RosenTss
 }
 
 // PartyIdMessageHandler handles partyId message and if cals setup functions if patryIds list length was at least equal to the threshold
-func (k *operationEDDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
+func (k *operationECDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
 
 	if gossipMessage.SenderId != k.LocalTssData.PartyID.Id &&
 		(gossipMessage.ReceiverId == "" || gossipMessage.ReceiverId == k.LocalTssData.PartyID.Id) {
 
-		models.Logger.Infof("received partyId message ",
+		models.Logger.Info("received partyId message ",
 			fmt.Sprintf("from: %s", gossipMessage.SenderId))
 		partyIdParams := strings.Split(gossipMessage.Message, ",")
 		models.Logger.Infof("partyIdParams: %v", partyIdParams)
@@ -227,17 +234,17 @@ func (k *operationEDDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 
 		case "fromKeygen":
 			if !utils.IsPartyExist(newParty, k.LocalTssData.PartyIds) {
-
 				k.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(k.LocalTssData.PartyIds.ToUnSorted(), newParty))
-
-				if len(k.LocalTssData.PartyIds) < meta.Threshold {
-					err := k.Init(rosenTss, newParty.Id)
+			}
+			if k.LocalTssData.Params == nil {
+				if len(k.LocalTssData.PartyIds) >= meta.Threshold {
+					err := k.setup(rosenTss)
 					if err != nil {
 						return err
 					}
 				} else {
-					err := k.setup(rosenTss)
+					err := k.Init(rosenTss, "")
 					if err != nil {
 						return err
 					}
@@ -251,8 +258,8 @@ func (k *operationEDDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 	return nil
 }
 
-// PartyUpdate updates partyIds in eddsa app party based on received message
-func (k *operationEDDSAKeygen) partyUpdate(partyMsg models.PartyMessage) error {
+// PartyUpdate updates partyIds in ecdsa app party based on received message
+func (k *operationECDSAKeygen) partyUpdate(partyMsg models.PartyMessage) error {
 	dest := partyMsg.To
 	if dest == nil { // broadcast!
 
@@ -283,7 +290,7 @@ func (k *operationEDDSAKeygen) partyUpdate(partyMsg models.PartyMessage) error {
 }
 
 // Setup called after if Init up was successful. it used to create party params and keygen message
-func (k *operationEDDSAKeygen) setup(rosenTss _interface.RosenTss) error {
+func (k *operationECDSAKeygen) setup(rosenTss _interface.RosenTss) error {
 	meta := rosenTss.GetMetaData()
 
 	models.Logger.Infof("meta %+v", meta)
@@ -305,7 +312,7 @@ func (k *operationEDDSAKeygen) setup(rosenTss _interface.RosenTss) error {
 	models.Logger.Info("creating params")
 	models.Logger.Infof("PartyID: %d, peerId: %s", k.LocalTssData.PartyID.Index, k.LocalTssData.PartyID.Id)
 	k.LocalTssData.Params = tss.NewParameters(
-		tss.Edwards(), ctx, k.LocalTssData.PartyID, len(k.LocalTssData.PartyIds), meta.Threshold)
+		tss.S256(), ctx, k.LocalTssData.PartyID, len(k.LocalTssData.PartyIds), meta.Threshold)
 	models.Logger.Infof("k.LocalTssData params: %v\n", *k.LocalTssData.Params)
 
 	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, "generate key", "keygen", "keygen")
