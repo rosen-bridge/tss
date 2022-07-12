@@ -29,7 +29,7 @@ const (
 )
 
 type rosenTss struct {
-	ChannelMap map[string]chan models.Message
+	ChannelMap map[string]chan models.GossipMessage
 	metaData   models.MetaData
 	storage    storage.Storage
 	connection network.Connection
@@ -40,7 +40,7 @@ type rosenTss struct {
 // NewRosenTss Constructor of an app
 func NewRosenTss(connection network.Connection, storage storage.Storage, homeAddress string) _interface.RosenTss {
 	return &rosenTss{
-		ChannelMap: make(map[string]chan models.Message),
+		ChannelMap: make(map[string]chan models.GossipMessage),
 		metaData:   models.MetaData{},
 		storage:    storage,
 		connection: connection,
@@ -64,7 +64,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	log.Printf("signDtaHash: %v", signDataHash)
 
 	if _, ok := r.ChannelMap[signDataHash]; !ok {
-		messageCh := make(chan models.Message, 100)
+		messageCh := make(chan models.GossipMessage, 100)
 		r.ChannelMap[signDataHash] = messageCh
 		models.Logger.Infof("creating new channel in StartNewSign: %v", signDataHash)
 	}
@@ -118,7 +118,7 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 	}
 
 	if _, ok := r.ChannelMap["keygen"]; !ok {
-		messageCh := make(chan models.Message, 100)
+		messageCh := make(chan models.GossipMessage, 100)
 		r.ChannelMap["keygen"] = messageCh
 		models.Logger.Infof("creating new channel in StartNewKeygen: %v", "keygen")
 	}
@@ -176,7 +176,7 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 	log.Printf("Starting New regroup process")
 
 	if _, ok := r.ChannelMap["regroup"]; !ok {
-		messageCh := make(chan models.Message, 100)
+		messageCh := make(chan models.GossipMessage, 100)
 		r.ChannelMap["regroup"] = messageCh
 		models.Logger.Infof("creating new channel in StartNewRegroup: %v", "regroup")
 	}
@@ -218,15 +218,23 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 }
 
 // MessageHandler handles the receiving message from message route
-func (r *rosenTss) MessageHandler(message models.Message) {
+func (r *rosenTss) MessageHandler(message models.Message) error {
 
-	models.Logger.Infof("new message: %+v", message.Message.Name)
-	if _, ok := r.ChannelMap[message.Message.MessageId]; !ok {
-		models.Logger.Infof("creating new channel in MessageHandler: %v", message.Message.MessageId)
-		messageCh := make(chan models.Message, 100)
-		r.ChannelMap[message.Message.MessageId] = messageCh
+	msgBytes := []byte(message.Message)
+	gossipMsg := models.GossipMessage{}
+	err := json.Unmarshal(msgBytes, &gossipMsg)
+	if err != nil {
+		return err
 	}
-	r.ChannelMap[message.Message.MessageId] <- message
+
+	models.Logger.Infof("new message: %+v", gossipMsg.Name)
+	if _, ok := r.ChannelMap[gossipMsg.MessageId]; !ok {
+		models.Logger.Infof("creating new channel in MessageHandler: %v", gossipMsg.MessageId)
+		messageCh := make(chan models.GossipMessage, 100)
+		r.ChannelMap[gossipMsg.MessageId] = messageCh
+	}
+	r.ChannelMap[gossipMsg.MessageId] <- gossipMsg
+	return nil
 }
 
 // GetStorage returns the storage

@@ -9,7 +9,7 @@ import (
 // Operation (sign, keygen , regroup for ecdsa and eddsa protocol)
 type Operation interface {
 	Init(RosenTss, string) error
-	Loop(RosenTss, chan models.Message) error
+	Loop(RosenTss, chan models.GossipMessage) error
 	GetClassName() string
 }
 
@@ -20,7 +20,7 @@ type RosenTss interface {
 	StartNewSign(models.SignMessage) error
 	StartNewRegroup(models.RegroupMessage) error
 	StartNewKeygen(models.KeygenMessage) error
-	MessageHandler(models.Message)
+	MessageHandler(models.Message) error
 
 	GetStorage() storage.Storage
 	GetConnection() network.Connection
