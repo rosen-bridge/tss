@@ -42,9 +42,14 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 	models.Logger.Infof("message published: {%+v}", msg.Name)
 	marshalledMessage, _ := json.Marshal(&msg)
 
-	values := models.Message{
+	type message struct {
+		Message string `json:"message"`
+		Channel string `json:"channel"`
+	}
+
+	values := message{
 		Message: string(marshalledMessage),
-		Topic:   "tss",
+		Channel: "tss",
 	}
 	jsonData, err := json.Marshal(values)
 	if err != nil {
