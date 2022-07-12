@@ -20,16 +20,12 @@ import (
 */
 func TestConnection_Publish(t *testing.T) {
 	// test for publish route, there must be no error and the response code and response type must bo correct
-	message := models.Message{
-		Message: models.GossipMessage{
-			Message:    "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-			SenderId:   "1",
-			ReceiverId: "",
-			Name:       "partyId",
-		},
-		Topic:  "tss",
-		Sender: "1",
+	message := models.GossipMessage{
+		Message:    "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+		MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+		SenderId:   "1",
+		ReceiverId: "",
+		Name:       "partyId",
 	}
 
 	cnn := connect{
@@ -61,7 +57,7 @@ func TestConnection_Publish(t *testing.T) {
 		},
 	}
 
-	err := cnn.Publish(message.Message)
+	err := cnn.Publish(message)
 	if err != nil {
 		t.Error(err)
 	}

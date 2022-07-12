@@ -104,18 +104,17 @@ func (r *operationECDSARegroup) Init(rosenTss _interface.RosenTss, receiverId st
 }
 
 // Loop listens to the given channel and parsing the message based on the name
-func (r *operationECDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
+func (r *operationECDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh chan models.GossipMessage) error {
 	errorCh := make(chan error)
 
 	for {
 		select {
 		case err := <-errorCh:
 			return err
-		case message, ok := <-messageCh:
+		case msg, ok := <-messageCh:
 			if !ok {
 				return fmt.Errorf("channel closed")
 			}
-			msg := message.Message
 			models.Logger.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {
 			case "partyId":

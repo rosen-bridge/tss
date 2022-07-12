@@ -175,21 +175,18 @@ func TestECDSA_Loop(t *testing.T) {
 	tests := []struct {
 		name      string
 		expected  string
-		message   models.Message
+		message   models.GossipMessage
 		AppConfig func() _interface.RosenTss
 	}{
 		{
 			name:     "partyId",
 			expected: "handling incoming partyId message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    partyIDMessage,
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "partyId",
-				},
+			message: models.GossipMessage{
+				Message:    partyIDMessage,
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyId",
 			},
 			AppConfig: func() _interface.RosenTss {
 				app := mockedInterface.NewRosenTss(t)
@@ -215,15 +212,12 @@ func TestECDSA_Loop(t *testing.T) {
 		{
 			name:     "partyMsg",
 			expected: "handling incoming partyMsg message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    hex.EncodeToString(partyMessageBytes),
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "partyMsg",
-				},
+			message: models.GossipMessage{
+				Message:    hex.EncodeToString(partyMessageBytes),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyMsg",
 			},
 			AppConfig: func() _interface.RosenTss {
 				app := mockedInterface.NewRosenTss(t)
@@ -235,15 +229,12 @@ func TestECDSA_Loop(t *testing.T) {
 		{
 			name:     "sign with party",
 			expected: "handling incoming sign message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    signData.String(),
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "sign",
-				},
+			message: models.GossipMessage{
+				Message:    signData.String(),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "sign",
 			},
 			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = party
@@ -255,15 +246,12 @@ func TestECDSA_Loop(t *testing.T) {
 		{
 			name:     "sign without party",
 			expected: "handling incoming sign message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    signData.String(),
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "sign",
-				},
+			message: models.GossipMessage{
+				Message:    signData.String(),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "sign",
 			},
 			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = nil
@@ -299,7 +287,7 @@ func TestECDSA_Loop(t *testing.T) {
 					},
 				},
 			}
-			messageCh := make(chan models.Message, 1)
+			messageCh := make(chan models.GossipMessage, 1)
 
 			messageCh <- tt.message
 			go func() {

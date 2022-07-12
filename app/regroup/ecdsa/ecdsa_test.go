@@ -227,36 +227,30 @@ func TestECDSA_Loop(t *testing.T) {
 	tests := []struct {
 		name      string
 		expected  string
-		message   models.Message
+		message   models.GossipMessage
 		AppConfig func()
 	}{
 		{
 			name:     "partyId",
 			expected: "handling incoming partyId message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    partyIDMessage,
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "partyId",
-				},
+			message: models.GossipMessage{
+				Message:    partyIDMessage,
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyId",
 			},
 			AppConfig: func() {},
 		},
 		{
 			name:     "partyMsg",
 			expected: "handling incoming partyMsg message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    hex.EncodeToString(partyMessageBytes),
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "partyMsg",
-				},
+			message: models.GossipMessage{
+				Message:    hex.EncodeToString(partyMessageBytes),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyMsg",
 			},
 			AppConfig: func() {
 				localTssData.Party = party
@@ -265,15 +259,12 @@ func TestECDSA_Loop(t *testing.T) {
 		{
 			name:     "regroup with party",
 			expected: "handling incoming regroup message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    "regroup pre params creates.",
-					MessageId:  "regroup",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "regroup",
-				},
+			message: models.GossipMessage{
+				Message:    "regroup pre params creates.",
+				MessageId:  "regroup",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "regroup",
 			},
 			AppConfig: func() {
 				localTssData.Party = party
@@ -282,15 +273,12 @@ func TestECDSA_Loop(t *testing.T) {
 		{
 			name:     "regroup without party",
 			expected: "handling incoming regroup message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    "regroup pre params creates.",
-					MessageId:  "regroup",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "regroup",
-				},
+			message: models.GossipMessage{
+				Message:    "regroup pre params creates.",
+				MessageId:  "regroup",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "regroup",
 			},
 			AppConfig: func() {
 				localTssData.Party = nil
@@ -316,7 +304,7 @@ func TestECDSA_Loop(t *testing.T) {
 				},
 			}
 
-			messageCh := make(chan models.Message, 100)
+			messageCh := make(chan models.GossipMessage, 100)
 
 			messageCh <- tt.message
 			go func() {

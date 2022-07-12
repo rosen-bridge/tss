@@ -47,7 +47,6 @@ func (s *operationECDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 		s.savedData = data
 		s.LocalTssData.PartyID = pID
 	}
-	fmt.Printf("saveData:%v\n", s.savedData.BigXj)
 	message := fmt.Sprintf("%s,%s,%d,%s", s.LocalTssData.PartyID.Id, s.LocalTssData.PartyID.Moniker, s.LocalTssData.PartyID.KeyInt(), "fromSign")
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 
@@ -116,7 +115,6 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				}
 
 				if s.LocalTssData.Party == nil {
-					fmt.Printf("here\n")
 					s.LocalTssData.Party = ecdsaSigning.NewLocalParty(signData, s.LocalTssData.Params, s.savedData, outCh, endCh)
 				}
 				if !s.LocalTssData.Party.Running() {

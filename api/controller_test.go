@@ -94,15 +94,12 @@ func TestController_Message(t *testing.T) {
 	}{
 		{
 			name: "new true message, get status code 200",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "partyId",
-				},
+			message: models.GossipMessage{
+				Message:    "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyId",
 			},
 			wantErr: false,
 		},

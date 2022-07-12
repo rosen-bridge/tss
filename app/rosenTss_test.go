@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
@@ -290,7 +291,7 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
 	app := rosenTss{
-		ChannelMap: make(map[string]chan models.Message),
+		ChannelMap: make(map[string]chan models.GossipMessage),
 		metaData: models.MetaData{
 			Threshold:  2,
 			PeersCount: 3,
@@ -299,40 +300,40 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 		connection: conn,
 		peerHome:   "/tmp/.rosenTss",
 	}
-	messageCh := make(chan models.Message, 100)
-	channelMap := make(map[string]chan models.Message)
+	messageCh := make(chan models.GossipMessage, 100)
+	channelMap := make(map[string]chan models.GossipMessage)
 	channelMap["ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1"] = messageCh
+
+	gossipMessage := models.GossipMessage{
+		Message:    "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+		MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+		SenderId:   "cahj2pgs4eqvn1eo1tp0",
+		ReceiverId: "",
+		Name:       "partyId",
+	}
+	marshal, err := json.Marshal(&gossipMessage)
+	if err != nil {
+		return
+	}
 
 	tests := []struct {
 		name       string
-		channelMap map[string]chan models.Message
+		channelMap map[string]chan models.GossipMessage
 		message    models.Message
 	}{
 		{
 			name: "the channel with messageId is exist in the channel map, there must be not error",
 			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "partyId",
-				},
+				Topic:   "tss",
+				Message: string(marshal),
 			},
 			channelMap: channelMap,
 		},
 		{
 			name: "the channel with messageId is not exist in the channel map, there must be no error",
 			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-					MessageId:  "aad5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "partyId",
-				},
+				Topic:   "tss",
+				Message: string(marshal),
 			},
 			channelMap: channelMap,
 		},
@@ -341,10 +342,17 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			app.MessageHandler(tt.message)
+			err := app.MessageHandler(tt.message)
+			if err != nil {
+				return
+			}
 
-			msg := <-app.ChannelMap[tt.message.Message.MessageId]
-			assert.Equal(t, msg, tt.message)
+			msg := <-app.ChannelMap[gossipMessage.MessageId]
+			marshal, err := json.Marshal(&msg)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, string(marshal), tt.message.Message)
 		})
 	}
 }
@@ -377,7 +385,7 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 	conn := mockedNetwork.NewConnection(t)
 
 	app := rosenTss{
-		ChannelMap: make(map[string]chan models.Message),
+		ChannelMap: make(map[string]chan models.GossipMessage),
 		metaData: models.MetaData{
 			Threshold:  2,
 			PeersCount: 3,
@@ -398,15 +406,15 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := hex.EncodeToString(signDataBytes[:])
 
-	messageCh := make(chan models.Message, 100)
-	channelMap := make(map[string]chan models.Message)
-	channelMapWithoutMessageId := make(map[string]chan models.Message)
+	messageCh := make(chan models.GossipMessage, 100)
+	channelMap := make(map[string]chan models.GossipMessage)
+	channelMapWithoutMessageId := make(map[string]chan models.GossipMessage)
 	channelMapWithoutMessageId["no sign"] = messageCh
 	channelMap[messageId] = messageCh
 
 	tests := []struct {
 		name       string
-		channelMap map[string]chan models.Message
+		channelMap map[string]chan models.GossipMessage
 		messageId  string
 	}{
 		{
@@ -458,7 +466,7 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 	conn := mockedNetwork.NewConnection(t)
 
 	app := rosenTss{
-		ChannelMap: make(map[string]chan models.Message),
+		ChannelMap: make(map[string]chan models.GossipMessage),
 		metaData: models.MetaData{
 			Threshold:  2,
 			PeersCount: 3,
@@ -479,15 +487,15 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := hex.EncodeToString(signDataBytes[:])
 
-	messageCh := make(chan models.Message, 100)
-	channelMap := make(map[string]chan models.Message)
-	channelMapWithoutMessageId := make(map[string]chan models.Message)
+	messageCh := make(chan models.GossipMessage, 100)
+	channelMap := make(map[string]chan models.GossipMessage)
+	channelMapWithoutMessageId := make(map[string]chan models.GossipMessage)
 	channelMapWithoutMessageId["no sign"] = messageCh
 	channelMap[messageId] = messageCh
 
 	tests := []struct {
 		name       string
-		channelMap map[string]chan models.Message
+		channelMap map[string]chan models.GossipMessage
 		messageId  string
 	}{
 		{
@@ -541,7 +549,7 @@ func TestRosenTss_StartNewKeygen_ECDSA(t *testing.T) {
 	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 
 	app := rosenTss{
-		ChannelMap: make(map[string]chan models.Message),
+		ChannelMap: make(map[string]chan models.GossipMessage),
 		metaData: models.MetaData{
 			Threshold:  2,
 			PeersCount: 3,
@@ -550,9 +558,9 @@ func TestRosenTss_StartNewKeygen_ECDSA(t *testing.T) {
 		connection: conn,
 		peerHome:   peerHome,
 	}
-	messageCh := make(chan models.Message, 100)
-	channelMapWithKeygen := make(map[string]chan models.Message)
-	channelMapWithoutKeygen := make(map[string]chan models.Message)
+	messageCh := make(chan models.GossipMessage, 100)
+	channelMapWithKeygen := make(map[string]chan models.GossipMessage)
+	channelMapWithoutKeygen := make(map[string]chan models.GossipMessage)
 	channelMapWithKeygen["keygen"] = messageCh
 	channelMapWithoutKeygen["no keygen"] = messageCh
 	message := models.KeygenMessage{
@@ -563,7 +571,7 @@ func TestRosenTss_StartNewKeygen_ECDSA(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		channelMap map[string]chan models.Message
+		channelMap map[string]chan models.GossipMessage
 	}{
 		{
 			name:       "with channel id",
@@ -583,15 +591,12 @@ func TestRosenTss_StartNewKeygen_ECDSA(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app.ChannelMap = tt.channelMap
 			if tt.name == "error in loop" {
-				app.ChannelMap["keygen"] <- models.Message{
-					Topic: "tss",
-					Message: models.GossipMessage{
-						Message:    "generate key",
-						MessageId:  "keygen",
-						SenderId:   "cahj2pgs4eqvn1eo1tp0",
-						ReceiverId: "",
-						Name:       "keygen",
-					},
+				app.ChannelMap["keygen"] <- models.GossipMessage{
+					Message:    "generate key",
+					MessageId:  "keygen",
+					SenderId:   "cahj2pgs4eqvn1eo1tp0",
+					ReceiverId: "",
+					Name:       "keygen",
 				}
 			}
 			err := app.StartNewKeygen(message)
@@ -632,7 +637,7 @@ func TestRosenTss_StartNewKeygen_EDDSA(t *testing.T) {
 	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 
 	app := rosenTss{
-		ChannelMap: make(map[string]chan models.Message),
+		ChannelMap: make(map[string]chan models.GossipMessage),
 		metaData: models.MetaData{
 			Threshold:  2,
 			PeersCount: 3,
@@ -641,9 +646,9 @@ func TestRosenTss_StartNewKeygen_EDDSA(t *testing.T) {
 		connection: conn,
 		peerHome:   peerHome,
 	}
-	messageCh := make(chan models.Message, 100)
-	channelMapWithKeygen := make(map[string]chan models.Message)
-	channelMapWithoutKeygen := make(map[string]chan models.Message)
+	messageCh := make(chan models.GossipMessage, 100)
+	channelMapWithKeygen := make(map[string]chan models.GossipMessage)
+	channelMapWithoutKeygen := make(map[string]chan models.GossipMessage)
 	channelMapWithKeygen["keygen"] = messageCh
 	channelMapWithoutKeygen["no keygen"] = messageCh
 	message := models.KeygenMessage{
@@ -654,7 +659,7 @@ func TestRosenTss_StartNewKeygen_EDDSA(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		channelMap map[string]chan models.Message
+		channelMap map[string]chan models.GossipMessage
 	}{
 		{
 			name:       "with channel id",
@@ -674,15 +679,12 @@ func TestRosenTss_StartNewKeygen_EDDSA(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app.ChannelMap = tt.channelMap
 			if tt.name == "error in loop" {
-				app.ChannelMap["keygen"] <- models.Message{
-					Topic: "tss",
-					Message: models.GossipMessage{
-						Message:    "generate key",
-						MessageId:  "keygen",
-						SenderId:   "cahj2pgs4eqvn1eo1tp0",
-						ReceiverId: "",
-						Name:       "keygen",
-					},
+				app.ChannelMap["keygen"] <- models.GossipMessage{
+					Message:    "generate key",
+					MessageId:  "keygen",
+					SenderId:   "cahj2pgs4eqvn1eo1tp0",
+					ReceiverId: "",
+					Name:       "keygen",
 				}
 			}
 			err := app.StartNewKeygen(message)
@@ -804,15 +806,15 @@ func TestRosenTss_StartNewRegroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	messageCh := make(chan models.Message, 100)
-	channelMapWithRegroup := make(map[string]chan models.Message)
-	channelMapWithoutRegroup := make(map[string]chan models.Message)
+	messageCh := make(chan models.GossipMessage, 100)
+	channelMapWithRegroup := make(map[string]chan models.GossipMessage)
+	channelMapWithoutRegroup := make(map[string]chan models.GossipMessage)
 	channelMapWithRegroup["regroup"] = messageCh
 	channelMapWithoutRegroup["no regroup"] = messageCh
 
 	tests := []struct {
 		name       string
-		channelMap map[string]chan models.Message
+		channelMap map[string]chan models.GossipMessage
 		message    models.RegroupMessage
 		appConfig  func() rosenTss
 	}{
@@ -833,7 +835,7 @@ func TestRosenTss_StartNewRegroup(t *testing.T) {
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 
 				return rosenTss{
-					ChannelMap: make(map[string]chan models.Message),
+					ChannelMap: make(map[string]chan models.GossipMessage),
 					storage:    store,
 					connection: conn,
 					peerHome:   peerHome,
@@ -858,7 +860,7 @@ func TestRosenTss_StartNewRegroup(t *testing.T) {
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 
 				return rosenTss{
-					ChannelMap: make(map[string]chan models.Message),
+					ChannelMap: make(map[string]chan models.GossipMessage),
 					storage:    store,
 					connection: conn,
 					peerHome:   peerHome,
@@ -885,7 +887,7 @@ func TestRosenTss_StartNewRegroup(t *testing.T) {
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
 
 				return rosenTss{
-					ChannelMap: make(map[string]chan models.Message),
+					ChannelMap: make(map[string]chan models.GossipMessage),
 					storage:    store,
 					connection: conn,
 					peerHome:   peerHome,
@@ -899,15 +901,12 @@ func TestRosenTss_StartNewRegroup(t *testing.T) {
 			app := tt.appConfig()
 			app.ChannelMap = tt.channelMap
 			if tt.name == "error in loop" {
-				app.ChannelMap["keygen"] <- models.Message{
-					Topic: "tss",
-					Message: models.GossipMessage{
-						Message:    "generate key",
-						MessageId:  "keygen",
-						SenderId:   "cahj2pgs4eqvn1eo1tp0",
-						ReceiverId: "",
-						Name:       "keygen",
-					},
+				app.ChannelMap["keygen"] <- models.GossipMessage{
+					Message:    "generate key",
+					MessageId:  "keygen",
+					SenderId:   "cahj2pgs4eqvn1eo1tp0",
+					ReceiverId: "",
+					Name:       "keygen",
 				}
 			}
 			err := app.StartNewRegroup(tt.message)
