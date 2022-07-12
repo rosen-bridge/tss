@@ -115,7 +115,10 @@ func (tssController *tssController) Message() echo.HandlerFunc {
 		}
 		c.Logger().Infof("message data: %+v ", data)
 
-		tssController.rosenTss.MessageHandler(data)
+		err := tssController.rosenTss.MessageHandler(data)
+		if err != nil {
+			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+		}
 
 		return c.JSON(http.StatusOK, response{
 			Message: "ok",

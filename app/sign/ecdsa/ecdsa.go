@@ -63,7 +63,7 @@ func (s *operationECDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 }
 
 // Loop listens to the given channel and parsing the message based on the name
-func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
+func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.GossipMessage) error {
 
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
@@ -74,11 +74,10 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 		select {
 		case err := <-errorCh:
 			return err
-		case message, ok := <-messageCh:
+		case msg, ok := <-messageCh:
 			if !ok {
 				return fmt.Errorf("channel closed")
 			}
-			msg := message.Message
 			models.Logger.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {
 			case "partyId":

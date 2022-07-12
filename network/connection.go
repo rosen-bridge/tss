@@ -40,9 +40,10 @@ func InitConnection(publishPath string, subscriptionPath string, p2pPort string)
 // Publish publishes a message to p2p
 func (c *connect) Publish(msg models.GossipMessage) error {
 	models.Logger.Infof("message published: {%+v}", msg.Name)
+	marshalledMessage, _ := json.Marshal(&msg)
 
 	values := models.Message{
-		Message: msg,
+		Message: string(marshalledMessage),
 		Topic:   "tss",
 	}
 	jsonData, err := json.Marshal(values)

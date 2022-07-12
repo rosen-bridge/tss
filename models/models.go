@@ -21,9 +21,9 @@ type SignData struct {
 }
 
 type Message struct {
-	Message GossipMessage `json:"message"`
-	Sender  string        `json:"sender"`
-	Topic   string        `json:"channel"`
+	Message string `json:"message"`
+	Sender  string `json:"sender"`
+	Topic   string `json:"channel"`
 }
 
 type GossipMessage struct {
