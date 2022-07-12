@@ -116,12 +116,6 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		PeersCount: keygenMessage.PeersCount,
 		Threshold:  keygenMessage.Threshold,
 	}
-	err := r.GetStorage().WriteData(meta, r.GetPeerHome(), "config.json", "eddsa")
-	if err != nil {
-		return err
-	}
-
-	r.metaData = meta
 
 	if _, ok := r.ChannelMap["keygen"]; !ok {
 		messageCh := make(chan models.Message, 100)
@@ -131,8 +125,14 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 
 	// read loop function
 	if keygenMessage.Crypto == "ecdsa" {
+		err := r.GetStorage().WriteData(meta, r.GetPeerHome(), "config.json", "ecdsa")
+		if err != nil {
+			return err
+		}
+
+		r.metaData = meta
 		ECDSAOperation := ecdsaKeygen.NewKeygenECDSAOperation()
-		err := ECDSAOperation.Init(r, "")
+		err = ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
 		}
@@ -147,8 +147,14 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		}()
 
 	} else if keygenMessage.Crypto == "eddsa" {
+		err := r.GetStorage().WriteData(meta, r.GetPeerHome(), "config.json", "eddsa")
+		if err != nil {
+			return err
+		}
+
+		r.metaData = meta
 		EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation()
-		err := EDDSAOperation.Init(r, "")
+		err = EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err
 		}

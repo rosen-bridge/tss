@@ -105,7 +105,6 @@ func (r *operationECDSARegroup) Init(rosenTss _interface.RosenTss, receiverId st
 
 // Loop listens to the given channel and parsing the message based on the name
 func (r *operationECDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
-	models.Logger.Infof("channel", messageCh)
 	errorCh := make(chan error)
 
 	for {
@@ -143,51 +142,52 @@ func (r *operationECDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 					return err
 				}
 			case "regroup":
-				if r.LocalTssData.Party == nil {
 
-					models.Logger.Infof("final NewPartyIds: %+v", r.LocalTssData.NewPartyIds)
-					models.Logger.Infof("final OldPartyIds: %+v", r.LocalTssData.OldPartyIds)
+				models.Logger.Infof("final NewPartyIds: %+v", r.LocalTssData.NewPartyIds)
+				models.Logger.Infof("final OldPartyIds: %+v", r.LocalTssData.OldPartyIds)
 
-					models.Logger.Info("received regroup message: ",
-						fmt.Sprintf("from: %s", msg.SenderId))
-					partiesLength := len(r.LocalTssData.NewPartyIds) + len(r.LocalTssData.OldPartyIds)
-					outCh := make(chan tss.Message, partiesLength)
-					endCh := make(chan ecdsaKeygen.LocalPartySaveData, partiesLength)
+				models.Logger.Info("received regroup message: ",
+					fmt.Sprintf("from: %s", msg.SenderId))
+				partiesLength := len(r.LocalTssData.NewPartyIds) + len(r.LocalTssData.OldPartyIds)
+				outCh := make(chan tss.Message, partiesLength)
+				endCh := make(chan ecdsaKeygen.LocalPartySaveData, partiesLength)
 
-					for {
-						if r.LocalTssData.RegroupingParams == nil {
-							time.Sleep(time.Second)
-							continue
-						} else {
-							break
-						}
+				for {
+					if r.LocalTssData.RegroupingParams == nil {
+						time.Sleep(time.Second)
+						continue
+					} else {
+						break
 					}
+				}
+				if r.LocalTssData.Party == nil {
 
 					models.Logger.Infof("LocalTssData %+v", r.LocalTssData)
 					r.LocalTssData.Party = ecdsaRegrouping.NewLocalParty(r.LocalTssData.RegroupingParams, r.savedData, outCh, endCh)
-					waitingFor := r.LocalTssData.Party.WaitingFor()
-					models.Logger.Infof("waiting for: %v", waitingFor)
-					if !r.LocalTssData.Party.Running() {
-						go func() {
-							if err := r.LocalTssData.Party.Start(); err != nil {
-								models.Logger.Error(err)
-								errorCh <- err
-								return
-							} else {
-								models.Logger.Info("party started")
-							}
-						}()
-					}
-
+				}
+				waitingFor := r.LocalTssData.Party.WaitingFor()
+				models.Logger.Infof("waiting for: %v", waitingFor)
+				if !r.LocalTssData.Party.Running() {
 					go func() {
-						err := r.gossipMessageHandler(rosenTss, outCh, endCh)
-						if err != nil {
+						if err := r.LocalTssData.Party.Start(); err != nil {
 							models.Logger.Error(err)
 							errorCh <- err
 							return
+						} else {
+							models.Logger.Info("party started")
 						}
 					}()
 				}
+
+				go func() {
+					err := r.gossipMessageHandler(rosenTss, outCh, endCh)
+					if err != nil {
+						models.Logger.Error(err)
+						errorCh <- err
+						return
+					}
+				}()
+
 			}
 		}
 	}
@@ -290,19 +290,11 @@ func (r *operationECDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 			if !utils.IsPartyExist(newParty, r.LocalTssData.OldPartyIds) {
 				r.LocalTssData.OldPartyIds = tss.SortPartyIDs(
 					append(r.LocalTssData.OldPartyIds.ToUnSorted(), newParty))
-				err := r.Init(rosenTss, newParty.Id)
-				if err != nil {
-					return err
-				}
 			}
 		case "1":
 			if !utils.IsPartyExist(newParty, r.LocalTssData.NewPartyIds) {
 				r.LocalTssData.NewPartyIds = tss.SortPartyIDs(
 					append(r.LocalTssData.NewPartyIds.ToUnSorted(), newParty))
-				err := r.Init(rosenTss, newParty.Id)
-				if err != nil {
-					return err
-				}
 			}
 		}
 		models.Logger.Infof("NewPartyIds: %+v\n", r.LocalTssData.NewPartyIds)
@@ -316,10 +308,20 @@ func (r *operationECDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 					if err != nil {
 						return err
 					}
+				} else {
+					err := r.Init(rosenTss, "")
+					if err != nil {
+						return err
+					}
 				}
 			case 1:
 				if len(r.LocalTssData.OldPartyIds) > r.RegroupMessage.OldThreshold && len(r.LocalTssData.NewPartyIds) >= r.RegroupMessage.NewThreshold {
 					err := r.setup(rosenTss)
+					if err != nil {
+						return err
+					}
+				} else {
+					err := r.Init(rosenTss, "")
 					if err != nil {
 						return err
 					}
