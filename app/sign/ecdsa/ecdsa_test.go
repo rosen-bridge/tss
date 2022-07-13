@@ -889,7 +889,7 @@ func TestECDSA_gossipMessageHandler(t *testing.T) {
 			case "party message":
 				outCh <- tt.tssMessage
 			}
-			err := ecdsaSignOp.gossipMessageHandler(tt.app, outCh, endCh)
+			_, err := ecdsaSignOp.gossipMessageHandler(tt.app, outCh, endCh)
 			if err != nil && err.Error() != "message received" {
 				t.Errorf("gossipMessageHandler error = %v", err)
 			}

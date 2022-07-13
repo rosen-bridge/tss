@@ -873,11 +873,10 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 			case "party message":
 				outCh <- tt.tssMessage
 			}
-			err := eddsaSignOp.gossipMessageHandler(tt.app, outCh, endCh)
+			_, err := eddsaSignOp.gossipMessageHandler(tt.app, outCh, endCh)
 			if err != nil && err.Error() != "message received" {
 				t.Errorf("gossipMessageHandler error = %v", err)
 			}
-
 		})
 	}
 }

@@ -93,7 +93,7 @@ func (r *operationECDSARegroup) Init(rosenTss _interface.RosenTss, receiverId st
 	message := fmt.Sprintf("%s,%s,%d,%s,%d",
 		r.LocalTssData.PartyID.Id, r.LocalTssData.PartyID.Moniker,
 		r.LocalTssData.PartyID.KeyInt(), "fromRegroup", r.LocalTssData.PeerState)
-	jsonMessage := rosenTss.NewMessage(receiverId, r.LocalTssData.PartyID.Id, message, "regroup", "partyId")
+	jsonMessage := rosenTss.NewMessage(receiverId, r.LocalTssData.PartyID.Id, message, "ecdsaRegroup", "partyId")
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err
@@ -110,6 +110,10 @@ func (r *operationECDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 	for {
 		select {
 		case err := <-errorCh:
+			if err.Error() == "close channel" {
+				close(messageCh)
+				return nil
+			}
 			return err
 		case msg, ok := <-messageCh:
 			if !ok {
@@ -141,10 +145,6 @@ func (r *operationECDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 					return err
 				}
 			case "regroup":
-
-				models.Logger.Infof("final NewPartyIds: %+v", r.LocalTssData.NewPartyIds)
-				models.Logger.Infof("final OldPartyIds: %+v", r.LocalTssData.OldPartyIds)
-
 				models.Logger.Info("received regroup message: ",
 					fmt.Sprintf("from: %s", msg.SenderId))
 				partiesLength := len(r.LocalTssData.NewPartyIds) + len(r.LocalTssData.OldPartyIds)
@@ -164,8 +164,6 @@ func (r *operationECDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 					models.Logger.Infof("LocalTssData %+v", r.LocalTssData)
 					r.LocalTssData.Party = ecdsaRegrouping.NewLocalParty(r.LocalTssData.RegroupingParams, r.savedData, outCh, endCh)
 				}
-				waitingFor := r.LocalTssData.Party.WaitingFor()
-				models.Logger.Infof("waiting for: %v", waitingFor)
 				if !r.LocalTssData.Party.Running() {
 					go func() {
 						if err := r.LocalTssData.Party.Start(); err != nil {
@@ -179,10 +177,14 @@ func (r *operationECDSARegroup) Loop(rosenTss _interface.RosenTss, messageCh cha
 				}
 
 				go func() {
-					err := r.gossipMessageHandler(rosenTss, outCh, endCh)
+					result, err := r.gossipMessageHandler(rosenTss, outCh, endCh)
 					if err != nil {
 						models.Logger.Error(err)
 						errorCh <- err
+						return
+					}
+					if result {
+						errorCh <- fmt.Errorf("close channel")
 						return
 					}
 				}()
@@ -204,7 +206,7 @@ func (r *operationECDSARegroup) handleOutMessage(rosenTss _interface.RosenTss, p
 		return err
 	}
 
-	jsonMessage := rosenTss.NewMessage("", r.LocalTssData.PartyID.Id, msgHex, "regroup", "partyMsg")
+	jsonMessage := rosenTss.NewMessage("", r.LocalTssData.PartyID.Id, msgHex, "ecdsaRegroup", "partyMsg")
 	err = rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err
@@ -248,19 +250,20 @@ func (r *operationECDSARegroup) handleEndMessage(rosenTss _interface.RosenTss, s
 }
 
 // gossipMessageHandler called in the main loop of message passing between peers for regrouping scenario.
-func (r *operationECDSARegroup) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan ecdsaKeygen.LocalPartySaveData) error {
+func (r *operationECDSARegroup) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan ecdsaKeygen.LocalPartySaveData) (bool, error) {
 	for {
 		select {
 		case partyMsg := <-outCh:
 			err := r.handleOutMessage(rosenTss, partyMsg)
 			if err != nil {
-				return err
+				return false, err
 			}
 		case save := <-endCh:
 			err := r.handleEndMessage(rosenTss, save)
 			if err != nil {
-				return err
+				return false, err
 			}
+			return true, nil
 		}
 	}
 }
@@ -276,7 +279,6 @@ func (r *operationECDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 	models.Logger.Info("received partyId message ",
 		fmt.Sprintf("from: %s", gossipMessage.SenderId))
 	partyIdParams := strings.Split(gossipMessage.Message, ",")
-	models.Logger.Infof("partyIdParams: %v", partyIdParams)
 	key, _ := new(big.Int).SetString(partyIdParams[2], 10)
 	newParty := tss.NewPartyID(partyIdParams[0], partyIdParams[1], key)
 
@@ -296,9 +298,6 @@ func (r *operationECDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 					append(r.LocalTssData.NewPartyIds.ToUnSorted(), newParty))
 			}
 		}
-		models.Logger.Infof("NewPartyIds: %+v\n", r.LocalTssData.NewPartyIds)
-		models.Logger.Infof("OldPartyIds: %+v\n", r.LocalTssData.OldPartyIds)
-
 		if r.LocalTssData.RegroupingParams == nil {
 			switch r.LocalTssData.PeerState {
 			case 0:
@@ -335,7 +334,6 @@ func (r *operationECDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 
 // PartyUpdate updates partyIds in ecdsa app party based on received message
 func (r *operationECDSARegroup) partyUpdate(partyMsg models.PartyMessage) error {
-	models.Logger.Infof("partyMsg: %+v", partyMsg)
 	dest := partyMsg.To
 	if dest == nil {
 		err := fmt.Errorf("did not expect a msg to have a nil destination during regrouping")
@@ -388,9 +386,8 @@ func (r *operationECDSARegroup) setup(rosenTss _interface.RosenTss) error {
 				append(r.LocalTssData.NewPartyIds.ToUnSorted(), r.LocalTssData.PartyID))
 		}
 	}
-
-	models.Logger.Infof("len NewPartyIds: %d", len(r.LocalTssData.NewPartyIds))
-	models.Logger.Infof("len OldPartyIds: %d", len(r.LocalTssData.OldPartyIds))
+	models.Logger.Infof("NewPartyIds: %+v\n", r.LocalTssData.NewPartyIds)
+	models.Logger.Infof("OldPartyIds: %+v\n", r.LocalTssData.OldPartyIds)
 
 	newCtx := tss.NewPeerContext(r.LocalTssData.NewPartyIds)
 	oldCtx := tss.NewPeerContext(r.LocalTssData.OldPartyIds)
@@ -399,7 +396,7 @@ func (r *operationECDSARegroup) setup(rosenTss _interface.RosenTss) error {
 	r.LocalTssData.RegroupingParams = tss.NewReSharingParameters(
 		tss.S256(), oldCtx, newCtx, r.LocalTssData.PartyID, r.RegroupMessage.PeersCount, r.RegroupMessage.OldThreshold,
 		len(r.LocalTssData.NewPartyIds), r.RegroupMessage.NewThreshold)
-	jsonMessage := rosenTss.NewMessage("", r.LocalTssData.PartyID.Id, "start regroup.", "regroup", "regroup")
+	jsonMessage := rosenTss.NewMessage("", r.LocalTssData.PartyID.Id, "start regroup.", "ecdsaRegroup", "regroup")
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err

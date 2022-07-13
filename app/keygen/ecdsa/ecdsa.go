@@ -62,7 +62,7 @@ func (k *operationECDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId str
 	message := fmt.Sprintf("%s,%s,%d,%s",
 		k.LocalTssData.PartyID.Id, k.LocalTssData.PartyID.Moniker,
 		k.LocalTssData.PartyID.KeyInt(), "fromKeygen")
-	jsonMessage := rosenTss.NewMessage(receiverId, k.LocalTssData.PartyID.Id, message, "keygen", "partyId")
+	jsonMessage := rosenTss.NewMessage(receiverId, k.LocalTssData.PartyID.Id, message, "ecdsaKeygen", "partyId")
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err
@@ -77,6 +77,10 @@ func (k *operationECDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 	for {
 		select {
 		case err := <-errorCh:
+			if err.Error() == "close channel" {
+				close(messageCh)
+				return nil
+			}
 			return err
 
 		case msg, ok := <-messageCh:
@@ -134,10 +138,14 @@ func (k *operationECDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 						models.Logger.Info("party started")
 					}()
 					go func() {
-						err := k.gossipMessageHandler(rosenTss, outCh, endCh)
+						result, err := k.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
 							errorCh <- err
+							return
+						}
+						if result {
+							errorCh <- fmt.Errorf("close channel")
 							return
 						}
 					}()
@@ -160,7 +168,7 @@ func (k *operationECDSAKeygen) handleOutMessage(rosenTss _interface.RosenTss, pa
 		return err
 	}
 
-	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, msgHex, "keygen", "partyMsg")
+	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, msgHex, "ecdsaKeygen", "partyMsg")
 	err = rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err
@@ -193,23 +201,26 @@ func (k *operationECDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 	if err != nil {
 		return err
 	}
+
+	k.LocalTssData = models.TssData{}
 	return nil
 }
 
 // GossipMessageHandler handling all party messages on outCH and endCh
-func (k *operationECDSAKeygen) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan ecdsaKeygen.LocalPartySaveData) error {
+func (k *operationECDSAKeygen) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan ecdsaKeygen.LocalPartySaveData) (bool, error) {
 	for {
 		select {
 		case partyMsg := <-outCh:
 			err := k.handleOutMessage(rosenTss, partyMsg)
 			if err != nil {
-				return err
+				return false, err
 			}
 		case save := <-endCh:
 			err := k.handleEndMessage(rosenTss, save)
 			if err != nil {
-				return err
+				return false, err
 			}
+			return true, nil
 		}
 	}
 }
@@ -223,7 +234,6 @@ func (k *operationECDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 		models.Logger.Info("received partyId message ",
 			fmt.Sprintf("from: %s", gossipMessage.SenderId))
 		partyIdParams := strings.Split(gossipMessage.Message, ",")
-		models.Logger.Infof("partyIdParams: %v", partyIdParams)
 		key, _ := new(big.Int).SetString(partyIdParams[2], 10)
 		newParty := tss.NewPartyID(partyIdParams[0], partyIdParams[1], key)
 
@@ -308,13 +318,13 @@ func (k *operationECDSAKeygen) setup(rosenTss _interface.RosenTss) error {
 			k.LocalTssData.PartyID = id
 		}
 	}
-	models.Logger.Info("creating params")
 	models.Logger.Infof("PartyID: %d, peerId: %s", k.LocalTssData.PartyID.Index, k.LocalTssData.PartyID.Id)
+
+	models.Logger.Info("creating params")
 	k.LocalTssData.Params = tss.NewParameters(
 		tss.S256(), ctx, k.LocalTssData.PartyID, len(k.LocalTssData.PartyIds), meta.Threshold)
-	models.Logger.Infof("k.LocalTssData params: %v\n", *k.LocalTssData.Params)
 
-	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, "generate key", "keygen", "keygen")
+	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, "generate key", "ecdsaKeygen", "keygen")
 
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {

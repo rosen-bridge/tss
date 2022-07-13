@@ -201,6 +201,11 @@ func TestRosenTss_SetPeerHome(t *testing.T) {
 			homeAddress: "~/tmp/.rosenTss",
 			expected:    fmt.Sprintf("%s/tmp/.rosenTss", userHome),
 		},
+		{
+			name:        "complete home address, should be equal to expected",
+			homeAddress: "/tmp/.rosenTss",
+			expected:    "/tmp/.rosenTss",
+		},
 	}
 
 	storage := mockedStorage.NewStorage(t)
@@ -780,7 +785,7 @@ func TestRosenTss_GetPrivate(t *testing.T) {
 	}
 }
 
-/*	TestRosenTss_StartNewRegroup
+/*	TestRosenTss_StartNewRegroup_ECDSA
 	TestCases:
 	testing message controller, there are 4 testcases.
 	each test case runs as a subtests.
@@ -789,7 +794,136 @@ func TestRosenTss_GetPrivate(t *testing.T) {
 	- storage LoadPrivate, WriteData, LoadEDDSAKeygen function
 	- network Publish function
 */
-func TestRosenTss_StartNewRegroup(t *testing.T) {
+func TestRosenTss_StartNewRegroup_ECDSA(t *testing.T) {
+	peerHome := "/tmp/.rosenTss"
+	err := os.MkdirAll(fmt.Sprintf("%s/ecdsa", peerHome), os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// reading ecdsaKeygen.LocalPartySaveData data from fixtures
+	data, id, err := mockUtils.LoadECDSAKeygenFixture(0)
+	if err != nil {
+		t.Errorf("LoadECDSAKeygenFixture error = %v", err)
+	}
+	priv, _, _, err := utils.GenerateECDSAKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	messageCh := make(chan models.GossipMessage, 100)
+	channelMapWithRegroup := make(map[string]chan models.GossipMessage)
+	channelMapWithoutRegroup := make(map[string]chan models.GossipMessage)
+	channelMapWithRegroup["regroup"] = messageCh
+	channelMapWithoutRegroup["no regroup"] = messageCh
+
+	tests := []struct {
+		name       string
+		channelMap map[string]chan models.GossipMessage
+		message    models.RegroupMessage
+		appConfig  func() rosenTss
+	}{
+		{
+			name:       "with channel id, peerStare 0",
+			channelMap: channelMapWithRegroup,
+			message: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeersCount:   3,
+				PeerState:    0,
+				Crypto:       "ecdsa",
+			},
+			appConfig: func() rosenTss {
+				store := mockedStorage.NewStorage(t)
+				store.On("LoadECDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.GossipMessage),
+					storage:    store,
+					connection: conn,
+					peerHome:   peerHome,
+				}
+			},
+		},
+		{
+			name:       "without channel id, peerStare 1 with private",
+			channelMap: channelMapWithoutRegroup,
+			message: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeersCount:   3,
+				PeerState:    1,
+				Crypto:       "ecdsa",
+			},
+			appConfig: func() rosenTss {
+				store := mockedStorage.NewStorage(t)
+				store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
+
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.GossipMessage),
+					storage:    store,
+					connection: conn,
+					peerHome:   peerHome,
+				}
+			},
+		},
+		{
+			name:       "without channel id, peerStare 1 without private",
+			channelMap: channelMapWithoutRegroup,
+			message: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeersCount:   3,
+				PeerState:    1,
+				Crypto:       "ecdsa",
+			},
+			appConfig: func() rosenTss {
+				store := mockedStorage.NewStorage(t)
+				store.On("WriteData",
+					mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+				store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", nil)
+
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.GossipMessage),
+					storage:    store,
+					connection: conn,
+					peerHome:   peerHome,
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := tt.appConfig()
+			app.ChannelMap = tt.channelMap
+
+			err := app.StartNewRegroup(tt.message)
+			if err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+/*	TestRosenTss_StartNewRegroup_EDDSA
+	TestCases:
+	testing message controller, there are 4 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- storage LoadPrivate, WriteData, LoadEDDSAKeygen function
+	- network Publish function
+*/
+func TestRosenTss_StartNewRegroup_EDDSA(t *testing.T) {
 	peerHome := "/tmp/.rosenTss"
 	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
 	if err != nil {
@@ -809,7 +943,7 @@ func TestRosenTss_StartNewRegroup(t *testing.T) {
 	messageCh := make(chan models.GossipMessage, 100)
 	channelMapWithRegroup := make(map[string]chan models.GossipMessage)
 	channelMapWithoutRegroup := make(map[string]chan models.GossipMessage)
-	channelMapWithRegroup["regroup"] = messageCh
+	channelMapWithRegroup["eddsaRegroup"] = messageCh
 	channelMapWithoutRegroup["no regroup"] = messageCh
 
 	tests := []struct {
@@ -900,18 +1034,65 @@ func TestRosenTss_StartNewRegroup(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			app.ChannelMap = tt.channelMap
-			if tt.name == "error in loop" {
-				app.ChannelMap["keygen"] <- models.GossipMessage{
-					Message:    "generate key",
-					MessageId:  "keygen",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "keygen",
-				}
-			}
-			err := app.StartNewRegroup(tt.message)
+
+			err = app.StartNewRegroup(tt.message)
 			if err != nil {
 				t.Error(err)
+			}
+		})
+	}
+}
+
+/*	TestRosenTss_deleteInstance
+	TestCases:
+	testing message controller, there are 4 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- storage LoadPrivate, WriteData, LoadEDDSAKeygen function
+	- network Publish function
+*/
+func TestRosenTss_deleteInstance(t *testing.T) {
+	peerHome := "/tmp/.rosenTss"
+	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	messageCh := make(chan models.GossipMessage, 100)
+	channelMap := make(map[string]chan models.GossipMessage)
+	channelId := "regroup"
+	channelMap[channelId] = messageCh
+
+	tests := []struct {
+		name       string
+		channelMap map[string]chan models.GossipMessage
+		message    models.RegroupMessage
+	}{
+		{
+			name:       "deleting channel and operation",
+			channelMap: channelMap,
+			message: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeersCount:   3,
+				PeerState:    0,
+				Crypto:       "eddsa",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := rosenTss{
+				ChannelMap: make(map[string]chan models.GossipMessage),
+				peerHome:   peerHome,
+			}
+			app.ChannelMap = tt.channelMap
+
+			app.deleteInstance(channelId)
+			if _, ok := app.ChannelMap[channelId]; ok {
+				t.Errorf("deleteInstance error: channel still exist")
 			}
 		})
 	}

@@ -803,7 +803,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 			case "party message":
 				outCh <- tt.tssMessage
 			}
-			err := eddsaKeygenOp.gossipMessageHandler(tt.app, outCh, endCh)
+			_, err := eddsaKeygenOp.gossipMessageHandler(tt.app, outCh, endCh)
 			if err != nil && err.Error() != "message received" {
 				t.Errorf("gossipMessageHandler error = %v", err)
 			}
