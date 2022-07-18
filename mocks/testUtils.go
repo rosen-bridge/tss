@@ -226,9 +226,9 @@ func LoadECDSAKeygenFixture(index int) (ecdsaKeygen.LocalPartySaveData, *tss.Par
 			"could not unmarshal data for party located at: %s\nerror: {%s}", filePath, err.Error())
 	}
 	for _, kbxj := range key.BigXj {
-		kbxj.SetCurve(tss.Edwards())
+		kbxj.SetCurve(tss.S256())
 	}
-	key.ECDSAPub.SetCurve(tss.Edwards())
+	key.ECDSAPub.SetCurve(tss.S256())
 	id := xid.New()
 	pMoniker := fmt.Sprintf("%s", id.String())
 	partyID := tss.NewPartyID(pMoniker, "tss/tssPeer", key.ShareID)

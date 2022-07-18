@@ -47,7 +47,6 @@ func (s *operationECDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 		s.savedData = data
 		s.LocalTssData.PartyID = pID
 	}
-	fmt.Printf("saveData:%v\n", s.savedData.BigXj)
 	message := fmt.Sprintf("%s,%s,%d,%s", s.LocalTssData.PartyID.Id, s.LocalTssData.PartyID.Moniker, s.LocalTssData.PartyID.KeyInt(), "fromSign")
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 
@@ -63,7 +62,7 @@ func (s *operationECDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 }
 
 // Loop listens to the given channel and parsing the message based on the name
-func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
+func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.GossipMessage) error {
 
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
@@ -73,12 +72,15 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 	for {
 		select {
 		case err := <-errorCh:
+			if err.Error() == "close channel" {
+				close(messageCh)
+				return nil
+			}
 			return err
-		case message, ok := <-messageCh:
+		case msg, ok := <-messageCh:
 			if !ok {
 				return fmt.Errorf("channel closed")
 			}
-			msg := message.Message
 			models.Logger.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {
 			case "partyId":
@@ -117,7 +119,6 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				}
 
 				if s.LocalTssData.Party == nil {
-					fmt.Printf("here\n")
 					s.LocalTssData.Party = ecdsaSigning.NewLocalParty(signData, s.LocalTssData.Params, s.savedData, outCh, endCh)
 				}
 				if !s.LocalTssData.Party.Running() {
@@ -130,10 +131,14 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 						models.Logger.Info("party started")
 					}()
 					go func() {
-						err := s.gossipMessageHandler(rosenTss, outCh, endCh)
+						result, err := s.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
 							errorCh <- err
+							return
+						}
+						if result {
+							errorCh <- fmt.Errorf("close channel")
 							return
 						}
 					}()
@@ -178,6 +183,7 @@ func (s *operationECDSASign) handleEndMessage(rosenTss _interface.RosenTss, save
 
 	models.Logger.Infof("sign result: R: {%s}, S: {%s}, M:{%s}\n", signData.R, signData.S, signData.M)
 	models.Logger.Infof("signature: %v", signData.Signature)
+	models.Logger.Info("ECDSA signing done.")
 
 	err := rosenTss.GetConnection().CallBack(s.SignMessage.CallBackUrl, signData)
 	if err != nil {
@@ -189,19 +195,20 @@ func (s *operationECDSASign) handleEndMessage(rosenTss _interface.RosenTss, save
 }
 
 // GossipMessageHandler handling all party messages on outCH and endCh
-func (s *operationECDSASign) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData) error {
+func (s *operationECDSASign) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData) (bool, error) {
 	for {
 		select {
 		case partyMsg := <-outCh:
 			err := s.handleOutMessage(rosenTss, partyMsg)
 			if err != nil {
-				return err
+				return false, err
 			}
 		case save := <-endCh:
 			err := s.handleEndMessage(rosenTss, &save)
 			if err != nil {
-				return err
+				return false, err
 			}
+			return true, nil
 		}
 	}
 }
@@ -298,9 +305,10 @@ func (s *operationECDSASign) setup(rosenTss _interface.RosenTss) error {
 	models.Logger.Infof("partyIds {%+v}, local partyId index {%d}", s.LocalTssData.PartyIds, s.LocalTssData.PartyID.Index)
 
 	ctx := tss.NewPeerContext(s.LocalTssData.PartyIds)
+
+	models.Logger.Info("creating params")
 	s.LocalTssData.Params = tss.NewParameters(
 		tss.S256(), ctx, s.LocalTssData.PartyID, len(s.LocalTssData.PartyIds), meta.Threshold)
-	models.Logger.Infof("localECDSAData params: %v\n", *s.LocalTssData.Params.EC().Params())
 
 	messageBytes := blake2b.Sum256(signData.Bytes())
 	messageId := hex.EncodeToString(messageBytes[:])

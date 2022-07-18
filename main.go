@@ -19,8 +19,20 @@ var (
 	cfgFile string
 )
 
-func init() {
-	err := initConfig()
+func main() {
+
+	// parsing cli flags
+	projectPort := flag.String("port", "4000", "project port (e.g. 4000)")
+	p2pPort := flag.String("p2pPort", "8080", "p2p port (e.g. 8080)")
+	publishPath := flag.String(
+		"publishPath", "/p2p/send", "publish path of p2p (e.g. /p2p/send)")
+	subscriptionPath := flag.String(
+		"subscriptionPath", "/p2p/channel/subscribe", "subscriptionPath for p2p (e.g. /p2p/channel/subscribe)")
+	configFile := flag.String(
+		"configFile", "./conf/conf.env", "config file")
+	flag.Parse()
+
+	err := initConfig(*configFile)
 	if err != nil {
 		panic(err)
 	}
@@ -31,19 +43,6 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-func main() {
-
-	// parsing cli flags
-	projectPort := flag.String("port", "4000", "project port (e.g. 4000)")
-	p2pPort := flag.String("p2pPort", "8080", "p2p port (e.g. 8080)")
-	publishPath := flag.String(
-		"publishPath", "/p2p/send", "publish path of p2p (e.g. /p2p/send)")
-
-	subscriptionPath := flag.String(
-		"subscriptionPath", "/p2p/channel/subscribe", "subscriptionPath for p2p (e.g. /p2p/channel/subscribe)")
-	flag.Parse()
 
 	// creating new instance of echo framework
 	e := echo.New()
@@ -57,7 +56,7 @@ func main() {
 	tss := app.NewRosenTss(conn, localStorage, homeAddress)
 
 	// setting up peer home based on configs
-	err := tss.SetPeerHome(homeAddress)
+	err = tss.SetPeerHome(homeAddress)
 	if err != nil {
 		e.Logger.Fatal(err)
 	}
@@ -76,16 +75,14 @@ func main() {
 }
 
 // initConfig reads in config file and ENV variables if set.
-func initConfig() error {
+func initConfig(configFile string) error {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
 
 		// Search config in home directory with name "default" (without extension).
-		viper.AddConfigPath("./conf")
-		viper.SetConfigName("conf")
-		viper.SetConfigType("env")
+		viper.SetConfigFile(configFile)
 
 	}
 

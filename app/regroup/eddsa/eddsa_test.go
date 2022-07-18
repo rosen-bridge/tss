@@ -1,4 +1,4 @@
-package regroup
+package eddsa
 
 import (
 	"encoding/hex"
@@ -7,8 +7,10 @@ import (
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	eddsaRegroup "github.com/binance-chain/tss-lib/eddsa/resharing"
 	"github.com/binance-chain/tss-lib/tss"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	_interface "rosen-bridge/tss/app/interface"
+	"rosen-bridge/tss/app/regroup"
 	mockUtils "rosen-bridge/tss/mocks"
 	mockedNetwork "rosen-bridge/tss/mocks/network"
 	mockedStorage "rosen-bridge/tss/mocks/storage"
@@ -136,7 +138,7 @@ func TestEDDSA_Init(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 				},
 			}
@@ -226,36 +228,30 @@ func TestEDDSA_Loop(t *testing.T) {
 	tests := []struct {
 		name      string
 		expected  string
-		message   models.Message
+		message   models.GossipMessage
 		AppConfig func()
 	}{
 		{
 			name:     "partyId",
 			expected: "handling incoming partyId message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    partyIDMessage,
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "partyId",
-				},
+			message: models.GossipMessage{
+				Message:    partyIDMessage,
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyId",
 			},
 			AppConfig: func() {},
 		},
 		{
 			name:     "partyMsg",
 			expected: "handling incoming partyMsg message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    hex.EncodeToString(partyMessageBytes),
-					MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "partyMsg",
-				},
+			message: models.GossipMessage{
+				Message:    hex.EncodeToString(partyMessageBytes),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyMsg",
 			},
 			AppConfig: func() {
 				localTssData.Party = party
@@ -264,15 +260,12 @@ func TestEDDSA_Loop(t *testing.T) {
 		{
 			name:     "regroup with party",
 			expected: "handling incoming regroup message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    "regroup pre params creates.",
-					MessageId:  "regroup",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "regroup",
-				},
+			message: models.GossipMessage{
+				Message:    "regroup pre params creates.",
+				MessageId:  "regroup",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "regroup",
 			},
 			AppConfig: func() {
 				localTssData.Party = party
@@ -281,15 +274,12 @@ func TestEDDSA_Loop(t *testing.T) {
 		{
 			name:     "regroup without party",
 			expected: "handling incoming regroup message from p2p, there must be no error out of err list",
-			message: models.Message{
-				Topic: "tss",
-				Message: models.GossipMessage{
-					Message:    "regroup pre params creates.",
-					MessageId:  "regroup",
-					SenderId:   "cahj2pgs4eqvn1eo1tp0",
-					ReceiverId: "",
-					Name:       "regroup",
-				},
+			message: models.GossipMessage{
+				Message:    "regroup pre params creates.",
+				MessageId:  "regroup",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "regroup",
 			},
 			AppConfig: func() {
 				localTssData.Party = nil
@@ -303,7 +293,7 @@ func TestEDDSA_Loop(t *testing.T) {
 
 			eddsaRegroupOp := operationEDDSARegroup{
 				savedData: saveData,
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: localTssData,
 					RegroupMessage: models.RegroupMessage{
 						PeerState:    0,
@@ -315,7 +305,7 @@ func TestEDDSA_Loop(t *testing.T) {
 				},
 			}
 
-			messageCh := make(chan models.Message, 100)
+			messageCh := make(chan models.GossipMessage, 100)
 
 			messageCh <- tt.message
 			go func() {
@@ -378,7 +368,10 @@ func TestEDDSA_GetClassName(t *testing.T) {
 func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 
 	data, id, _ := mockUtils.LoadEDDSAKeygenFixture(0)
-
+	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
+	if err != nil {
+		t.Errorf("createNewParty error = %v", err)
+	}
 	tests := []struct {
 		name          string
 		peerState     int
@@ -388,10 +381,10 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 		dataConfig    func() models.TssRegroupData
 	}{
 		{
-			name:      "handling new party with state 0",
+			name:      "handling new party with state 0 with true threshold",
 			peerState: 0,
 			gossipMessage: models.GossipMessage{
-				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", id.Id, id.Moniker, id.KeyInt(), "fromRegroup", 0),
+				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 				SenderId:   "cahj2pgs4eqvn1eo1tp0",
 				ReceiverId: "",
@@ -405,7 +398,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 				app.On("GetConnection").Return(conn)
 				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(models.GossipMessage{
-						Message:    fmt.Sprintf("%s,%s,%d,%s,%d", id.Id, id.Moniker, id.KeyInt(), "fromRegroup", 0),
+						Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
 						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 						SenderId:   "cahj2pgs4eqvn1eo1tp0",
 						ReceiverId: "",
@@ -436,10 +429,10 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "handling new party with state 1",
-			peerState: 1,
+			name:      "handling new party with state 0 with false threshold",
+			peerState: 0,
 			gossipMessage: models.GossipMessage{
-				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", id.Id, id.Moniker, id.KeyInt(), "fromRegroup", 1),
+				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 				SenderId:   "cahj2pgs4eqvn1eo1tp0",
 				ReceiverId: "",
@@ -453,7 +446,47 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 				app.On("GetConnection").Return(conn)
 				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(models.GossipMessage{
-						Message:    fmt.Sprintf("%s,%s,%d,%s,%d", id.Id, id.Moniker, id.KeyInt(), "fromRegroup", 0),
+						Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
+				return app
+			},
+			dataConfig: func() models.TssRegroupData {
+				localTssData := models.TssRegroupData{
+					PartyID: id,
+				}
+				id1, err := mockUtils.CreateNewEDDSAPartyId()
+				if err != nil {
+					t.Errorf("createNewParty error = %v", err)
+				}
+				localTssData.NewPartyIds = tss.SortPartyIDs(
+					append(localTssData.NewPartyIds.ToUnSorted(), id1))
+				return localTssData
+			},
+			wantErr: false,
+		},
+		{
+			name:      "handling new party with state 1 with true threshold",
+			peerState: 1,
+			gossipMessage: models.GossipMessage{
+				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 1),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyId",
+			},
+			appConfig: func() _interface.RosenTss {
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				app := mockedInterface.NewRosenTss(t)
+				app.On("GetConnection").Return(conn)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
 						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 						SenderId:   "cahj2pgs4eqvn1eo1tp0",
 						ReceiverId: "",
@@ -484,10 +517,50 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:      "handling new party with state 1 with false threshold",
+			peerState: 1,
+			gossipMessage: models.GossipMessage{
+				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 1),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyId",
+			},
+			appConfig: func() _interface.RosenTss {
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				app := mockedInterface.NewRosenTss(t)
+				app.On("GetConnection").Return(conn)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
+				return app
+			},
+			dataConfig: func() models.TssRegroupData {
+				localTssData := models.TssRegroupData{
+					PartyID: id,
+				}
+				id1, err := mockUtils.CreateNewEDDSAPartyId()
+				if err != nil {
+					t.Errorf("createNewParty error = %v", err)
+				}
+				localTssData.OldPartyIds = tss.SortPartyIDs(
+					append(localTssData.OldPartyIds.ToUnSorted(), id1))
+				return localTssData
+			},
+			wantErr: false,
+		},
+		{
 			name:      "handling new party with state 0 with wrong message",
 			peerState: 0,
 			gossipMessage: models.GossipMessage{
-				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", id.Id, id.Moniker, id.KeyInt(), "fromKeygen", 0),
+				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromKeygen", 0),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 				SenderId:   "cahj2pgs4eqvn1eo1tp0",
 				ReceiverId: "",
@@ -505,19 +578,38 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name:      "handling new party with state 0 with receiver not equal to local",
+			peerState: 0,
+			gossipMessage: models.GossipMessage{
+				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromKeygen", 0),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "cahj2pgs4eqvn1eo1tp1",
+				Name:       "partyId",
+			},
+			appConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
+				return app
+			},
+			dataConfig: func() models.TssRegroupData {
+				localTssData := models.TssRegroupData{
+					PartyID: id,
+				}
+				return localTssData
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			localTssData := tt.dataConfig()
-			newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
-			if err != nil {
-				t.Errorf("createNewParty error = %v", err)
-			}
+
 			eddsaRegroupOp := operationEDDSARegroup{
 				savedData: data,
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState:   tt.peerState,
 						PartyID:     newPartyId,
@@ -658,7 +750,7 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 					RegroupMessage: models.RegroupMessage{
 						PeerState:    tt.localTssData.PeerState,
@@ -746,7 +838,7 @@ func TestEDDSA_setup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState:   tt.peerState,
 						OldPartyIds: localTssData.OldPartyIds,
@@ -826,7 +918,7 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PartyID: tt.localTssData.PartyID,
 					},
@@ -887,7 +979,7 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState: tt.peerState,
 					},
@@ -993,7 +1085,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: OperationRegroup{
+				OperationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 				},
 			}
@@ -1007,9 +1099,14 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 			case "party message":
 				outCh <- tt.tssMessage
 			}
-			err := eddsaRegroupOp.gossipMessageHandler(app, outCh, endCh)
-			if err != nil && err.Error() != "message received" {
-				t.Errorf("gossipMessageHandler error = %v", err)
+			result, err := eddsaRegroupOp.gossipMessageHandler(app, outCh, endCh)
+			if err != nil {
+				assert.Equal(t, result, false)
+				if err.Error() != "message received" {
+					t.Errorf("gossipMessageHandler error = %v", err)
+				}
+			} else {
+				assert.Equal(t, result, true)
 			}
 
 		})

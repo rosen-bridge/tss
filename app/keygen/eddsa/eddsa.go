@@ -62,7 +62,7 @@ func (k *operationEDDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId str
 	message := fmt.Sprintf("%s,%s,%d,%s",
 		k.LocalTssData.PartyID.Id, k.LocalTssData.PartyID.Moniker,
 		k.LocalTssData.PartyID.KeyInt(), "fromKeygen")
-	jsonMessage := rosenTss.NewMessage(receiverId, k.LocalTssData.PartyID.Id, message, "keygen", "partyId")
+	jsonMessage := rosenTss.NewMessage(receiverId, k.LocalTssData.PartyID.Id, message, "eddsaKeygen", "partyId")
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err
@@ -71,19 +71,22 @@ func (k *operationEDDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId str
 }
 
 // Loop listens to the given channel and parsing the message based on the name
-func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
+func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan models.GossipMessage) error {
 	errorCh := make(chan error)
 
 	for {
 		select {
 		case err := <-errorCh:
+			if err.Error() == "close channel" {
+				close(messageCh)
+				return nil
+			}
 			return err
 
-		case message, ok := <-messageCh:
+		case msg, ok := <-messageCh:
 			if !ok {
 				return fmt.Errorf("channel closed")
 			}
-			msg := message.Message
 			models.Logger.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {
 			case "partyId":
@@ -129,10 +132,14 @@ func (k *operationEDDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 					}
 					models.Logger.Info("party started")
 					go func() {
-						err := k.gossipMessageHandler(rosenTss, outCh, endCh)
+						result, err := k.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
 							errorCh <- err
+							return
+						}
+						if result {
+							errorCh <- fmt.Errorf("close channel")
 							return
 						}
 					}()
@@ -155,7 +162,7 @@ func (k *operationEDDSAKeygen) handleOutMessage(rosenTss _interface.RosenTss, pa
 		return err
 	}
 
-	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, msgHex, "keygen", "partyMsg")
+	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, msgHex, "eddsaKeygen", "partyMsg")
 	err = rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err
@@ -168,7 +175,7 @@ func (k *operationEDDSAKeygen) handleOutMessage(rosenTss _interface.RosenTss, pa
 func (k *operationEDDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, saveData eddsaKeygen.LocalPartySaveData) error {
 	index, err := saveData.OriginalIndex()
 	if err != nil {
-		return fmt.Errorf("should not be an error getting a party's index from save data %v", err)
+		return fmt.Errorf("should not be an error getting a party's index from save data: %v", err)
 	}
 	models.Logger.Infof("data index %v", index)
 
@@ -192,19 +199,20 @@ func (k *operationEDDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 }
 
 // GossipMessageHandler handling all party messages on outCH and endCh
-func (k *operationEDDSAKeygen) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan eddsaKeygen.LocalPartySaveData) error {
+func (k *operationEDDSAKeygen) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan eddsaKeygen.LocalPartySaveData) (bool, error) {
 	for {
 		select {
 		case partyMsg := <-outCh:
 			err := k.handleOutMessage(rosenTss, partyMsg)
 			if err != nil {
-				return err
+				return false, err
 			}
 		case save := <-endCh:
 			err := k.handleEndMessage(rosenTss, save)
 			if err != nil {
-				return err
+				return false, err
 			}
+			return true, nil
 		}
 	}
 }
@@ -218,7 +226,6 @@ func (k *operationEDDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 		models.Logger.Infof("received partyId message ",
 			fmt.Sprintf("from: %s", gossipMessage.SenderId))
 		partyIdParams := strings.Split(gossipMessage.Message, ",")
-		models.Logger.Infof("partyIdParams: %v", partyIdParams)
 		key, _ := new(big.Int).SetString(partyIdParams[2], 10)
 		newParty := tss.NewPartyID(partyIdParams[0], partyIdParams[1], key)
 
@@ -233,7 +240,7 @@ func (k *operationEDDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 					append(k.LocalTssData.PartyIds.ToUnSorted(), newParty))
 
 				if len(k.LocalTssData.PartyIds) < meta.Threshold {
-					err := k.Init(rosenTss, newParty.Id)
+					err := k.Init(rosenTss, "")
 					if err != nil {
 						return err
 					}
@@ -285,6 +292,8 @@ func (k *operationEDDSAKeygen) partyUpdate(partyMsg models.PartyMessage) error {
 
 // Setup called after if Init up was successful. it used to create party params and keygen message
 func (k *operationEDDSAKeygen) setup(rosenTss _interface.RosenTss) error {
+	models.Logger.Info("setup called")
+
 	meta := rosenTss.GetMetaData()
 
 	models.Logger.Infof("meta %+v", meta)
@@ -293,23 +302,22 @@ func (k *operationEDDSAKeygen) setup(rosenTss _interface.RosenTss) error {
 		return fmt.Errorf("not eanough partyId")
 	}
 
-	models.Logger.Info("setup tss called")
 	k.LocalTssData.PartyIds = tss.SortPartyIDs(append(k.LocalTssData.PartyIds.ToUnSorted(), k.LocalTssData.PartyID))
 
 	ctx := tss.NewPeerContext(k.LocalTssData.PartyIds)
 	for _, id := range k.LocalTssData.PartyIds {
-		models.Logger.Infof("PartyID: %v	, peerId: %s, key: %v", id, id.Id, id.KeyInt())
+		models.Logger.Infof("PartyID: %v, peerId: %s, key: %v", id, id.Id, id.KeyInt())
 		if id.Id == k.LocalTssData.PartyID.Id {
 			k.LocalTssData.PartyID = id
 		}
 	}
-	models.Logger.Info("creating params")
 	models.Logger.Infof("PartyID: %d, peerId: %s", k.LocalTssData.PartyID.Index, k.LocalTssData.PartyID.Id)
+
+	models.Logger.Info("creating params")
 	k.LocalTssData.Params = tss.NewParameters(
 		tss.Edwards(), ctx, k.LocalTssData.PartyID, len(k.LocalTssData.PartyIds), meta.Threshold)
-	models.Logger.Infof("k.LocalTssData params: %v\n", *k.LocalTssData.Params)
 
-	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, "generate key", "keygen", "keygen")
+	jsonMessage := rosenTss.NewMessage("", k.LocalTssData.PartyID.Id, "generate key", "eddsaKeygen", "keygen")
 
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {

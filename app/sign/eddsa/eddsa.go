@@ -61,7 +61,7 @@ func (s *operationEDDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 }
 
 // Loop listens to the given channel and parsing the message based on the name
-func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.Message) error {
+func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.GossipMessage) error {
 
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
@@ -71,12 +71,15 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 	for {
 		select {
 		case err := <-errorCh:
+			if err.Error() == "close channel" {
+				close(messageCh)
+				return nil
+			}
 			return err
-		case message, ok := <-messageCh:
+		case msg, ok := <-messageCh:
 			if !ok {
 				return fmt.Errorf("channel closed")
 			}
-			msg := message.Message
 			models.Logger.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {
 			case "partyId":
@@ -123,11 +126,14 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 					}
 					models.Logger.Info("party started")
 					go func() {
-
-						err := s.gossipMessageHandler(rosenTss, outCh, endCh)
+						result, err := s.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
 							models.Logger.Error(err)
 							errorCh <- err
+							return
+						}
+						if result {
+							errorCh <- fmt.Errorf("close channel")
 							return
 						}
 					}()
@@ -172,7 +178,7 @@ func (s *operationEDDSASign) handleEndMessage(rosenTss _interface.RosenTss, save
 
 	models.Logger.Infof("sign result: R: {%s}, S: {%s}, M:{%s}\n", sign.R, sign.S, sign.M)
 	models.Logger.Infof("signature: %v", sign.Signature)
-	models.Logger.Info("EDDSA signing test done.")
+	models.Logger.Info("EDDSA signing done.")
 
 	err := rosenTss.GetConnection().CallBack(s.SignMessage.CallBackUrl, sign)
 	if err != nil {
@@ -184,19 +190,20 @@ func (s *operationEDDSASign) handleEndMessage(rosenTss _interface.RosenTss, save
 }
 
 // GossipMessageHandler handling all party messages on outCH and endCh
-func (s *operationEDDSASign) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData) error {
+func (s *operationEDDSASign) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData) (bool, error) {
 	for {
 		select {
 		case partyMsg := <-outCh:
 			err := s.handleOutMessage(rosenTss, partyMsg)
 			if err != nil {
-				return err
+				return false, err
 			}
 		case save := <-endCh:
 			err := s.handleEndMessage(rosenTss, &save)
 			if err != nil {
-				return err
+				return false, err
 			}
+			return true, nil
 		}
 	}
 }
@@ -288,18 +295,13 @@ func (s *operationEDDSASign) setup(rosenTss _interface.RosenTss) error {
 	s.LocalTssData.PartyIds = tss.SortPartyIDs(
 		append(s.LocalTssData.PartyIds.ToUnSorted(), s.LocalTssData.PartyID))
 
-	models.Logger.Infof("partyIds {%+v}", s.LocalTssData.PartyIds)
-	models.Logger.Infof("partyIds count {%+v}", len(s.LocalTssData.PartyIds))
+	models.Logger.Infof("partyIds {%+v}, local partyId index {%d}", s.LocalTssData.PartyIds, s.LocalTssData.PartyID.Index)
 
 	ctx := tss.NewPeerContext(s.LocalTssData.PartyIds)
-	models.Logger.Info("creating params")
-	models.Logger.Infof("PartyID: %d, peerId: %s", s.LocalTssData.PartyID.Index, s.LocalTssData.PartyID.Id)
 
+	models.Logger.Info("creating params")
 	s.LocalTssData.Params = tss.NewParameters(
 		tss.Edwards(), ctx, s.LocalTssData.PartyID, len(s.LocalTssData.PartyIds), meta.Threshold)
-
-	models.Logger.Infof("params created: %v", s.LocalTssData.Params.EC().Params().N)
-	models.Logger.Infof("localEDDSAData params: %v\n", *s.LocalTssData.Params)
 
 	messageBytes := blake2b.Sum256(signData.Bytes())
 	messageId := hex.EncodeToString(messageBytes[:])
