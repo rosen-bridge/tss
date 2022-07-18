@@ -19,10 +19,6 @@ var (
 	cfgFile string
 )
 
-func init() {
-
-}
-
 func main() {
 
 	// parsing cli flags

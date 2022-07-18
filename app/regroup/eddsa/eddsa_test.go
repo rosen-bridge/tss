@@ -7,6 +7,7 @@ import (
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	eddsaRegroup "github.com/binance-chain/tss-lib/eddsa/resharing"
 	"github.com/binance-chain/tss-lib/tss"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	_interface "rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/regroup"
@@ -577,6 +578,28 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name:      "handling new party with state 0 with receiver not equal to local",
+			peerState: 0,
+			gossipMessage: models.GossipMessage{
+				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromKeygen", 0),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "cahj2pgs4eqvn1eo1tp1",
+				Name:       "partyId",
+			},
+			appConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
+				return app
+			},
+			dataConfig: func() models.TssRegroupData {
+				localTssData := models.TssRegroupData{
+					PartyID: id,
+				}
+				return localTssData
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1076,9 +1099,14 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 			case "party message":
 				outCh <- tt.tssMessage
 			}
-			_, err := eddsaRegroupOp.gossipMessageHandler(app, outCh, endCh)
-			if err != nil && err.Error() != "message received" {
-				t.Errorf("gossipMessageHandler error = %v", err)
+			result, err := eddsaRegroupOp.gossipMessageHandler(app, outCh, endCh)
+			if err != nil {
+				assert.Equal(t, result, false)
+				if err.Error() != "message received" {
+					t.Errorf("gossipMessageHandler error = %v", err)
+				}
+			} else {
+				assert.Equal(t, result, true)
 			}
 
 		})

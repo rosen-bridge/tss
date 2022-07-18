@@ -35,6 +35,7 @@ type rosenTss struct {
 	connection network.Connection
 	Private    models.Private
 	peerHome   string
+	operations []_interface.Operation
 }
 
 // NewRosenTss Constructor of an app
@@ -73,7 +74,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 
 		// read loop function
 		ECDSAOperation := ecdsaSign.NewSignECDSAOperation(signMessage)
-
+		r.operations = append(r.operations, ECDSAOperation)
 		err = ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -92,6 +93,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	} else if signMessage.Crypto == "eddsa" {
 
 		EDDSAOperation := eddsaSign.NewSignEDDSAOperation(signMessage)
+		r.operations = append(r.operations, EDDSAOperation)
 
 		err = EDDSAOperation.Init(r, "")
 		if err != nil {
@@ -137,6 +139,8 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		}
 
 		ECDSAOperation := ecdsaKeygen.NewKeygenECDSAOperation()
+		r.operations = append(r.operations, ECDSAOperation)
+
 		err = ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -168,6 +172,8 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		}
 
 		EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation()
+		r.operations = append(r.operations, EDDSAOperation)
+
 		err = EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -199,6 +205,8 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 		}
 
 		ECDSAOperation := ecdsaRegroup.NewRegroupECDSAOperation(regroupMessage)
+		r.operations = append(r.operations, ECDSAOperation)
+
 		err := ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -222,6 +230,8 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 		}
 
 		EDDSAOperation := eddsaRegroup.NewRegroupEDDSAOperation(regroupMessage)
+		r.operations = append(r.operations, EDDSAOperation)
+
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err

@@ -8,6 +8,7 @@ import (
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	eddsaSign "github.com/binance-chain/tss-lib/eddsa/signing"
 	"github.com/binance-chain/tss-lib/tss"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"math/big"
 	_interface "rosen-bridge/tss/app/interface"
@@ -873,9 +874,14 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 			case "party message":
 				outCh <- tt.tssMessage
 			}
-			_, err := eddsaSignOp.gossipMessageHandler(tt.app, outCh, endCh)
-			if err != nil && err.Error() != "message received" {
-				t.Errorf("gossipMessageHandler error = %v", err)
+			result, err := eddsaSignOp.gossipMessageHandler(tt.app, outCh, endCh)
+			if err != nil {
+				assert.Equal(t, result, false)
+				if err.Error() != "message received" {
+					t.Errorf("gossipMessageHandler error = %v", err)
+				}
+			} else {
+				assert.Equal(t, result, true)
 			}
 		})
 	}
