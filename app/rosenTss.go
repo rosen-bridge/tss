@@ -73,7 +73,6 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 
 		// read loop function
 		ECDSAOperation := ecdsaSign.NewSignECDSAOperation(signMessage)
-
 		err = ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -137,6 +136,7 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		}
 
 		ECDSAOperation := ecdsaKeygen.NewKeygenECDSAOperation()
+
 		err = ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -168,6 +168,7 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		}
 
 		EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation()
+
 		err = EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -199,6 +200,7 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 		}
 
 		ECDSAOperation := ecdsaRegroup.NewRegroupECDSAOperation(regroupMessage)
+
 		err := ECDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -222,6 +224,7 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 		}
 
 		EDDSAOperation := eddsaRegroup.NewRegroupEDDSAOperation(regroupMessage)
+
 		err := EDDSAOperation.Init(r, "")
 		if err != nil {
 			return err
@@ -375,5 +378,6 @@ func (r *rosenTss) GetPrivate(crypto string) string {
 }
 
 func (r *rosenTss) deleteInstance(channelId string) {
+
 	delete(r.ChannelMap, channelId)
 }
