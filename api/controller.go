@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/models"
+	"strings"
 )
 
 // TssController Interface of an app controller
@@ -41,9 +42,26 @@ func errorHandler(code int, err string, c echo.Context) *echo.HTTPError {
 	return echo.NewHTTPError(code, err)
 }
 
+func (tssController *tssController) checkOperation(forbiddenOperations []string) error {
+	operations := tssController.rosenTss.GetOperations()
+	for _, operation := range operations {
+		for _, forbidden := range forbiddenOperations {
+			if operation.GetClassName() == forbidden {
+				return fmt.Errorf("%s operation is running", forbidden)
+			}
+		}
+	}
+	return nil
+}
+
 // Keygen returns echo handler, starting new keygen process
 func (tssController *tssController) Keygen() echo.HandlerFunc {
 	return func(c echo.Context) error {
+		forbiddenOperations := []string{"ecdsaSign", "eddsaSign"}
+		err := tssController.checkOperation(forbiddenOperations)
+		if err != nil {
+			return errorHandler(http.StatusConflict, err.Error(), c)
+		}
 		data := models.KeygenMessage{}
 
 		if err := c.Bind(&data); err != nil {
@@ -51,9 +69,15 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 		}
 		c.Logger().Info("keygen data: %+v ", data)
 
-		err := tssController.rosenTss.StartNewKeygen(data)
+		err = tssController.rosenTss.StartNewKeygen(data)
 		if err != nil {
-			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			if strings.Contains(err.Error(), "duplicate messageId") {
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			} else if strings.Contains(err.Error(), "keygen file exist") {
+				return errorHandler(http.StatusBadRequest, err.Error(), c)
+			} else {
+				return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			}
 		}
 		return c.JSON(http.StatusOK, response{
 			Message: "ok",
@@ -64,6 +88,12 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 // Sign returns echo handler, starting new sign process.
 func (tssController *tssController) Sign() echo.HandlerFunc {
 	return func(c echo.Context) error {
+		forbiddenOperations := []string{"ecdsaKeygen", "eddsaKeygen", "ecdsaRegroup", "eddsaRegroup"}
+		err := tssController.checkOperation(forbiddenOperations)
+		if err != nil {
+			return errorHandler(http.StatusConflict, err.Error(), c)
+		}
+
 		data := models.SignMessage{}
 
 		if err := c.Bind(&data); err != nil {
@@ -71,9 +101,15 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 		}
 		c.Logger().Info("sign data: %+v ", data)
 
-		err := tssController.rosenTss.StartNewSign(data)
+		err = tssController.rosenTss.StartNewSign(data)
 		if err != nil {
-			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			if strings.Contains(err.Error(), "duplicate messageId") {
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			} else if strings.Contains(err.Error(), "no keygen data found") {
+				return errorHandler(http.StatusBadRequest, err.Error(), c)
+			} else {
+				return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			}
 		}
 
 		return c.JSON(http.StatusOK, response{
@@ -85,6 +121,11 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 // Regroup returns echo handler, starting new regroup process
 func (tssController *tssController) Regroup() echo.HandlerFunc {
 	return func(c echo.Context) error {
+		forbiddenOperations := []string{"ecdsaSign", "eddsaSign"}
+		err := tssController.checkOperation(forbiddenOperations)
+		if err != nil {
+			return errorHandler(http.StatusConflict, err.Error(), c)
+		}
 		data := models.RegroupMessage{}
 
 		if err := c.Bind(&data); err != nil {
@@ -92,9 +133,14 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 		}
 		c.Logger().Info("regroup data: %+v ", data)
 
-		err := tssController.rosenTss.StartNewRegroup(data)
+		err = tssController.rosenTss.StartNewRegroup(data)
 		if err != nil {
-			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			switch err.Error() {
+			case "duplicate messageId":
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			default:
+				return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			}
 		}
 
 		return c.JSON(http.StatusOK, response{

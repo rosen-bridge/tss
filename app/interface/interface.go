@@ -33,4 +33,6 @@ type RosenTss interface {
 
 	SetPrivate(private models.Private) error
 	GetPrivate(string) string
+
+	GetOperations() []Operation
 }

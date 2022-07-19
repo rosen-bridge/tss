@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"rosen-bridge/tss/mocks"
 	"rosen-bridge/tss/models"
+	"strings"
 	"testing"
 )
 
@@ -79,6 +80,10 @@ func TestHandler_SharedPartyUpdater(t *testing.T) {
 		t.Error(err)
 	}
 
+	newPartyId, err := mocks.CreateNewEDDSAPartyId()
+	if err != nil {
+		t.Error(err)
+	}
 	// creating fake tss.Party
 	ctx := tss.NewPeerContext(localTssData.PartyIds)
 	localTssData.Params = tss.NewParameters(
@@ -88,14 +93,6 @@ func TestHandler_SharedPartyUpdater(t *testing.T) {
 	localTssData.Party = eddsaKeygen.NewLocalParty(localTssData.Params, outCh, endCh)
 
 	// fake models.PartyMessage
-	message := models.PartyMessage{
-		To:                      []*tss.PartyID{localTssData.PartyID},
-		GetFrom:                 localTssData.PartyID,
-		IsBroadcast:             true,
-		Message:                 []byte("cfc72ea72b7e96bcf542ea2e359596031e13134d68a503cb13d3f31d8428ae03"),
-		IsToOldCommittee:        true,
-		IsToOldAndNewCommittees: false,
-	}
 
 	tests := []struct {
 		name    string
@@ -103,17 +100,36 @@ func TestHandler_SharedPartyUpdater(t *testing.T) {
 		party   tss.Party
 	}{
 		{
-			name:    "updating shared party, there must be no error",
-			message: message,
-			party:   localTssData.Party,
+			name: "updating shared party, party = getFrom",
+			message: models.PartyMessage{
+				To:                      []*tss.PartyID{localTssData.PartyID},
+				GetFrom:                 localTssData.PartyID,
+				IsBroadcast:             true,
+				Message:                 []byte("cfc72ea72b7e96bcf542ea2e359596031e13134d68a503cb13d3f31d8428ae03"),
+				IsToOldCommittee:        true,
+				IsToOldAndNewCommittees: false,
+			},
+			party: localTssData.Party,
+		},
+		{
+			name: "updating shared party, party != getFrom",
+			message: models.PartyMessage{
+				To:                      []*tss.PartyID{localTssData.PartyID},
+				GetFrom:                 newPartyId,
+				IsBroadcast:             true,
+				Message:                 []byte("cfc72ea72b7e96bcf542ea2e359596031e13134d68a503cb13d3f31d8428ae03"),
+				IsToOldCommittee:        true,
+				IsToOldAndNewCommittees: false,
+			},
+			party: localTssData.Party,
 		},
 	}
 
 	operation := OperationHandler{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := operation.SharedPartyUpdater(tt.party, tt.message)
-			if err != nil {
+			err = operation.SharedPartyUpdater(tt.party, tt.message)
+			if err != nil && !strings.Contains(err.Error(), "invalid wire-format data") {
 				t.Error(err)
 			}
 		})
