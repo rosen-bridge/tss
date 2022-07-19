@@ -12,7 +12,9 @@ import (
 	"os"
 	_interface "rosen-bridge/tss/app/interface"
 	ecdsaKeygen "rosen-bridge/tss/app/keygen/ecdsa"
+	eddsaKeygen "rosen-bridge/tss/app/keygen/eddsa"
 	ecdsaSign "rosen-bridge/tss/app/sign/ecdsa"
+	eddsaSign "rosen-bridge/tss/app/sign/eddsa"
 	mockedApp "rosen-bridge/tss/mocks/app/interface"
 	"rosen-bridge/tss/models"
 	"strings"
@@ -133,6 +135,22 @@ func TestController_Sign(t *testing.T) {
 			wantErr:    true,
 			statusCode: 409,
 		},
+		{
+			name: "new eddsa signMessage, get status code 409, there are other operations running",
+			signMessage: models.SignMessage{
+				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+				Crypto:      "eddsa",
+				CallBackUrl: "http://localhost:5050/callback/sign",
+			},
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation()
+				app.On("GetOperations").Return([]_interface.Operation{EDDSAOperation})
+				return app
+			},
+			wantErr:    true,
+			statusCode: 409,
+		},
 	}
 
 	e := echo.New()
@@ -186,9 +204,10 @@ func TestController_Sign(t *testing.T) {
 func TestController_Message(t *testing.T) {
 
 	tests := []struct {
-		name    string
-		message interface{}
-		wantErr bool
+		name      string
+		message   interface{}
+		wantErr   bool
+		appConfig func() _interface.RosenTss
 	}{
 		{
 			name: "new true message, get status code 200",
@@ -200,15 +219,35 @@ func TestController_Message(t *testing.T) {
 				Name:       "partyId",
 			},
 			wantErr: false,
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				app.On("MessageHandler", mock.AnythingOfType("models.Message")).Return(nil)
+				return app
+			},
+		},
+		{
+			name: "new true message, get status code 500",
+			message: models.GossipMessage{
+				Message:    "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyId",
+			},
+			wantErr: true,
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				app.On("MessageHandler", mock.AnythingOfType("models.Message")).Return(fmt.Errorf("error"))
+				return app
+			},
 		},
 	}
 
 	e := echo.New()
-	app := mockedApp.NewRosenTss(t)
-	app.On("MessageHandler", mock.AnythingOfType("models.Message")).Return(nil)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			app := tt.appConfig()
 			controller := NewTssController(app)
 			messageHandler := controller.Message()
 			marshal, err := json.Marshal(tt.message)
@@ -221,6 +260,7 @@ func TestController_Message(t *testing.T) {
 			c := e.NewContext(req, rec)
 			// Assertions
 			err = messageHandler(c)
+			e.HTTPErrorHandler(err, c)
 			if err != nil && tt.wantErr {
 				assert.Equal(t, http.StatusInternalServerError, rec.Code)
 			} else if err == nil && tt.wantErr {
@@ -436,6 +476,26 @@ func TestController_Keygen(t *testing.T) {
 			wantErr:    true,
 			statusCode: 409,
 		},
+		{
+			name: "success eddsa keygenMessage, get status code 409, operation is running",
+			keygenMessage: models.KeygenMessage{
+				Threshold:  2,
+				PeersCount: 3,
+				Crypto:     "eddsa",
+			},
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				EDDSAOperation := eddsaSign.NewSignEDDSAOperation(models.SignMessage{
+					Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+					Crypto:      "eddsa",
+					CallBackUrl: "http://localhost:5050/callback/sign",
+				})
+				app.On("GetOperations").Return([]_interface.Operation{EDDSAOperation})
+				return app
+			},
+			wantErr:    true,
+			statusCode: 409,
+		},
 	}
 
 	e := echo.New()
@@ -550,7 +610,29 @@ func TestController_Regroup(t *testing.T) {
 			statusCode: 409,
 		},
 		{
-			name: "success ecdsa RegroupMessage, statusCode: 409, operation is running",
+			name: "eddsa, statusCode: 409, operation is running",
+			regroupMessage: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeerState:    0,
+				PeersCount:   4,
+				Crypto:       "eddsa",
+			},
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				EDDSAOperation := eddsaSign.NewSignEDDSAOperation(models.SignMessage{
+					Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+					Crypto:      "eddsa",
+					CallBackUrl: "http://localhost:5050/callback/sign",
+				})
+				app.On("GetOperations").Return([]_interface.Operation{EDDSAOperation})
+				return app
+			},
+			wantErr:    true,
+			statusCode: 409,
+		},
+		{
+			name: "ecdsa, statusCode: 409, operation is running",
 			regroupMessage: models.RegroupMessage{
 				NewThreshold: 3,
 				OldThreshold: 2,

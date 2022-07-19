@@ -57,11 +57,6 @@ func (tssController *tssController) checkOperation(forbiddenOperations []string)
 // Keygen returns echo handler, starting new keygen process
 func (tssController *tssController) Keygen() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		forbiddenOperations := []string{"ecdsaSign", "eddsaSign"}
-		err := tssController.checkOperation(forbiddenOperations)
-		if err != nil {
-			return errorHandler(http.StatusConflict, err.Error(), c)
-		}
 		data := models.KeygenMessage{}
 
 		if err := c.Bind(&data); err != nil {
@@ -69,7 +64,21 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 		}
 		c.Logger().Info("keygen data: %+v ", data)
 
-		err = tssController.rosenTss.StartNewKeygen(data)
+		switch data.Crypto {
+		case "ecdsa":
+			forbiddenOperations := []string{"ecdsaSign"}
+			err := tssController.checkOperation(forbiddenOperations)
+			if err != nil {
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			}
+		case "eddsa":
+			forbiddenOperations := []string{"eddsaSign"}
+			err := tssController.checkOperation(forbiddenOperations)
+			if err != nil {
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			}
+		}
+		err := tssController.rosenTss.StartNewKeygen(data)
 		if err != nil {
 			if strings.Contains(err.Error(), "duplicate messageId") {
 				return errorHandler(http.StatusConflict, err.Error(), c)
@@ -88,12 +97,6 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 // Sign returns echo handler, starting new sign process.
 func (tssController *tssController) Sign() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		forbiddenOperations := []string{"ecdsaKeygen", "eddsaKeygen", "ecdsaRegroup", "eddsaRegroup"}
-		err := tssController.checkOperation(forbiddenOperations)
-		if err != nil {
-			return errorHandler(http.StatusConflict, err.Error(), c)
-		}
-
 		data := models.SignMessage{}
 
 		if err := c.Bind(&data); err != nil {
@@ -101,7 +104,22 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 		}
 		c.Logger().Info("sign data: %+v ", data)
 
-		err = tssController.rosenTss.StartNewSign(data)
+		switch data.Crypto {
+		case "ecdsa":
+			forbiddenOperations := []string{"ecdsaKeygen", "ecdsaRegroup"}
+			err := tssController.checkOperation(forbiddenOperations)
+			if err != nil {
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			}
+		case "eddsa":
+			forbiddenOperations := []string{"eddsaKeygen", "eddsaRegroup"}
+			err := tssController.checkOperation(forbiddenOperations)
+			if err != nil {
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			}
+		}
+
+		err := tssController.rosenTss.StartNewSign(data)
 		if err != nil {
 			if strings.Contains(err.Error(), "duplicate messageId") {
 				return errorHandler(http.StatusConflict, err.Error(), c)
@@ -121,11 +139,6 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 // Regroup returns echo handler, starting new regroup process
 func (tssController *tssController) Regroup() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		forbiddenOperations := []string{"ecdsaSign", "eddsaSign"}
-		err := tssController.checkOperation(forbiddenOperations)
-		if err != nil {
-			return errorHandler(http.StatusConflict, err.Error(), c)
-		}
 		data := models.RegroupMessage{}
 
 		if err := c.Bind(&data); err != nil {
@@ -133,7 +146,22 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 		}
 		c.Logger().Info("regroup data: %+v ", data)
 
-		err = tssController.rosenTss.StartNewRegroup(data)
+		switch data.Crypto {
+		case "ecdsa":
+			forbiddenOperations := []string{"ecdsaSign"}
+			err := tssController.checkOperation(forbiddenOperations)
+			if err != nil {
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			}
+		case "eddsa":
+			forbiddenOperations := []string{"eddsaSign"}
+			err := tssController.checkOperation(forbiddenOperations)
+			if err != nil {
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			}
+		}
+
+		err := tssController.rosenTss.StartNewRegroup(data)
 		if err != nil {
 			switch err.Error() {
 			case "duplicate messageId":
