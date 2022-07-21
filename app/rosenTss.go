@@ -22,6 +22,7 @@ import (
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
 	"strings"
+	"time"
 )
 
 const (
@@ -291,11 +292,31 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 	}
 
 	models.Logger.Infof("new message: %+v", gossipMsg.Name)
-	if _, ok := r.ChannelMap[gossipMsg.MessageId]; !ok {
-		return fmt.Errorf("channel not found: %+v", gossipMsg.MessageId)
+
+	timeout := time.After(time.Second * 2)
+	var state bool
+
+timoutLoop:
+	for {
+		select {
+		case <-timeout:
+			models.Logger.Error("timeout")
+			state = false
+			break timoutLoop
+		default:
+			if _, ok := r.ChannelMap[gossipMsg.MessageId]; ok {
+				r.ChannelMap[gossipMsg.MessageId] <- gossipMsg
+				state = true
+				break timoutLoop
+			}
+		}
 	}
-	r.ChannelMap[gossipMsg.MessageId] <- gossipMsg
-	return nil
+
+	if !state {
+		return fmt.Errorf("channel not found: %+v", gossipMsg.MessageId)
+	} else {
+		return nil
+	}
 }
 
 // GetStorage returns the storage
