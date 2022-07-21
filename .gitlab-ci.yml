@@ -5,14 +5,13 @@ stages:
   - mocking
   - test
 
-preoaring:
+preparing:
   stage: prepare_go
   script:
     - echo "prepare_go"
     - mkdir -p .go
     - go env -w GO111MODULE=on
     - go env -w GOPROXY="https://goproxy.io,direct"
-
   artifacts:
     paths:
       - .go/
