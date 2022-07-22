@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/models"
-	"strings"
 )
 
 // TssController Interface of an app controller
@@ -47,7 +46,7 @@ func (tssController *tssController) checkOperation(forbiddenOperations []string)
 	for _, operation := range operations {
 		for _, forbidden := range forbiddenOperations {
 			if operation.GetClassName() == forbidden {
-				return fmt.Errorf("%s operation is running", forbidden)
+				return fmt.Errorf("%s "+models.OperationIsRunningError, forbidden)
 			}
 		}
 	}
@@ -64,27 +63,19 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 		}
 		c.Logger().Info("keygen data: %+v ", data)
 
-		switch data.Crypto {
-		case "ecdsa":
-			forbiddenOperations := []string{"ecdsaSign"}
-			err := tssController.checkOperation(forbiddenOperations)
-			if err != nil {
-				return errorHandler(http.StatusConflict, err.Error(), c)
-			}
-		case "eddsa":
-			forbiddenOperations := []string{"eddsaSign"}
-			err := tssController.checkOperation(forbiddenOperations)
-			if err != nil {
-				return errorHandler(http.StatusConflict, err.Error(), c)
-			}
-		}
-		err := tssController.rosenTss.StartNewKeygen(data)
+		forbiddenOperations := []string{data.Crypto + "Sign"}
+		err := tssController.checkOperation(forbiddenOperations)
 		if err != nil {
-			if strings.Contains(err.Error(), "duplicate messageId") {
+			return errorHandler(http.StatusConflict, err.Error(), c)
+		}
+		err = tssController.rosenTss.StartNewKeygen(data)
+		if err != nil {
+			switch err.Error() {
+			case models.DuplicatedMessageIdError:
 				return errorHandler(http.StatusConflict, err.Error(), c)
-			} else if strings.Contains(err.Error(), "keygen file exist") {
+			case models.KeygenFileExistError:
 				return errorHandler(http.StatusBadRequest, err.Error(), c)
-			} else {
+			default:
 				return errorHandler(http.StatusInternalServerError, err.Error(), c)
 			}
 		}
@@ -104,28 +95,19 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 		}
 		c.Logger().Info("sign data: %+v ", data)
 
-		switch data.Crypto {
-		case "ecdsa":
-			forbiddenOperations := []string{"ecdsaKeygen", "ecdsaRegroup"}
-			err := tssController.checkOperation(forbiddenOperations)
-			if err != nil {
-				return errorHandler(http.StatusConflict, err.Error(), c)
-			}
-		case "eddsa":
-			forbiddenOperations := []string{"eddsaKeygen", "eddsaRegroup"}
-			err := tssController.checkOperation(forbiddenOperations)
-			if err != nil {
-				return errorHandler(http.StatusConflict, err.Error(), c)
-			}
-		}
-
-		err := tssController.rosenTss.StartNewSign(data)
+		forbiddenOperations := []string{data.Crypto + "Keygen", data.Crypto + "Regroup"}
+		err := tssController.checkOperation(forbiddenOperations)
 		if err != nil {
-			if strings.Contains(err.Error(), "duplicate messageId") {
+			return errorHandler(http.StatusConflict, err.Error(), c)
+		}
+		err = tssController.rosenTss.StartNewSign(data)
+		if err != nil {
+			switch err.Error() {
+			case models.DuplicatedMessageIdError:
 				return errorHandler(http.StatusConflict, err.Error(), c)
-			} else if strings.Contains(err.Error(), "no keygen data found") {
+			case models.NoKeygenDataFoundError:
 				return errorHandler(http.StatusBadRequest, err.Error(), c)
-			} else {
+			default:
 				return errorHandler(http.StatusInternalServerError, err.Error(), c)
 			}
 		}
@@ -146,26 +128,18 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 		}
 		c.Logger().Info("regroup data: %+v ", data)
 
-		switch data.Crypto {
-		case "ecdsa":
-			forbiddenOperations := []string{"ecdsaSign"}
-			err := tssController.checkOperation(forbiddenOperations)
-			if err != nil {
-				return errorHandler(http.StatusConflict, err.Error(), c)
-			}
-		case "eddsa":
-			forbiddenOperations := []string{"eddsaSign"}
-			err := tssController.checkOperation(forbiddenOperations)
-			if err != nil {
-				return errorHandler(http.StatusConflict, err.Error(), c)
-			}
+		forbiddenOperations := []string{data.Crypto + "Sign"}
+		err := tssController.checkOperation(forbiddenOperations)
+		if err != nil {
+			return errorHandler(http.StatusConflict, err.Error(), c)
 		}
-
-		err := tssController.rosenTss.StartNewRegroup(data)
+		err = tssController.rosenTss.StartNewRegroup(data)
 		if err != nil {
 			switch err.Error() {
-			case "duplicate messageId":
+			case models.DuplicatedMessageIdError:
 				return errorHandler(http.StatusConflict, err.Error(), c)
+			case models.NoKeygenDataFoundError:
+				return errorHandler(http.StatusBadRequest, err.Error(), c)
 			default:
 				return errorHandler(http.StatusInternalServerError, err.Error(), c)
 			}

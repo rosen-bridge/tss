@@ -7,6 +7,13 @@ import (
 
 var Logger = log.Logger("rosen-tss")
 
+const (
+	DuplicatedMessageIdError = "duplicated messageId"
+	KeygenFileExistError     = "keygen file exists"
+	OperationIsRunningError  = "operation is running"
+	NoKeygenDataFoundError   = "no keygen data found"
+)
+
 type SignMessage struct {
 	Crypto      string `json:"crypto"`
 	Message     string `json:"message"`

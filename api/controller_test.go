@@ -80,7 +80,7 @@ func TestController_Sign(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewSign", mock.AnythingOfType("models.SignMessage")).Return(fmt.Errorf("duplicate messageId"))
+				app.On("StartNewSign", mock.AnythingOfType("models.SignMessage")).Return(fmt.Errorf(models.DuplicatedMessageIdError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -96,7 +96,7 @@ func TestController_Sign(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewSign", mock.AnythingOfType("models.SignMessage")).Return(fmt.Errorf("no keygen data found"))
+				app.On("StartNewSign", mock.AnythingOfType("models.SignMessage")).Return(fmt.Errorf(models.NoKeygenDataFoundError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -417,7 +417,7 @@ func TestController_Keygen(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewKeygen", mock.AnythingOfType("models.KeygenMessage")).Return(fmt.Errorf("keygen file exist"))
+				app.On("StartNewKeygen", mock.AnythingOfType("models.KeygenMessage")).Return(fmt.Errorf(models.KeygenFileExistError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -449,7 +449,7 @@ func TestController_Keygen(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewKeygen", mock.AnythingOfType("models.KeygenMessage")).Return(fmt.Errorf("duplicate messageId"))
+				app.On("StartNewKeygen", mock.AnythingOfType("models.KeygenMessage")).Return(fmt.Errorf(models.DuplicatedMessageIdError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -602,7 +602,7 @@ func TestController_Regroup(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewRegroup", mock.AnythingOfType("models.RegroupMessage")).Return(fmt.Errorf("duplicate messageId"))
+				app.On("StartNewRegroup", mock.AnythingOfType("models.RegroupMessage")).Return(fmt.Errorf(models.DuplicatedMessageIdError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},

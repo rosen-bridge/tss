@@ -65,16 +65,17 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	signDataHash := hex.EncodeToString(signDataBytes[:])
 	log.Printf("signDtaHash: %v", signDataHash)
 
+	messageId := fmt.Sprintf("%s%s", signMessage.Crypto, signDataHash)
+	_, ok := r.ChannelMap[messageId]
+	if !ok {
+		messageCh := make(chan models.GossipMessage, 100)
+		r.ChannelMap[messageId] = messageCh
+		models.Logger.Infof("creating new channel in StartNewSign: %v", messageId)
+	} else {
+		return fmt.Errorf(models.DuplicatedMessageIdError)
+	}
+
 	if signMessage.Crypto == "ecdsa" {
-		messageId := fmt.Sprintf("%s%s", "ecdsa", signDataHash)
-		_, ok := r.ChannelMap[messageId]
-		if !ok {
-			messageCh := make(chan models.GossipMessage, 100)
-			r.ChannelMap[messageId] = messageCh
-			models.Logger.Infof("creating new channel in StartNewSign: %v", messageId)
-		} else {
-			return fmt.Errorf("duplicate messageId")
-		}
 		// read loop function
 		ECDSAOperation := ecdsaSign.NewSignECDSAOperation(signMessage)
 
@@ -96,15 +97,6 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		}()
 
 	} else if signMessage.Crypto == "eddsa" {
-		messageId := fmt.Sprintf("%s%s", "eddsa", signDataHash)
-		_, ok := r.ChannelMap[messageId]
-		if !ok {
-			messageCh := make(chan models.GossipMessage, 100)
-			r.ChannelMap[messageId] = messageCh
-			models.Logger.Infof("creating new channel in StartNewSign: %v", messageId)
-		} else {
-			return fmt.Errorf("duplicate messageId")
-		}
 		EDDSAOperation := eddsaSign.NewSignEDDSAOperation(signMessage)
 		r.operations = append(r.operations, EDDSAOperation)
 
@@ -137,8 +129,18 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 	}
 	path := fmt.Sprintf("%s/%s/%s", r.GetPeerHome(), keygenMessage.Crypto, "keygen_data.json")
 	if _, err := os.Stat(path); err == nil {
-		return fmt.Errorf("keygen file exist")
+		return fmt.Errorf(models.KeygenFileExistError)
 	}
+
+	_, ok := r.ChannelMap[keygenMessage.Crypto+"Keygen"]
+	if !ok {
+		messageCh := make(chan models.GossipMessage, 100)
+		r.ChannelMap["ecdsaKeygen"] = messageCh
+		models.Logger.Infof("creating new channel in StartNewKeygen: %v", "ecdsaKeygen")
+	} else {
+		return fmt.Errorf(models.DuplicatedMessageIdError)
+	}
+
 	// read loop function
 	if keygenMessage.Crypto == "ecdsa" {
 
@@ -148,14 +150,6 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		}
 
 		r.metaData = meta
-		_, ok := r.ChannelMap["ecdsaKeygen"]
-		if !ok {
-			messageCh := make(chan models.GossipMessage, 100)
-			r.ChannelMap["ecdsaKeygen"] = messageCh
-			models.Logger.Infof("creating new channel in StartNewKeygen: %v", "ecdsaKeygen")
-		} else {
-			return fmt.Errorf("duplicate messageId")
-		}
 
 		ECDSAOperation := ecdsaKeygen.NewKeygenECDSAOperation()
 
@@ -185,14 +179,6 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		}
 
 		r.metaData = meta
-		_, ok := r.ChannelMap["eddsaKeygen"]
-		if !ok {
-			messageCh := make(chan models.GossipMessage, 100)
-			r.ChannelMap["eddsaKeygen"] = messageCh
-			models.Logger.Infof("creating new channel in StartNewKeygen: %v", "eddsaKeygen")
-		} else {
-			return fmt.Errorf("duplicate messageId")
-		}
 
 		EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation()
 		r.operations = append(r.operations, EDDSAOperation)
@@ -219,17 +205,17 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 	log.Printf("Starting New regroup process")
 
+	_, ok := r.ChannelMap[regroupMessage.Crypto+"Regroup"]
+	if !ok {
+		messageCh := make(chan models.GossipMessage, 100)
+		r.ChannelMap["ecdsaRegroup"] = messageCh
+		models.Logger.Infof("creating new channel in StartNewRegroup: %v", "ecdsaRegroup")
+	} else {
+		return fmt.Errorf(models.DuplicatedMessageIdError)
+	}
+
 	// read loop function
 	if regroupMessage.Crypto == "ecdsa" {
-		_, ok := r.ChannelMap["ecdsaRegroup"]
-		if !ok {
-			messageCh := make(chan models.GossipMessage, 100)
-			r.ChannelMap["ecdsaRegroup"] = messageCh
-			models.Logger.Infof("creating new channel in StartNewRegroup: %v", "ecdsaRegroup")
-		} else {
-			return fmt.Errorf("duplicate messageId")
-		}
-
 		ECDSAOperation := ecdsaRegroup.NewRegroupECDSAOperation(regroupMessage)
 		r.operations = append(r.operations, ECDSAOperation)
 
@@ -249,15 +235,6 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 		}()
 
 	} else if regroupMessage.Crypto == "eddsa" {
-		_, ok := r.ChannelMap["eddsaRegroup"]
-		if !ok {
-			messageCh := make(chan models.GossipMessage, 100)
-			r.ChannelMap["eddsaRegroup"] = messageCh
-			models.Logger.Infof("creating new channel in StartNewRegroup: %v", "eddsaRegroup")
-		} else {
-			return fmt.Errorf("duplicate messageId")
-		}
-
 		EDDSAOperation := eddsaRegroup.NewRegroupEDDSAOperation(regroupMessage)
 		r.operations = append(r.operations, EDDSAOperation)
 
