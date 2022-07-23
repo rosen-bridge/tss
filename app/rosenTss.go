@@ -75,47 +75,33 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		return fmt.Errorf(models.DuplicatedMessageIdError)
 	}
 
-	if signMessage.Crypto == "ecdsa" {
-		// read loop function
-		ECDSAOperation := ecdsaSign.NewSignECDSAOperation(signMessage)
-
-		r.operations = append(r.operations, ECDSAOperation)
-
-		err = ECDSAOperation.Init(r, "")
-		if err != nil {
-			return err
-		}
-		go func() {
-			err = ECDSAOperation.Loop(r, r.ChannelMap[messageId])
-			if err != nil {
-				models.Logger.Errorf("en error occurred in ecdsa sign loop, err: %+v", err)
-				os.Exit(1)
-
-			}
-			r.deleteInstance(messageId, ECDSAOperation.GetClassName())
-			models.Logger.Info("end of loop")
-		}()
-
-	} else if signMessage.Crypto == "eddsa" {
-		EDDSAOperation := eddsaSign.NewSignEDDSAOperation(signMessage)
-		r.operations = append(r.operations, EDDSAOperation)
-
-		err = EDDSAOperation.Init(r, "")
-		if err != nil {
-			return err
-		}
-		go func() {
-			models.Logger.Info("calling loop")
-			err = EDDSAOperation.Loop(r, r.ChannelMap[messageId])
-			if err != nil {
-				models.Logger.Errorf("en error occurred in eddsa sign loop, err: %+v", err)
-				os.Exit(1)
-
-			}
-			r.deleteInstance(messageId, EDDSAOperation.GetClassName())
-			models.Logger.Info("end of loop")
-		}()
+	var operation _interface.Operation
+	switch signMessage.Crypto {
+	case "ecdsa":
+		operation = ecdsaSign.NewSignECDSAOperation(signMessage)
+	case "eddsa":
+		operation = eddsaSign.NewSignEDDSAOperation(signMessage)
+	default:
+		return fmt.Errorf(models.WrongCryptoProtocolError)
 	}
+	r.operations = append(r.operations, operation)
+
+	err = operation.Init(r, "")
+	if err != nil {
+		return err
+	}
+	go func() {
+		models.Logger.Infof("calling loop for %s sign", signMessage.Crypto)
+		err = operation.Loop(r, r.ChannelMap[messageId])
+		if err != nil {
+			models.Logger.Errorf("en error occurred in %s sign loop, err: %+v", signMessage.Crypto, err)
+			os.Exit(1)
+
+		}
+		r.deleteInstance(messageId, operation.GetClassName())
+		models.Logger.Infof("end of %s sign loop", signMessage.Crypto)
+	}()
+
 	return nil
 }
 
@@ -132,72 +118,50 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		return fmt.Errorf(models.KeygenFileExistError)
 	}
 
-	_, ok := r.ChannelMap[keygenMessage.Crypto+"Keygen"]
+	messageId := fmt.Sprintf("%s%s", keygenMessage.Crypto, "Keygen")
+	_, ok := r.ChannelMap[messageId]
 	if !ok {
 		messageCh := make(chan models.GossipMessage, 100)
-		r.ChannelMap["ecdsaKeygen"] = messageCh
-		models.Logger.Infof("creating new channel in StartNewKeygen: %v", "ecdsaKeygen")
+		r.ChannelMap[messageId] = messageCh
+		models.Logger.Infof("creating new channel in StartNewKeygen: %v", messageId)
 	} else {
 		return fmt.Errorf(models.DuplicatedMessageIdError)
 	}
-
-	// read loop function
-	if keygenMessage.Crypto == "ecdsa" {
-
-		err := r.GetStorage().WriteData(meta, r.GetPeerHome(), "config.json", "ecdsa")
-		if err != nil {
-			return err
-		}
-
-		r.metaData = meta
-
-		ECDSAOperation := ecdsaKeygen.NewKeygenECDSAOperation()
-
-		r.operations = append(r.operations, ECDSAOperation)
-
-		err = ECDSAOperation.Init(r, "")
-		if err != nil {
-			return err
-		}
-		go func() {
-			models.Logger.Info("calling loop")
-			err = ECDSAOperation.Loop(r, r.ChannelMap["ecdsaKeygen"])
-			if err != nil {
-				models.Logger.Errorf("en error occurred in ecdsa Keygen loop, err: %+v", err)
-				os.Exit(1)
-
-			}
-			r.deleteInstance("ecdsaKeygen", ECDSAOperation.GetClassName())
-			models.Logger.Info("end of loop")
-		}()
-
-	} else if keygenMessage.Crypto == "eddsa" {
-
-		err := r.GetStorage().WriteData(meta, r.GetPeerHome(), "config.json", "eddsa")
-		if err != nil {
-			return err
-		}
-
-		r.metaData = meta
-
-		EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation()
-		r.operations = append(r.operations, EDDSAOperation)
-
-		err = EDDSAOperation.Init(r, "")
-		if err != nil {
-			return err
-		}
-		go func() {
-			models.Logger.Info("calling loop")
-			err = EDDSAOperation.Loop(r, r.ChannelMap["eddsaKeygen"])
-			if err != nil {
-				models.Logger.Errorf("en error occurred in eddsa Keygen loop, err: %+v", err)
-				os.Exit(1)
-			}
-			r.deleteInstance("eddsaKeygen", EDDSAOperation.GetClassName())
-			models.Logger.Info("end of loop")
-		}()
+	err := r.GetStorage().WriteData(meta, r.GetPeerHome(), "config.json", keygenMessage.Crypto)
+	if err != nil {
+		return err
 	}
+	r.metaData = meta
+
+	var operation _interface.Operation
+
+	switch keygenMessage.Crypto {
+	case "ecdsa":
+		operation = ecdsaKeygen.NewKeygenECDSAOperation()
+	case "eddsa":
+		operation = eddsaKeygen.NewKeygenEDDSAOperation()
+	default:
+		return fmt.Errorf(models.WrongCryptoProtocolError)
+	}
+
+	r.operations = append(r.operations, operation)
+
+	err = operation.Init(r, "")
+	if err != nil {
+		return err
+	}
+	go func() {
+		models.Logger.Infof("calling loop for %s keygen", keygenMessage.Crypto)
+		err = operation.Loop(r, r.ChannelMap[messageId])
+		if err != nil {
+			models.Logger.Errorf("en error occurred in %s keygen loop, err: %+v", keygenMessage.Crypto, err)
+			os.Exit(1)
+
+		}
+		r.deleteInstance(messageId, operation.GetClassName())
+		models.Logger.Infof("end of %s keygen loop", keygenMessage.Crypto)
+	}()
+
 	return nil
 }
 
@@ -205,56 +169,43 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 	log.Printf("Starting New regroup process")
 
-	_, ok := r.ChannelMap[regroupMessage.Crypto+"Regroup"]
+	messageId := fmt.Sprintf("%s%s", regroupMessage.Crypto, "Regroup")
+
+	_, ok := r.ChannelMap[messageId]
 	if !ok {
 		messageCh := make(chan models.GossipMessage, 100)
-		r.ChannelMap["ecdsaRegroup"] = messageCh
-		models.Logger.Infof("creating new channel in StartNewRegroup: %v", "ecdsaRegroup")
+		r.ChannelMap[messageId] = messageCh
+		models.Logger.Infof("creating new channel in StartNewRegroup: %v", messageId)
 	} else {
 		return fmt.Errorf(models.DuplicatedMessageIdError)
 	}
+	var operation _interface.Operation
 
-	// read loop function
-	if regroupMessage.Crypto == "ecdsa" {
-		ECDSAOperation := ecdsaRegroup.NewRegroupECDSAOperation(regroupMessage)
-		r.operations = append(r.operations, ECDSAOperation)
-
-		err := ECDSAOperation.Init(r, "")
-		if err != nil {
-			return err
-		}
-		go func() {
-			models.Logger.Info("calling loop")
-			err = ECDSAOperation.Loop(r, r.ChannelMap["ecdsaRegroup"])
-			if err != nil {
-				models.Logger.Errorf("en error occurred in ecdsa regroup loop, err: %+v", err)
-				os.Exit(1)
-			}
-			r.deleteInstance("ecdsaRegroup", ECDSAOperation.GetClassName())
-			models.Logger.Info("end of loop")
-		}()
-
-	} else if regroupMessage.Crypto == "eddsa" {
-		EDDSAOperation := eddsaRegroup.NewRegroupEDDSAOperation(regroupMessage)
-		r.operations = append(r.operations, EDDSAOperation)
-
-		err := EDDSAOperation.Init(r, "")
-		if err != nil {
-			return err
-		}
-		go func() {
-			models.Logger.Info("calling loop")
-			err = EDDSAOperation.Loop(r, r.ChannelMap["eddsaRegroup"])
-			if err != nil {
-
-				models.Logger.Errorf("en error occurred in eddsa regroup loop, err: %+v", err)
-				os.Exit(1)
-
-			}
-			r.deleteInstance("eddsaRegroup", EDDSAOperation.GetClassName())
-			models.Logger.Info("end of loop")
-		}()
+	switch regroupMessage.Crypto {
+	case "ecdsa":
+		operation = ecdsaRegroup.NewRegroupECDSAOperation(regroupMessage)
+	case "eddsa":
+		operation = eddsaRegroup.NewRegroupEDDSAOperation(regroupMessage)
+	default:
+		return fmt.Errorf(models.WrongCryptoProtocolError)
 	}
+	r.operations = append(r.operations, operation)
+
+	err := operation.Init(r, "")
+	if err != nil {
+		return err
+	}
+	go func() {
+		models.Logger.Infof("calling loop for %s regroup", regroupMessage.Crypto)
+		err = operation.Loop(r, r.ChannelMap[messageId])
+		if err != nil {
+			models.Logger.Errorf("en error occurred in %s regroup loop, err: %+v", regroupMessage.Crypto, err)
+			os.Exit(1)
+		}
+		r.deleteInstance(messageId, operation.GetClassName())
+		models.Logger.Infof("end of %s regroup loop", regroupMessage.Crypto)
+	}()
+
 	return nil
 }
 

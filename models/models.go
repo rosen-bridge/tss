@@ -12,6 +12,7 @@ const (
 	KeygenFileExistError     = "keygen file exists"
 	OperationIsRunningError  = "operation is running"
 	NoKeygenDataFoundError   = "no keygen data found"
+	WrongCryptoProtocolError = "wrong crypto protocol"
 )
 
 type SignMessage struct {

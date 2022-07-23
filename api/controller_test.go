@@ -653,6 +653,43 @@ func TestController_Regroup(t *testing.T) {
 			wantErr:    true,
 			statusCode: 409,
 		},
+		{
+			name: "ecdsa, statusCode: 400, No Keygen Data Found",
+			regroupMessage: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeerState:    0,
+				PeersCount:   4,
+				Crypto:       "ecdsa",
+			},
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				app.On("StartNewRegroup", mock.AnythingOfType("models.RegroupMessage")).Return(fmt.Errorf(models.NoKeygenDataFoundError))
+				app.On("GetOperations").Return([]_interface.Operation{})
+
+				return app
+			},
+			wantErr:    true,
+			statusCode: 400,
+		},
+		{
+			name: "eplsa, statusCode: 400, Wrong Crypto Protocol",
+			regroupMessage: models.RegroupMessage{
+				NewThreshold: 3,
+				OldThreshold: 2,
+				PeerState:    0,
+				PeersCount:   4,
+				Crypto:       "eplsa",
+			},
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				app.On("StartNewRegroup", mock.AnythingOfType("models.RegroupMessage")).Return(fmt.Errorf(models.WrongCryptoProtocolError))
+				app.On("GetOperations").Return([]_interface.Operation{})
+				return app
+			},
+			wantErr:    true,
+			statusCode: 400,
+		},
 	}
 
 	e := echo.New()

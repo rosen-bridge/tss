@@ -73,7 +73,7 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 			switch err.Error() {
 			case models.DuplicatedMessageIdError:
 				return errorHandler(http.StatusConflict, err.Error(), c)
-			case models.KeygenFileExistError:
+			case models.KeygenFileExistError, models.WrongCryptoProtocolError:
 				return errorHandler(http.StatusBadRequest, err.Error(), c)
 			default:
 				return errorHandler(http.StatusInternalServerError, err.Error(), c)
@@ -105,7 +105,7 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 			switch err.Error() {
 			case models.DuplicatedMessageIdError:
 				return errorHandler(http.StatusConflict, err.Error(), c)
-			case models.NoKeygenDataFoundError:
+			case models.NoKeygenDataFoundError, models.WrongCryptoProtocolError:
 				return errorHandler(http.StatusBadRequest, err.Error(), c)
 			default:
 				return errorHandler(http.StatusInternalServerError, err.Error(), c)
@@ -138,7 +138,7 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 			switch err.Error() {
 			case models.DuplicatedMessageIdError:
 				return errorHandler(http.StatusConflict, err.Error(), c)
-			case models.NoKeygenDataFoundError:
+			case models.NoKeygenDataFoundError, models.WrongCryptoProtocolError:
 				return errorHandler(http.StatusBadRequest, err.Error(), c)
 			default:
 				return errorHandler(http.StatusInternalServerError, err.Error(), c)
