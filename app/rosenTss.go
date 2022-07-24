@@ -364,6 +364,7 @@ func (r *rosenTss) GetOperations() []_interface.Operation {
 	return r.operations
 }
 
+// deleteInstance removes operation and related channel from list
 func (r *rosenTss) deleteInstance(channelId string, operationName string) {
 	for i, operation := range r.operations {
 		if operation.GetClassName() == operationName {

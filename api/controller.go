@@ -41,6 +41,7 @@ func errorHandler(code int, err string, c echo.Context) *echo.HTTPError {
 	return echo.NewHTTPError(code, err)
 }
 
+// checkOperation check if there is any common between forbidden list of requested operation and running operations
 func (tssController *tssController) checkOperation(forbiddenOperations []string) error {
 	operations := tssController.rosenTss.GetOperations()
 	for _, operation := range operations {
