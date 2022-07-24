@@ -87,7 +87,7 @@ func (f *storage) LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveDa
 		return eddsaKeygen.LocalPartySaveData{}, nil, err
 	}
 	if len(files) == 0 {
-		return eddsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
+		return eddsaKeygen.LocalPartySaveData{}, nil, errors.New(models.NoKeygenDataFoundError)
 	}
 	for _, File := range files {
 		if strings.Contains(File.Name(), "keygen") {
@@ -135,7 +135,7 @@ func (f *storage) LoadECDSAKeygen(peerHome string) (ecdsaKeygen.LocalPartySaveDa
 		return ecdsaKeygen.LocalPartySaveData{}, nil, err
 	}
 	if len(files) == 0 {
-		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
+		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.New(models.NoKeygenDataFoundError)
 	}
 	for _, File := range files {
 		if strings.Contains(File.Name(), "keygen") {

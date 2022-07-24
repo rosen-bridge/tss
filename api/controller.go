@@ -41,6 +41,19 @@ func errorHandler(code int, err string, c echo.Context) *echo.HTTPError {
 	return echo.NewHTTPError(code, err)
 }
 
+// checkOperation check if there is any common between forbidden list of requested operation and running operations
+func (tssController *tssController) checkOperation(forbiddenOperations []string) error {
+	operations := tssController.rosenTss.GetOperations()
+	for _, operation := range operations {
+		for _, forbidden := range forbiddenOperations {
+			if operation.GetClassName() == forbidden {
+				return fmt.Errorf("%s "+models.OperationIsRunningError, forbidden)
+			}
+		}
+	}
+	return nil
+}
+
 // Keygen returns echo handler, starting new keygen process
 func (tssController *tssController) Keygen() echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -51,9 +64,21 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 		}
 		c.Logger().Info("keygen data: %+v ", data)
 
-		err := tssController.rosenTss.StartNewKeygen(data)
+		forbiddenOperations := []string{data.Crypto + "Sign"}
+		err := tssController.checkOperation(forbiddenOperations)
 		if err != nil {
-			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			return errorHandler(http.StatusConflict, err.Error(), c)
+		}
+		err = tssController.rosenTss.StartNewKeygen(data)
+		if err != nil {
+			switch err.Error() {
+			case models.DuplicatedMessageIdError:
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			case models.KeygenFileExistError, models.WrongCryptoProtocolError:
+				return errorHandler(http.StatusBadRequest, err.Error(), c)
+			default:
+				return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			}
 		}
 		return c.JSON(http.StatusOK, response{
 			Message: "ok",
@@ -71,9 +96,21 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 		}
 		c.Logger().Info("sign data: %+v ", data)
 
-		err := tssController.rosenTss.StartNewSign(data)
+		forbiddenOperations := []string{data.Crypto + "Keygen", data.Crypto + "Regroup"}
+		err := tssController.checkOperation(forbiddenOperations)
 		if err != nil {
-			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			return errorHandler(http.StatusConflict, err.Error(), c)
+		}
+		err = tssController.rosenTss.StartNewSign(data)
+		if err != nil {
+			switch err.Error() {
+			case models.DuplicatedMessageIdError:
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			case models.NoKeygenDataFoundError, models.WrongCryptoProtocolError:
+				return errorHandler(http.StatusBadRequest, err.Error(), c)
+			default:
+				return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			}
 		}
 
 		return c.JSON(http.StatusOK, response{
@@ -92,9 +129,21 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 		}
 		c.Logger().Info("regroup data: %+v ", data)
 
-		err := tssController.rosenTss.StartNewRegroup(data)
+		forbiddenOperations := []string{data.Crypto + "Sign"}
+		err := tssController.checkOperation(forbiddenOperations)
 		if err != nil {
-			return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			return errorHandler(http.StatusConflict, err.Error(), c)
+		}
+		err = tssController.rosenTss.StartNewRegroup(data)
+		if err != nil {
+			switch err.Error() {
+			case models.DuplicatedMessageIdError:
+				return errorHandler(http.StatusConflict, err.Error(), c)
+			case models.NoKeygenDataFoundError, models.WrongCryptoProtocolError:
+				return errorHandler(http.StatusBadRequest, err.Error(), c)
+			default:
+				return errorHandler(http.StatusInternalServerError, err.Error(), c)
+			}
 		}
 
 		return c.JSON(http.StatusOK, response{

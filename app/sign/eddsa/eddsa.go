@@ -51,7 +51,7 @@ func (s *operationEDDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 	msgBytes, _ := hex.DecodeString(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
-	messageId := hex.EncodeToString(signDataBytes[:])
+	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(signDataBytes[:]))
 	jsonMessage := rosenTss.NewMessage(receiverId, s.LocalTssData.PartyID.Id, message, messageId, "partyId")
 	err := rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
@@ -157,7 +157,7 @@ func (s *operationEDDSASign) handleOutMessage(rosenTss _interface.RosenTss, part
 		return err
 	}
 	messageBytes := blake2b.Sum256(signData.Bytes())
-	messageId := hex.EncodeToString(messageBytes[:])
+	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(messageBytes[:]))
 	jsonMessage := rosenTss.NewMessage("", s.LocalTssData.PartyID.Id, msgHex, messageId, "partyMsg")
 	err = rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
@@ -304,7 +304,7 @@ func (s *operationEDDSASign) setup(rosenTss _interface.RosenTss) error {
 		tss.Edwards(), ctx, s.LocalTssData.PartyID, len(s.LocalTssData.PartyIds), meta.Threshold)
 
 	messageBytes := blake2b.Sum256(signData.Bytes())
-	messageId := hex.EncodeToString(messageBytes[:])
+	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(messageBytes[:]))
 	jsonMessage := rosenTss.NewMessage("", s.LocalTssData.PartyID.Id, signData.String(), messageId, "sign")
 
 	err := rosenTss.GetConnection().Publish(jsonMessage)

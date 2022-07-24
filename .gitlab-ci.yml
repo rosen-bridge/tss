@@ -1,28 +1,43 @@
 image: golang:1.18
 
 stages:
+  - prepare_go
+  - mocking
   - test
 
-before_script:
-  - echo "before_script"
-  - mkdir -p .go
-  - go env -w GO111MODULE=on
-  - go env -w GOPROXY="https://goproxy.io,direct"
-  - go install github.com/vektra/mockery/v2@latest
-  - mockery --all --keeptree
+preparing:
+  stage: prepare_go
+  script:
+    - echo "prepare_go"
+    - mkdir -p .go
+    - go env -w GO111MODULE=on
+    - go env -w GOPROXY="https://goproxy.io,direct"
+  artifacts:
+    paths:
+      - .go/
 
+mocking_dependencies:
+  stage: mocking
+  script:
+    - echo "mocking"
+    - go install github.com/vektra/mockery/v2@latest
+    - mockery --all --keeptree
+  artifacts:
+    paths:
+      - mocks/
 
 format:
   stage: test
   script:
+    - echo "formating"
     - go fmt $(go list ./...)
     # - go vet $(go list ./...)
-
 
 
 code_coverage:
   stage: test
   script:
+    - echo "test and coverage"
     - go test $(go list ./...) -coverprofile=coverage.txt -covermode count
     - go get github.com/boumenot/gocover-cobertura
     - go run github.com/boumenot/gocover-cobertura < coverage.txt > coverage.xml
