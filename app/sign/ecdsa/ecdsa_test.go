@@ -88,10 +88,11 @@ func TestECDSA_Init(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaSignOp := operationECDSASign{
-				OperationSign: sign.OperationSign{
+				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -274,12 +275,13 @@ func TestECDSA_Loop(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.AppConfig()
 			ecdsaSignOp := operationECDSASign{
 				savedData: saveData,
-				OperationSign: sign.OperationSign{
+				operationSign: sign.OperationSign{
 					LocalTssData: localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -325,10 +327,12 @@ func TestECDSA_GetClassName(t *testing.T) {
 			expected: "ecdsaSign",
 		},
 	}
+
+	logging, _ = mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaSignOp := operationECDSASign{
-				OperationSign: sign.OperationSign{
+				operationSign: sign.OperationSign{
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
 						Crypto:      "ecdsa",
@@ -438,11 +442,12 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
 			ecdsaSignOp := operationECDSASign{
-				OperationSign: sign.OperationSign{
+				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage:  tt.signMessage,
 				},
@@ -555,7 +560,7 @@ func TestECDSA_partyUpdate(t *testing.T) {
 	}
 
 	ecdsaSignOp := operationECDSASign{
-		OperationSign: sign.OperationSign{
+		operationSign: sign.OperationSign{
 			LocalTssData: localTssData,
 			SignMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -565,6 +570,7 @@ func TestECDSA_partyUpdate(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if err := ecdsaSignOp.partyUpdate(tt.message); (err != nil) != tt.wantErr {
@@ -643,10 +649,12 @@ func TestECDSA_setup(t *testing.T) {
 			wantErr:      false,
 		},
 	}
+
+	logging, _ = mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaSignOp := operationECDSASign{
-				OperationSign: sign.OperationSign{
+				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -715,10 +723,12 @@ func TestECDSA_handleOutMessage(t *testing.T) {
 			tssMessage:   &message,
 		},
 	}
+
+	logging, _ = mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaSignOp := operationECDSASign{
-				OperationSign: sign.OperationSign{
+				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -776,10 +786,12 @@ func TestECDSA_handleEndMessage(t *testing.T) {
 			signatureData: &saveSign,
 		},
 	}
+
+	logging, _ = mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaSignOp := operationECDSASign{
-				OperationSign: sign.OperationSign{},
+				operationSign: sign.OperationSign{},
 			}
 			err := ecdsaSignOp.handleEndMessage(tt.app, tt.signatureData)
 			if err != nil {
@@ -869,10 +881,12 @@ func TestECDSA_gossipMessageHandler(t *testing.T) {
 			tssMessage:   &message,
 		},
 	}
+
+	logging, _ = mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaSignOp := operationECDSASign{
-				OperationSign: sign.OperationSign{
+				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -881,8 +895,8 @@ func TestECDSA_gossipMessageHandler(t *testing.T) {
 					},
 				},
 			}
-			outCh := make(chan tss.Message, len(ecdsaSignOp.LocalTssData.PartyIds))
-			endCh := make(chan common.SignatureData, len(ecdsaSignOp.LocalTssData.PartyIds))
+			outCh := make(chan tss.Message, len(ecdsaSignOp.operationSign.LocalTssData.PartyIds))
+			endCh := make(chan common.SignatureData, len(ecdsaSignOp.operationSign.LocalTssData.PartyIds))
 			switch tt.name {
 
 			case "handling sign":

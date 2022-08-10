@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/labstack/gommon/log"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/blake2b"
 	"io/ioutil"
 	"math/big"
@@ -18,6 +19,7 @@ import (
 	eddsaRegroup "rosen-bridge/tss/app/regroup/eddsa"
 	ecdsaSign "rosen-bridge/tss/app/sign/ecdsa"
 	eddsaSign "rosen-bridge/tss/app/sign/eddsa"
+	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
@@ -39,8 +41,11 @@ type rosenTss struct {
 	operations []_interface.Operation
 }
 
+var logging *zap.SugaredLogger
+
 // NewRosenTss Constructor of an app
 func NewRosenTss(connection network.Connection, storage storage.Storage, homeAddress string) _interface.RosenTss {
+	logging = logger.NewSugar("tss")
 	return &rosenTss{
 		ChannelMap: make(map[string]chan models.GossipMessage),
 		metaData:   models.MetaData{},
@@ -70,7 +75,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	if !ok {
 		messageCh := make(chan models.GossipMessage, 100)
 		r.ChannelMap[messageId] = messageCh
-		models.Logger.Infof("creating new channel in StartNewSign: %v", messageId)
+		logging.Infof("creating new channel in StartNewSign: %v", messageId)
 	} else {
 		return fmt.Errorf(models.DuplicatedMessageIdError)
 	}
@@ -91,15 +96,15 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		return err
 	}
 	go func() {
-		models.Logger.Infof("calling loop for %s sign", signMessage.Crypto)
+		logging.Infof("calling loop for %s sign", signMessage.Crypto)
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
-			models.Logger.Errorf("en error occurred in %s sign loop, err: %+v", signMessage.Crypto, err)
+			logging.Errorf("en error occurred in %s sign loop, err: %+v", signMessage.Crypto, err)
 			os.Exit(1)
 
 		}
 		r.deleteInstance(messageId, operation.GetClassName())
-		models.Logger.Infof("end of %s sign loop", signMessage.Crypto)
+		logging.Infof("end of %s sign loop", signMessage.Crypto)
 	}()
 
 	return nil
@@ -123,7 +128,7 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 	if !ok {
 		messageCh := make(chan models.GossipMessage, 100)
 		r.ChannelMap[messageId] = messageCh
-		models.Logger.Infof("creating new channel in StartNewKeygen: %v", messageId)
+		logging.Infof("creating new channel in StartNewKeygen: %v", messageId)
 	} else {
 		return fmt.Errorf(models.DuplicatedMessageIdError)
 	}
@@ -151,15 +156,15 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		return err
 	}
 	go func() {
-		models.Logger.Infof("calling loop for %s keygen", keygenMessage.Crypto)
+		logging.Infof("calling loop for %s keygen", keygenMessage.Crypto)
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
-			models.Logger.Errorf("en error occurred in %s keygen loop, err: %+v", keygenMessage.Crypto, err)
+			logging.Errorf("en error occurred in %s keygen loop, err: %+v", keygenMessage.Crypto, err)
 			os.Exit(1)
 
 		}
 		r.deleteInstance(messageId, operation.GetClassName())
-		models.Logger.Infof("end of %s keygen loop", keygenMessage.Crypto)
+		logging.Infof("end of %s keygen loop", keygenMessage.Crypto)
 	}()
 
 	return nil
@@ -175,7 +180,7 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 	if !ok {
 		messageCh := make(chan models.GossipMessage, 100)
 		r.ChannelMap[messageId] = messageCh
-		models.Logger.Infof("creating new channel in StartNewRegroup: %v", messageId)
+		logging.Infof("creating new channel in StartNewRegroup: %v", messageId)
 	} else {
 		return fmt.Errorf(models.DuplicatedMessageIdError)
 	}
@@ -196,14 +201,14 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 		return err
 	}
 	go func() {
-		models.Logger.Infof("calling loop for %s regroup", regroupMessage.Crypto)
+		logging.Infof("calling loop for %s regroup", regroupMessage.Crypto)
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
-			models.Logger.Errorf("en error occurred in %s regroup loop, err: %+v", regroupMessage.Crypto, err)
+			logging.Errorf("en error occurred in %s regroup loop, err: %+v", regroupMessage.Crypto, err)
 			os.Exit(1)
 		}
 		r.deleteInstance(messageId, operation.GetClassName())
-		models.Logger.Infof("end of %s regroup loop", regroupMessage.Crypto)
+		logging.Infof("end of %s regroup loop", regroupMessage.Crypto)
 	}()
 
 	return nil
@@ -219,7 +224,7 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 		return err
 	}
 
-	models.Logger.Infof("new message: %+v", gossipMsg.Name)
+	logging.Infof("new message: %+v", gossipMsg.Name)
 
 	timeout := time.After(time.Second * 2)
 	var state bool
@@ -228,7 +233,7 @@ timoutLoop:
 	for {
 		select {
 		case <-timeout:
-			models.Logger.Error("timeout")
+			logging.Error("timeout")
 			state = false
 			break timoutLoop
 		default:
@@ -259,7 +264,7 @@ func (r *rosenTss) GetConnection() network.Connection {
 
 //SetPeerHome setups peer home address and creates that
 func (r *rosenTss) SetPeerHome(homeAddress string) error {
-	models.Logger.Info("setting up home directory")
+	logging.Info("setting up home directory")
 
 	if homeAddress[0:1] == "." {
 		absHomeAddress, err := filepath.Abs(homeAddress)
@@ -307,7 +312,7 @@ func (r *rosenTss) SetMetaData(crypto string) error {
 		}
 	}
 	filePath := filepath.Join(rootFolder, configFile)
-	models.Logger.Infof("File: %v", filePath)
+	logging.Infof("File: %v", filePath)
 
 	// reading file
 	bz, err := ioutil.ReadFile(filePath)

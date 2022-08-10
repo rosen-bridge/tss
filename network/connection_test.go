@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	mockUtils "rosen-bridge/tss/mocks"
 	mockedClient "rosen-bridge/tss/mocks/client"
 	"rosen-bridge/tss/models"
 	"testing"
@@ -56,7 +57,7 @@ func TestConnection_Publish(t *testing.T) {
 			}, nil
 		},
 	}
-
+	logging, _ = mockUtils.InitLog("connection")
 	err := cnn.Publish(message)
 	if err != nil {
 		t.Error(err)
@@ -100,7 +101,7 @@ func TestConnection_Subscribe(t *testing.T) {
 			}, nil
 		},
 	}
-
+	logging, _ = mockUtils.InitLog("connection")
 	err := cnn.Subscribe(projectPort)
 	if err != nil {
 		t.Error(err)
@@ -156,7 +157,7 @@ func TestConnection_CallBack(t *testing.T) {
 			}, nil
 		},
 	}
-
+	logging, _ = mockUtils.InitLog("connection")
 	url := fmt.Sprintf("%s%s", callBackURLHost, callBackURLPath)
 	err := cnn.CallBack(url, saveSign)
 	if err != nil {

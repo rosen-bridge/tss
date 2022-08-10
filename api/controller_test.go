@@ -15,6 +15,7 @@ import (
 	eddsaKeygen "rosen-bridge/tss/app/keygen/eddsa"
 	ecdsaSign "rosen-bridge/tss/app/sign/ecdsa"
 	eddsaSign "rosen-bridge/tss/app/sign/eddsa"
+	"rosen-bridge/tss/mocks"
 	mockedApp "rosen-bridge/tss/mocks/app/interface"
 	"rosen-bridge/tss/models"
 	"strings"
@@ -154,7 +155,7 @@ func TestController_Sign(t *testing.T) {
 	}
 
 	e := echo.New()
-
+	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
@@ -244,7 +245,7 @@ func TestController_Message(t *testing.T) {
 	}
 
 	e := echo.New()
-
+	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
@@ -282,6 +283,8 @@ func TestController_Message(t *testing.T) {
 */
 func TestController_Export(t *testing.T) {
 	// Setup, creating fake peer home with some files in it
+	logging, _ = mocks.InitLog("controller")
+
 	e := echo.New()
 	req := httptest.NewRequest(http.MethodGet, "/export", nil)
 	rec := httptest.NewRecorder()
@@ -345,7 +348,7 @@ func TestController_Import(t *testing.T) {
 	}
 
 	e := echo.New()
-
+	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
@@ -499,7 +502,7 @@ func TestController_Keygen(t *testing.T) {
 	}
 
 	e := echo.New()
-
+	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
@@ -693,7 +696,7 @@ func TestController_Regroup(t *testing.T) {
 	}
 
 	e := echo.New()
-
+	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()

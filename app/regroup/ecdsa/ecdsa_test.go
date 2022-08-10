@@ -134,11 +134,15 @@ func TestECDSA_Init(t *testing.T) {
 			},
 		},
 	}
+	logging, err = mockUtils.InitLog("ecdsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			ecdsaRegroupOp := operationECDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 				},
 			}
@@ -287,13 +291,17 @@ func TestECDSA_Loop(t *testing.T) {
 		},
 	}
 
+	logging, err = mockUtils.InitLog("ecdsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.AppConfig()
 
 			ecdsaRegroupOp := operationECDSARegroup{
 				savedData: saveData,
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: localTssData,
 					RegroupMessage: models.RegroupMessage{
 						PeerState:    0,
@@ -340,6 +348,7 @@ func TestECDSA_GetClassName(t *testing.T) {
 			expected: "ecdsaRegroup",
 		},
 	}
+	logging, _ = mockUtils.InitLog("ecdsa-regroup")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaRegroupOp := operationECDSARegroup{}
@@ -592,7 +601,10 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 			wantErr: false,
 		},
 	}
-
+	logging, err = mockUtils.InitLog("ecdsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
@@ -600,7 +612,7 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 
 			ecdsaRegroupOp := operationECDSARegroup{
 				savedData: data,
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState:   tt.peerState,
 						PartyID:     newPartyId,
@@ -737,11 +749,14 @@ func TestECDSA_partyUpdate(t *testing.T) {
 			},
 		},
 	}
-
+	logging, err = mockUtils.InitLog("ecdsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaRegroupOp := operationECDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 					RegroupMessage: models.RegroupMessage{
 						PeerState:    tt.localTssData.PeerState,
@@ -826,10 +841,14 @@ func TestECDSA_setup(t *testing.T) {
 			peerState: 1,
 		},
 	}
+	logging, err = mockUtils.InitLog("ecdsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaRegroupOp := operationECDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState:   tt.peerState,
 						OldPartyIds: localTssData.OldPartyIds,
@@ -906,10 +925,14 @@ func TestECDSA_handleOutMessage(t *testing.T) {
 			tssMessage:   &message,
 		},
 	}
+	logging, err = mockUtils.InitLog("ecdsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaRegroupOp := operationECDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PartyID: tt.localTssData.PartyID,
 					},
@@ -966,11 +989,14 @@ func TestECDSA_handleEndMessage(t *testing.T) {
 	app := mockedInterface.NewRosenTss(t)
 	app.On("GetStorage").Return(store)
 	app.On("GetPeerHome").Return("/tmp/.rosenTss")
-
+	logging, err = mockUtils.InitLog("ecdsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaRegroupOp := operationECDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState: tt.peerState,
 					},
@@ -1072,11 +1098,15 @@ func TestECDSA_gossipMessageHandler(t *testing.T) {
 			},
 		},
 	}
+	logging, err = mockUtils.InitLog("ecdsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			ecdsaRegroupOp := operationECDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 				},
 			}

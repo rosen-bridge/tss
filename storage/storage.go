@@ -8,9 +8,11 @@ import (
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/pkg/errors"
 	"github.com/rs/xid"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
 	"strings"
 )
@@ -27,8 +29,11 @@ type storage struct {
 	filePath string
 }
 
+var logging *zap.SugaredLogger
+
 // NewStorage Constructor of a storage struct
 func NewStorage() Storage {
+	logging = logger.NewSugar("storage")
 	return &storage{
 		filePath: "",
 	}
@@ -42,7 +47,7 @@ func (f *storage) MakefilePath(peerHome string, protocol string) {
 // WriteData writing given data to file in given path
 func (f *storage) WriteData(data interface{}, peerHome string, fileFormat string, protocol string) error {
 
-	models.Logger.Info("write data called")
+	logging.Info("write data called")
 
 	f.MakefilePath(peerHome, protocol)
 	err := os.MkdirAll(f.filePath, os.ModePerm)
@@ -52,12 +57,12 @@ func (f *storage) WriteData(data interface{}, peerHome string, fileFormat string
 
 	path := filepath.Join(f.filePath, fileFormat)
 
-	models.Logger.Infof("path: %s", path)
+	logging.Infof("path: %s", path)
 	fd, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	defer func(fd *os.File) {
 		err := fd.Close()
 		if err != nil {
-			models.Logger.Errorf("unable to Close File %s, err:{%v}", path, err)
+			logging.Errorf("unable to Close File %s, err:{%v}", path, err)
 		}
 	}(fd)
 
@@ -72,7 +77,7 @@ func (f *storage) WriteData(data interface{}, peerHome string, fileFormat string
 	if err != nil {
 		return fmt.Errorf("unable to write to File %s", path)
 	}
-	models.Logger.Infof("Saved a File: %s", path)
+	logging.Infof("Saved a File: %s", path)
 	return nil
 }
 
@@ -95,7 +100,7 @@ func (f *storage) LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveDa
 		}
 	}
 	filePath := filepath.Join(f.filePath, keygenFile)
-	models.Logger.Infof("File: %v", filePath)
+	logging.Infof("File: %v", filePath)
 
 	// reading file
 	bz, err := ioutil.ReadFile(filePath)
@@ -143,7 +148,7 @@ func (f *storage) LoadECDSAKeygen(peerHome string) (ecdsaKeygen.LocalPartySaveDa
 		}
 	}
 	filePath := filepath.Join(f.filePath, keygenFile)
-	models.Logger.Infof("File: %v", filePath)
+	logging.Infof("File: %v", filePath)
 
 	// reading file
 	bz, err := ioutil.ReadFile(filePath)
@@ -180,11 +185,11 @@ func (f *storage) LoadPrivate(peerHome string, crypto string) string {
 	f.MakefilePath(peerHome, crypto)
 	files, err := ioutil.ReadDir(f.filePath)
 	if err != nil {
-		models.Logger.Error(err)
+		logging.Error(err)
 		return ""
 	}
 	if len(files) == 0 {
-		models.Logger.Error(fmt.Errorf("no private data found"))
+		logging.Error(fmt.Errorf("no private data found"))
 		return ""
 	}
 	for _, File := range files {
@@ -197,17 +202,17 @@ func (f *storage) LoadPrivate(peerHome string, crypto string) string {
 		return ""
 	}
 	filePath := filepath.Join(f.filePath, privateFile)
-	models.Logger.Infof("File: %v", filePath)
+	logging.Infof("File: %v", filePath)
 
 	// reading file
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		models.Logger.Error(fmt.Errorf("could not open the File for party in the expected location: %s. import private first. error: %v", filePath, err))
+		logging.Error(fmt.Errorf("could not open the File for party in the expected location: %s. import private first. error: %v", filePath, err))
 		return ""
 	}
 	var key models.Private
 	if err = json.Unmarshal(bz, &key); err != nil {
-		models.Logger.Error(fmt.Errorf("could not unmarshal private data located at: %s, err: %v", filePath, err))
+		logging.Error(fmt.Errorf("could not unmarshal private data located at: %s, err: %v", filePath, err))
 		return ""
 	}
 
