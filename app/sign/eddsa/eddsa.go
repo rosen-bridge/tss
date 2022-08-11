@@ -230,14 +230,13 @@ func (s *operationEDDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss,
 				s.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(s.LocalTssData.PartyIds.ToUnSorted(), newParty))
 
-				if len(s.LocalTssData.PartyIds) < meta.Threshold {
-					err := s.Init(rosenTss, newParty.Id)
+				if len(s.LocalTssData.PartyIds) == (meta.PeersCount - 1) {
+					err := s.setup(rosenTss)
 					if err != nil {
 						return err
 					}
 				} else {
-
-					err := s.setup(rosenTss)
+					err := s.Init(rosenTss, newParty.Id)
 					if err != nil {
 						return err
 					}
@@ -287,10 +286,6 @@ func (s *operationEDDSASign) setup(rosenTss _interface.RosenTss) error {
 
 	meta := rosenTss.GetMetaData()
 	models.Logger.Infof("meta %+v", meta)
-
-	if len(s.LocalTssData.PartyIds) < meta.Threshold {
-		return fmt.Errorf("not eanough partyId")
-	}
 
 	s.LocalTssData.PartyIds = tss.SortPartyIDs(
 		append(s.LocalTssData.PartyIds.ToUnSorted(), s.LocalTssData.PartyID))
