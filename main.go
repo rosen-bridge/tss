@@ -6,12 +6,12 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/viper"
 	_ "github.com/swaggo/echo-swagger/example/docs"
-	"os"
 	"rosen-bridge/tss/api"
 	"rosen-bridge/tss/app"
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
+	"rosen-bridge/tss/utils"
 )
 
 var (
@@ -36,11 +36,18 @@ func main() {
 		panic(err)
 	}
 
-	logLevel := viper.GetString("LOG_LEVEL")
 	homeAddress := viper.GetString("HOME_ADDRESS")
-	userHome, _ := os.UserHomeDir()
-	logFile := fmt.Sprintf("%s/%s/%s", userHome, ".rosenTss", "tss.log")
-	err = logger.Init(logLevel, logFile, false)
+	absAddress, err := utils.GetAbsoluteAddress(homeAddress)
+	if err != nil {
+		panic(err)
+	}
+	logFile := fmt.Sprintf("%s/%s", absAddress, "tss.log")
+	logLevel := viper.GetString("LOG_LEVEL")
+	MaxSize := viper.GetInt("LOG_MAX_SIZE")
+	MaxBackups := viper.GetInt("LOG_MAX_BACKUPS")
+	MaxAge := viper.GetInt("LOG_MAX_AGE")
+
+	err = logger.Init(logFile, logLevel, MaxSize, MaxBackups, MaxAge, false)
 	if err != nil {
 		panic(err)
 	}

@@ -189,7 +189,7 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 		if err := c.Bind(&data); err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 		}
-		logging.Info("import data: %+v ", data)
+		logging.Info("importing data")
 		err := tssController.rosenTss.SetPrivate(data)
 		if err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())

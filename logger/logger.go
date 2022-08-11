@@ -2,11 +2,10 @@ package logger
 
 import (
 	"fmt"
-	"os"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
+	"os"
 )
 
 const (
@@ -26,7 +25,7 @@ func Sync() error {
 	return globalLogger.Sync()
 }
 
-func Init(logLevel string, logFile string, dev bool) error {
+func Init(logFile string, logLevel string, MaxSize int, MaxBackups int, MaxAge int, dev bool) error {
 
 	var level zapcore.Level
 	switch logLevel {
@@ -44,9 +43,9 @@ func Init(logLevel string, logFile string, dev bool) error {
 
 	ws := zapcore.AddSync(&lumberjack.Logger{
 		Filename:   logFile,
-		MaxSize:    1, //MB
-		MaxBackups: 30,
-		MaxAge:     90, //days
+		MaxSize:    MaxSize, //MB
+		MaxBackups: MaxBackups,
+		MaxAge:     MaxAge, //days
 		Compress:   false,
 	})
 
@@ -65,15 +64,9 @@ func Init(logLevel string, logFile string, dev bool) error {
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	//developmentEncoder := zap.NewDevelopmentEncoderConfig()
-	//developmentEncoder.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	//productionEncoder := zap.NewProductionEncoderConfig()
-	//productionEncoder.EncodeLevel = zapcore.CapitalColorLevelEncoder
-
 	core := zapcore.NewCore(
 		// use NewConsoleEncoder for human-readable output
-		//zapcore.NewConsoleEncoder(encoderConfig),
-		zapcore.NewJSONEncoder(encoderConfig),
+		zapcore.NewConsoleEncoder(encoderConfig),
 		// write to stdout as well as log files
 		zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), ws),
 
@@ -92,6 +85,4 @@ func Init(logLevel string, logFile string, dev bool) error {
 
 func NewSugar(name string) *zap.SugaredLogger {
 	return globalLogger.Named(name).Sugar()
-	//logger, _ := zap.NewProduction()
-	//return logger.Sugar()
 }

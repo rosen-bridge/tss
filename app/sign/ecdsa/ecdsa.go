@@ -241,7 +241,7 @@ func (s *operationECDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss,
 					append(s.operationSign.LocalTssData.PartyIds.ToUnSorted(), newParty))
 			}
 			if s.operationSign.LocalTssData.Params == nil {
-				if len(s.operationSign.LocalTssData.PartyIds) == (meta.PeersCount - 1) {
+				if len(s.operationSign.LocalTssData.PartyIds) >= meta.Threshold {
 					err := s.setup(rosenTss)
 					if err != nil {
 						return err

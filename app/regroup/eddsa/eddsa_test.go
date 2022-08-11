@@ -632,7 +632,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 						PeerState:    tt.peerState,
 						NewThreshold: 1,
 						OldThreshold: 1,
-						PeersCount:   4,
+						PeersCount:   5,
 						Crypto:       "eddsa",
 					},
 				},

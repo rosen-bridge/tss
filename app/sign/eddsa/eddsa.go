@@ -237,13 +237,14 @@ func (s *operationEDDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss,
 				s.operationSign.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(s.operationSign.LocalTssData.PartyIds.ToUnSorted(), newParty))
 
-				if len(s.operationSign.LocalTssData.PartyIds) == (meta.PeersCount - 1) {
-					err := s.setup(rosenTss)
+				if len(s.operationSign.LocalTssData.PartyIds) < meta.Threshold {
+					err := s.Init(rosenTss, newParty.Id)
 					if err != nil {
 						return err
 					}
 				} else {
-					err := s.Init(rosenTss, newParty.Id)
+
+					err := s.setup(rosenTss)
 					if err != nil {
 						return err
 					}

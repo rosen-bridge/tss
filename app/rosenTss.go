@@ -23,6 +23,7 @@ import (
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
+	"rosen-bridge/tss/utils"
 	"strings"
 	"time"
 )
@@ -226,7 +227,7 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 
 	logging.Infof("new message: %+v", gossipMsg.Name)
 
-	timeout := time.After(time.Minute)
+	timeout := time.After(time.Second * 30)
 	var state bool
 
 timoutLoop:
@@ -266,22 +267,11 @@ func (r *rosenTss) GetConnection() network.Connection {
 func (r *rosenTss) SetPeerHome(homeAddress string) error {
 	logging.Info("setting up home directory")
 
-	if homeAddress[0:1] == "." {
-		absHomeAddress, err := filepath.Abs(homeAddress)
-		if err != nil {
-			return err
-		}
-		r.peerHome = absHomeAddress
-	} else if homeAddress[0:1] == "~" {
-		userHome, err := os.UserHomeDir()
-		if err != nil {
-			return err
-		}
-		absHomeAddress := filepath.Join(userHome, homeAddress[1:])
-		r.peerHome = absHomeAddress
-	} else {
-		r.peerHome = homeAddress
+	absAddress, err := utils.GetAbsoluteAddress(homeAddress)
+	if err != nil {
+		return err
 	}
+	r.peerHome = absAddress
 
 	if err := os.MkdirAll(r.peerHome, os.ModePerm); err != nil {
 		return err

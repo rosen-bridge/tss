@@ -241,7 +241,7 @@ func LoadECDSAKeygenFixture(index int) (ecdsaKeygen.LocalPartySaveData, *tss.Par
 }
 
 func InitLog(name string) (*zap.SugaredLogger, error) {
-	err := logger.Init("debug", "/tmp/tss.log", false)
+	err := logger.Init("/tmp/tss.log", "debug", 1, 5, 2, false)
 	if err != nil {
 		return nil, err
 	}
