@@ -244,13 +244,13 @@ func (k *operationEDDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 				k.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(k.LocalTssData.PartyIds.ToUnSorted(), newParty))
 
-				if len(k.LocalTssData.PartyIds) < meta.Threshold {
-					err := k.Init(rosenTss, "")
+				if len(k.LocalTssData.PartyIds) == (meta.PeersCount - 1) {
+					err := k.setup(rosenTss)
 					if err != nil {
 						return err
 					}
 				} else {
-					err := k.setup(rosenTss)
+					err := k.Init(rosenTss, "")
 					if err != nil {
 						return err
 					}
@@ -302,10 +302,6 @@ func (k *operationEDDSAKeygen) setup(rosenTss _interface.RosenTss) error {
 	meta := rosenTss.GetMetaData()
 
 	logging.Infof("meta %+v", meta)
-
-	if len(k.LocalTssData.PartyIds) < meta.Threshold {
-		return fmt.Errorf("not eanough partyId")
-	}
 
 	k.LocalTssData.PartyIds = tss.SortPartyIDs(append(k.LocalTssData.PartyIds.ToUnSorted(), k.LocalTssData.PartyID))
 
