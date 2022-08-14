@@ -309,6 +309,10 @@ func (k *operationECDSAKeygen) setup(rosenTss _interface.RosenTss) error {
 
 	logging.Infof("meta %+v", meta)
 
+	if len(k.LocalTssData.PartyIds) < meta.Threshold {
+		return fmt.Errorf("not eanough partyId")
+	}
+
 	logging.Info("setup tss called")
 
 	k.LocalTssData.PartyIds = tss.SortPartyIDs(append(k.LocalTssData.PartyIds.ToUnSorted(), k.LocalTssData.PartyID))
