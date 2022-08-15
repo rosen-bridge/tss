@@ -1,7 +1,7 @@
 # rosen tss project
 
 This project is used for keygen, sign and regroup operations on eddsa and ecdsa protocols in threshold signature.
-Base of the project is tss-lib of binance. For massage passing you should run ts-guard project and set it's port as p2pPort argument.
+It is based on Binance's TSS-lib. For massage passing you should run ts-guard project and set it's port as p2pPort argument.
 
 ### build command 
 ```bash
