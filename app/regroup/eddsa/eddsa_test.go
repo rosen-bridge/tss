@@ -134,11 +134,15 @@ func TestEDDSA_Init(t *testing.T) {
 			},
 		},
 	}
+	logging, err = mockUtils.InitLog("eddsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 				},
 			}
@@ -286,14 +290,17 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 	}
-
+	logging, err = mockUtils.InitLog("eddsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.AppConfig()
 
 			eddsaRegroupOp := operationEDDSARegroup{
 				savedData: saveData,
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: localTssData,
 					RegroupMessage: models.RegroupMessage{
 						PeerState:    0,
@@ -340,6 +347,8 @@ func TestEDDSA_GetClassName(t *testing.T) {
 			expected: "eddsaRegroup",
 		},
 	}
+	logging, _ = mockUtils.InitLog("eddsa-regroup")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{}
@@ -601,7 +610,10 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			wantErr: false,
 		},
 	}
-
+	logging, err = mockUtils.InitLog("eddsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
@@ -609,7 +621,7 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 
 			eddsaRegroupOp := operationEDDSARegroup{
 				savedData: data,
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState:   tt.peerState,
 						PartyID:     newPartyId,
@@ -746,11 +758,14 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 			},
 		},
 	}
-
+	logging, err = mockUtils.InitLog("eddsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 					RegroupMessage: models.RegroupMessage{
 						PeerState:    tt.localTssData.PeerState,
@@ -835,10 +850,14 @@ func TestEDDSA_setup(t *testing.T) {
 			peerState: 1,
 		},
 	}
+	logging, err = mockUtils.InitLog("eddsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState:   tt.peerState,
 						OldPartyIds: localTssData.OldPartyIds,
@@ -915,10 +934,14 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 			tssMessage:   &message,
 		},
 	}
+	logging, err = mockUtils.InitLog("eddsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PartyID: tt.localTssData.PartyID,
 					},
@@ -975,11 +998,14 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	app := mockedInterface.NewRosenTss(t)
 	app.On("GetStorage").Return(store)
 	app.On("GetPeerHome").Return("/tmp/.rosenTss")
-
+	logging, err = mockUtils.InitLog("eddsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: models.TssRegroupData{
 						PeerState: tt.peerState,
 					},
@@ -1081,11 +1107,15 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 			},
 		},
 	}
+	logging, err = mockUtils.InitLog("eddsa-regroup")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
 			eddsaRegroupOp := operationEDDSARegroup{
-				OperationRegroup: regroup.OperationRegroup{
+				operationRegroup: regroup.OperationRegroup{
 					LocalTssData: tt.localTssData,
 				},
 			}

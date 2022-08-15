@@ -17,7 +17,6 @@ func (o *OperationHandler) PartyMessageHandler(partyMsg tss.Message) (string, er
 	if err != nil {
 		return "", err
 	}
-	models.Logger.Infof("outCh data: {%s}", partyMsg.String())
 	partyMessage := models.PartyMessage{
 		Message:                 msgBytes,
 		IsBroadcast:             partyMsg.IsBroadcast(),
@@ -37,7 +36,6 @@ func (o *OperationHandler) PartyMessageHandler(partyMsg tss.Message) (string, er
 // SharedPartyUpdater used to update app party
 func (o *OperationHandler) SharedPartyUpdater(party tss.Party, msg models.PartyMessage) error {
 	// do not send a message from this party back to itself
-
 	if party.PartyID() == msg.GetFrom {
 		return nil
 	}

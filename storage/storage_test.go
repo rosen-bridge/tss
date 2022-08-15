@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"os"
 	"os/exec"
+	mockUtils "rosen-bridge/tss/mocks"
 	"rosen-bridge/tss/models"
 	"testing"
 )
@@ -62,6 +63,7 @@ func TestStorage_WriteData(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("storage")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := storage{}
@@ -113,6 +115,7 @@ func TestStorage_LoadEDDSAKeygen(t *testing.T) {
 		}
 	})
 
+	logging, _ = mockUtils.InitLog("storage")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := storage{}
@@ -165,6 +168,7 @@ func TestStorage_LoadECDSAKeygen(t *testing.T) {
 		}
 	})
 
+	logging, _ = mockUtils.InitLog("storage")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := storage{}
@@ -222,6 +226,7 @@ func TestStorage_LoadPrivate(t *testing.T) {
 		}
 	})
 
+	logging, _ = mockUtils.InitLog("storage")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := storage{}

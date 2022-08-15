@@ -116,6 +116,10 @@ func TestECDSA_Init(t *testing.T) {
 		},
 	}
 
+	logging, err = mockUtils.InitLog("ecdsa-keygen")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
@@ -256,12 +260,15 @@ func TestECDSA_Loop(t *testing.T) {
 			},
 		},
 	}
-
+	logging, err = mockUtils.InitLog("ecdsa-keygen")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.AppConfig()
 			ecdsaKeygenOp := operationECDSAKeygen{
-				OperationKeygen: keygen.OperationKeygen{
+				keygen.OperationKeygen{
 					LocalTssData: localTssData,
 				},
 			}
@@ -300,6 +307,8 @@ func TestECDSA_GetClassName(t *testing.T) {
 			expected: "ecdsaKeygen",
 		},
 	}
+	logging, _ = mockUtils.InitLog("ecdsa-keygen")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaKeygenOp := operationECDSAKeygen{}
@@ -382,13 +391,16 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 			PeersCount: 3,
 		},
 	)
-
+	logging, err = mockUtils.InitLog("ecdsa-keygen")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Return(tt.gossipMessage)
 			ecdsaKeygenOp := operationECDSAKeygen{
-				OperationKeygen: keygen.OperationKeygen{
+				keygen.OperationKeygen{
 					LocalTssData: tt.localTssData,
 				},
 			}
@@ -496,7 +508,10 @@ func TestECDSA_partyUpdate(t *testing.T) {
 			wantErr: false,
 		},
 	}
-
+	logging, err = mockUtils.InitLog("ecdsa-keygen")
+	if err != nil {
+		t.Fatal(err)
+	}
 	ecdsaKeygenOp := operationECDSAKeygen{
 		keygen.OperationKeygen{
 			LocalTssData: localTssData,
@@ -579,6 +594,10 @@ func TestECDSA_setup(t *testing.T) {
 			wantErr:      false,
 		},
 	}
+	logging, err = mockUtils.InitLog("ecdsa-keygen")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaKeygenOp := operationECDSAKeygen{
@@ -642,6 +661,10 @@ func TestECDSA_handleOutMessage(t *testing.T) {
 			tssMessage:   &message,
 		},
 	}
+	logging, err = mockUtils.InitLog("ecdsa-keygen")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaKeygenOp := operationECDSAKeygen{
@@ -688,6 +711,10 @@ func TestECDSA_handleEndMessage(t *testing.T) {
 	store.On("WriteData", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
+	logging, err = mockUtils.InitLog("ecdsa-keygen")
+	if err != nil {
+		t.Fatal(err)
+	}
 	ecdsaKeygenOp := operationECDSAKeygen{}
 
 	app := mockedInterface.NewRosenTss(t)
@@ -780,10 +807,16 @@ func TestECDSA_gossipMessageHandler(t *testing.T) {
 			tssMessage:   &message,
 		},
 	}
+	logging, err = mockUtils.InitLog("ecdsa-keygen")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ecdsaKeygenOp := operationECDSAKeygen{
-				keygen.OperationKeygen{LocalTssData: tt.localTssData},
+				keygen.OperationKeygen{
+					LocalTssData: tt.localTssData,
+				},
 			}
 			outCh := make(chan tss.Message, len(ecdsaKeygenOp.LocalTssData.PartyIds))
 			endCh := make(chan ecdsaKeygen.LocalPartySaveData, len(ecdsaKeygenOp.LocalTssData.PartyIds))

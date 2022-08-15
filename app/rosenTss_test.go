@@ -65,6 +65,7 @@ func TestRosenTss_SetMetadata(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("tss")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
@@ -100,9 +101,9 @@ func TestRosenTss_GetMetaData(t *testing.T) {
 		storage:    storage,
 		connection: conn,
 	}
+	logging, _ = mockUtils.InitLog("tss")
 
 	metaData := app.GetMetaData()
-
 	assert.Equal(t, app.metaData, metaData)
 }
 
@@ -120,7 +121,7 @@ func TestRosenTss_GetStorage(t *testing.T) {
 		storage:    storage,
 		connection: conn,
 	}
-
+	logging, _ = mockUtils.InitLog("tss")
 	assert.Equal(t, app.storage, app.GetStorage())
 }
 
@@ -138,7 +139,7 @@ func TestRosenTss_GetConnection(t *testing.T) {
 		storage:    storage,
 		connection: conn,
 	}
-
+	logging, _ = mockUtils.InitLog("tss")
 	assert.Equal(t, app.connection, app.GetConnection())
 }
 
@@ -161,7 +162,7 @@ func TestRosenTss_GetPeerHome(t *testing.T) {
 		connection: conn,
 		peerHome:   "/tmp/.rosenTss",
 	}
-
+	logging, _ = mockUtils.InitLog("tss")
 	home := app.GetPeerHome()
 
 	assert.Equal(t, app.peerHome, home)
@@ -212,6 +213,8 @@ func TestRosenTss_SetPeerHome(t *testing.T) {
 
 	storage := mockedStorage.NewStorage(t)
 	conn := mockedNetwork.NewConnection(t)
+	logging, _ = mockUtils.InitLog("tss")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := rosenTss{
@@ -270,6 +273,7 @@ func TestRosenTss_NewMessage(t *testing.T) {
 			},
 		},
 	}
+	logging, _ = mockUtils.InitLog("tss")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -348,6 +352,7 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 			wantErr:    true,
 		},
 	}
+	logging, _ = mockUtils.InitLog("tss")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -444,6 +449,7 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 			wantErr:    false,
 		},
 	}
+	logging, _ = mockUtils.InitLog("tss")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -529,6 +535,8 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("tss")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app.ChannelMap = tt.channelMap
@@ -611,6 +619,8 @@ func TestRosenTss_StartNewKeygen_ECDSA(t *testing.T) {
 			wantErr:    true,
 		},
 	}
+
+	logging, _ = mockUtils.InitLog("tss")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -704,6 +714,8 @@ func TestRosenTss_StartNewKeygen_EDDSA(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("tss")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app.ChannelMap = tt.channelMap
@@ -754,6 +766,8 @@ func TestRosenTss_SetPrivate(t *testing.T) {
 	store.On("WriteData", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
+	logging, _ = mockUtils.InitLog("tss")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
@@ -794,6 +808,8 @@ func TestRosenTss_GetPrivate(t *testing.T) {
 			},
 		},
 	}
+
+	logging, _ = mockUtils.InitLog("tss")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -918,6 +934,8 @@ func TestRosenTss_StartNewRegroup_ECDSA(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("tss")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
@@ -1039,6 +1057,8 @@ func TestRosenTss_StartNewRegroup_EDDSA(t *testing.T) {
 		},
 	}
 
+	logging, _ = mockUtils.InitLog("tss")
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
@@ -1089,6 +1109,8 @@ func TestRosenTss_deleteInstance(t *testing.T) {
 			},
 		},
 	}
+
+	logging, _ = mockUtils.InitLog("tss")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

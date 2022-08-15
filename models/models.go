@@ -2,10 +2,7 @@ package models
 
 import (
 	"github.com/binance-chain/tss-lib/tss"
-	"github.com/ipfs/go-log"
 )
-
-var Logger = log.Logger("rosen-tss")
 
 const (
 	DuplicatedMessageIdError = "duplicated messageId"

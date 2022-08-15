@@ -9,9 +9,11 @@ import (
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/mr-tron/base58"
 	"github.com/rs/xid"
+	"go.uber.org/zap"
 	"math/big"
 	_interface "rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/keygen"
+	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/utils"
 	"strings"
@@ -22,12 +24,15 @@ type operationECDSAKeygen struct {
 	keygen.OperationKeygen
 }
 
+var logging *zap.SugaredLogger
+
 func NewKeygenECDSAOperation() _interface.Operation {
+	logging = logger.NewSugar("ecdsa-keygen")
 	return &operationECDSAKeygen{}
 }
 
 func (k *operationECDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId string) error {
-	models.Logger.Info("Init called")
+	logging.Info("Init called")
 
 	if k.LocalTssData.PartyID == nil {
 		var private []byte
@@ -87,7 +92,7 @@ func (k *operationECDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 			if !ok {
 				return fmt.Errorf("channel closed")
 			}
-			models.Logger.Infof("msg.name: {%s}", msg.Name)
+			logging.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {
 			case "partyId":
 				if msg.Message != "" {
@@ -97,7 +102,7 @@ func (k *operationECDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 					}
 				}
 			case "partyMsg":
-				models.Logger.Info("received party message:",
+				logging.Info("received party message:",
 					fmt.Sprintf("from: %s", msg.SenderId))
 				msgBytes, err := hex.DecodeString(msg.Message)
 				if err != nil {
@@ -113,7 +118,7 @@ func (k *operationECDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 					return err
 				}
 			case "keygen":
-				models.Logger.Info("received keygen message: ",
+				logging.Info("received keygen message: ",
 					fmt.Sprintf("from: %s", msg.SenderId))
 				outCh := make(chan tss.Message, len(k.LocalTssData.PartyIds))
 				endCh := make(chan ecdsaKeygen.LocalPartySaveData, len(k.LocalTssData.PartyIds))
@@ -131,16 +136,16 @@ func (k *operationECDSAKeygen) Loop(rosenTss _interface.RosenTss, messageCh chan
 				if !k.LocalTssData.Party.Running() {
 					go func() {
 						if err := k.LocalTssData.Party.Start(); err != nil {
-							models.Logger.Error(err)
+							logging.Error(err)
 							errorCh <- err
 							return
 						}
-						models.Logger.Info("party started")
+						logging.Info("party started")
 					}()
 					go func() {
 						result, err := k.gossipMessageHandler(rosenTss, outCh, endCh)
 						if err != nil {
-							models.Logger.Error(err)
+							logging.Error(err)
 							errorCh <- err
 							return
 						}
@@ -183,7 +188,7 @@ func (k *operationECDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 	if err != nil {
 		return fmt.Errorf("should not be an error getting a party's index from save data %v", err)
 	}
-	models.Logger.Infof("data index %v", index)
+	logging.Infof("data index %v", index)
 
 	pkX, pkY := saveData.ECDSAPub.X(), saveData.ECDSAPub.Y()
 	pk := ecdsa.PublicKey{
@@ -194,8 +199,8 @@ func (k *operationECDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 
 	public := utils.GetPKFromECDSAPub(pk.X, pk.Y)
 	encodedPK := base58.Encode(public)
-	models.Logger.Infof("pk length: %d", len(public))
-	models.Logger.Infof("base58 pk: %v", encodedPK)
+	logging.Infof("pk length: %d", len(public))
+	logging.Infof("base58 pk: %v", encodedPK)
 
 	err = rosenTss.GetStorage().WriteData(saveData, rosenTss.GetPeerHome(), keygen.KeygenFileName, "ecdsa")
 	if err != nil {
@@ -231,7 +236,7 @@ func (k *operationECDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 	if gossipMessage.SenderId != k.LocalTssData.PartyID.Id &&
 		(gossipMessage.ReceiverId == "" || gossipMessage.ReceiverId == k.LocalTssData.PartyID.Id) {
 
-		models.Logger.Info("received partyId message ",
+		logging.Info("received partyId message ",
 			fmt.Sprintf("from: %s", gossipMessage.SenderId))
 		partyIdParams := strings.Split(gossipMessage.Message, ",")
 		key, _ := new(big.Int).SetString(partyIdParams[2], 10)
@@ -275,7 +280,7 @@ func (k *operationECDSAKeygen) partyUpdate(partyMsg models.PartyMessage) error {
 		if k.LocalTssData.Party.PartyID().Index == partyMsg.GetFrom.Index {
 			return nil
 		}
-		models.Logger.Infof("updating party state")
+		logging.Infof("updating party state")
 		err := k.SharedPartyUpdater(k.LocalTssData.Party, partyMsg)
 		if err != nil {
 			return err
@@ -287,7 +292,7 @@ func (k *operationECDSAKeygen) partyUpdate(partyMsg models.PartyMessage) error {
 			return err
 		}
 		if k.LocalTssData.PartyID.Index == dest[0].Index {
-			models.Logger.Infof("updating party state p2p")
+			logging.Infof("updating party state p2p")
 			err := k.SharedPartyUpdater(k.LocalTssData.Party, partyMsg)
 			if err != nil {
 				return err
@@ -302,25 +307,26 @@ func (k *operationECDSAKeygen) partyUpdate(partyMsg models.PartyMessage) error {
 func (k *operationECDSAKeygen) setup(rosenTss _interface.RosenTss) error {
 	meta := rosenTss.GetMetaData()
 
-	models.Logger.Infof("meta %+v", meta)
+	logging.Infof("meta %+v", meta)
 
 	if len(k.LocalTssData.PartyIds) < meta.Threshold {
 		return fmt.Errorf("not eanough partyId")
 	}
 
-	models.Logger.Info("setup tss called")
+	logging.Info("setup tss called")
+
 	k.LocalTssData.PartyIds = tss.SortPartyIDs(append(k.LocalTssData.PartyIds.ToUnSorted(), k.LocalTssData.PartyID))
 
 	ctx := tss.NewPeerContext(k.LocalTssData.PartyIds)
 	for _, id := range k.LocalTssData.PartyIds {
-		models.Logger.Infof("PartyID: %v	, peerId: %s, key: %v", id, id.Id, id.KeyInt())
+		logging.Infof("PartyID: %v	, peerId: %s, key: %v", id, id.Id, id.KeyInt())
 		if id.Id == k.LocalTssData.PartyID.Id {
 			k.LocalTssData.PartyID = id
 		}
 	}
-	models.Logger.Infof("PartyID: %d, peerId: %s", k.LocalTssData.PartyID.Index, k.LocalTssData.PartyID.Id)
+	logging.Infof("PartyID: %d, peerId: %s", k.LocalTssData.PartyID.Index, k.LocalTssData.PartyID.Id)
 
-	models.Logger.Info("creating params")
+	logging.Info("creating params")
 	k.LocalTssData.Params = tss.NewParameters(
 		tss.S256(), ctx, k.LocalTssData.PartyID, len(k.LocalTssData.PartyIds), meta.Threshold)
 

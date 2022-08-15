@@ -37,6 +37,7 @@ func TestHandler_PartyMessageHandler(t *testing.T) {
 			partyMsg: &message,
 		},
 	}
+
 	operation := OperationHandler{}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

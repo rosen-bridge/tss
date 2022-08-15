@@ -12,6 +12,8 @@ import (
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/labstack/gommon/log"
+	"go.uber.org/zap"
+	"rosen-bridge/tss/logger"
 
 	"github.com/rs/xid"
 	"io/ioutil"
@@ -236,4 +238,12 @@ func LoadECDSAKeygenFixture(index int) (ecdsaKeygen.LocalPartySaveData, *tss.Par
 	parties = append(parties, partyID)
 	sortedPIDs := tss.SortPartyIDs(parties)
 	return key, sortedPIDs[0], nil
+}
+
+func InitLog(name string) (*zap.SugaredLogger, error) {
+	err := logger.Init("/tmp/tss.log", "debug", 1, 5, 2, false)
+	if err != nil {
+		return nil, err
+	}
+	return logger.NewSugar(name), nil
 }

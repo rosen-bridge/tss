@@ -1,8 +1,11 @@
 package utils
 
 import (
+	"fmt"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"path/filepath"
 	"rosen-bridge/tss/mocks"
 	"testing"
 )
@@ -107,6 +110,70 @@ func TestUtils_GetErgoAddressFromPK(t *testing.T) {
 				assert.Equal(t, result[:1], "9")
 				assert.Equal(t, len(result), 51)
 			}
+		})
+	}
+}
+
+/*	TestUtils_GetAbsoluteAddress
+	TestCases:
+	testing message controller, there are 2 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	there are a tss.SortedPartyIDs and tss.PartyId used as function arguments.
+	Dependencies:
+	- localTssData models.TssData
+	- tss.PartyId
+*/
+func TestUtils_GetAbsoluteAddress(t *testing.T) {
+	// get user home dir
+	userHome, err := os.UserHomeDir()
+	if err != nil {
+		t.Error(err)
+	}
+	// creating absolute path from relative path
+	absHomeAddress, err := filepath.Abs("./.rosenTss")
+	if err != nil {
+		t.Error(err)
+	}
+
+	tests := []struct {
+		name        string
+		homeAddress string
+		expected    string
+		wantErr     bool
+	}{
+		{
+			name:        "relative home address, should be equal to expected",
+			homeAddress: "./.rosenTss",
+			expected:    absHomeAddress,
+			wantErr:     false,
+		},
+		{
+			name:        "user home address, should be equal to expected",
+			homeAddress: "~/tmp/.rosenTss",
+			expected:    fmt.Sprintf("%s/tmp/.rosenTss", userHome),
+			wantErr:     false,
+		},
+		{
+			name:        "complete home address, should be equal to expected",
+			homeAddress: "/tmp/.rosenTss",
+			expected:    "/tmp/.rosenTss",
+			wantErr:     false,
+		},
+		{
+			name:        "complete home address, should be equal to expected",
+			homeAddress: "!tmp/.rosenTss",
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := GetAbsoluteAddress(tt.homeAddress)
+			if err != nil && !tt.wantErr {
+				t.Fatal(err)
+			}
+			assert.Equal(t, result, tt.expected)
 		})
 	}
 }
