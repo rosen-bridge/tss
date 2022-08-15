@@ -23,6 +23,7 @@ type TssController interface {
 	Import() echo.HandlerFunc
 	Keygen() echo.HandlerFunc
 	Regroup() echo.HandlerFunc
+	GetPk() echo.HandlerFunc
 }
 
 type tssController struct {
@@ -248,5 +249,27 @@ func (tssController *tssController) Export() echo.HandlerFunc {
 		logging.Info("zipping file was successful.")
 		c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf("filename=%q", "rosenTss.zip"))
 		return c.Stream(200, echo.HeaderContentDisposition, buf)
+	}
+}
+
+// GetPk returns echo handler witch used to get generated public key in keygen process base on crypto protocol
+func (tssController *tssController) GetPk() echo.HandlerFunc {
+	return func(c echo.Context) error {
+		crypto := c.QueryParam("crypto")
+
+		logging.Infof("get %s public key for", crypto)
+
+		pk, err := tssController.rosenTss.GetPublicKey(crypto)
+		if err != nil {
+			switch err.Error() {
+			case models.NoKeygenDataFoundError, models.WrongCryptoProtocolError:
+				return tssController.errorHandler(http.StatusBadRequest, err.Error())
+			default:
+				return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			}
+		}
+
+		res := map[string]string{"message": "ok", "pubKey": pk}
+		return c.JSON(http.StatusOK, res)
 	}
 }

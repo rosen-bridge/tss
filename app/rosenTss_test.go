@@ -1134,3 +1134,105 @@ func TestRosenTss_deleteInstance(t *testing.T) {
 		})
 	}
 }
+
+/*	TestRosenTss_GetPublicKey
+	TestCases:
+	testing message controller, there are 3 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- storage LoadECDSAKeygen, LoadEDDSAKeygen function
+*/
+func TestRosenTss_GetPublicKey(t *testing.T) {
+	peerHome := "/tmp/.rosenTss"
+	err := os.MkdirAll(fmt.Sprintf("%s/eddsa", peerHome), os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	ecdsaPK, err := mockUtils.GetEcdsaPK()
+	if err != nil {
+		t.Error(err)
+	}
+	eddsaPK, err := mockUtils.GetEddsaPK()
+	if err != nil {
+		t.Error(err)
+	}
+
+	tests := []struct {
+		name      string
+		crypto    string
+		expected  string
+		wantErr   bool
+		appConfig func() rosenTss
+	}{
+		{
+			name:     "ecdsa key",
+			crypto:   "ecdsa",
+			expected: ecdsaPK,
+			wantErr:  false,
+			appConfig: func() rosenTss {
+				store := mockedStorage.NewStorage(t)
+				data, id, err := mockUtils.LoadECDSAKeygenFixture(0)
+				if err != nil {
+					t.Errorf("LoadECDSAKeygenFixture error = %v", err)
+				}
+				store.On("LoadECDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
+				return rosenTss{
+					peerHome: peerHome,
+					storage:  store,
+				}
+			},
+		},
+		{
+			name:     "eddsa key",
+			crypto:   "eddsa",
+			expected: eddsaPK,
+			wantErr:  false,
+			appConfig: func() rosenTss {
+				store := mockedStorage.NewStorage(t)
+				data, id, err := mockUtils.LoadEDDSAKeygenFixture(0)
+				if err != nil {
+					t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+				}
+				store.On("LoadEDDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
+				return rosenTss{
+					peerHome: peerHome,
+					storage:  store,
+				}
+			},
+		},
+		{
+			name:     "wrong crypto",
+			crypto:   "",
+			expected: "",
+			wantErr:  true,
+			appConfig: func() rosenTss {
+				return rosenTss{
+					peerHome: peerHome,
+				}
+			},
+		},
+	}
+
+	logging, _ = mockUtils.InitLog("tss")
+
+	// cleaning up after each test case called
+	t.Cleanup(func() {
+		_, err = exec.Command("rm", "-rf", peerHome).Output()
+		if err != nil {
+			t.Error(err)
+		}
+	})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := tt.appConfig()
+			key, err := app.GetPublicKey(tt.crypto)
+			if err != nil && !tt.wantErr {
+				t.Error(err)
+			}
+			assert.Equal(t, key, tt.expected)
+		})
+	}
+}

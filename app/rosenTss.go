@@ -1,10 +1,13 @@
 package app
 
 import (
+	"crypto/ecdsa"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/binance-chain/tss-lib/tss"
+	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/labstack/gommon/log"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/blake2b"
@@ -367,4 +370,42 @@ func (r *rosenTss) deleteInstance(channelId string, operationName string) {
 		}
 	}
 	delete(r.ChannelMap, channelId)
+}
+
+// GetPublicKey returns generated pk in the keygen process
+func (r *rosenTss) GetPublicKey(crypto string) (string, error) {
+	switch crypto {
+	case "ecdsa":
+		saveData, _, err := r.GetStorage().LoadECDSAKeygen(r.peerHome)
+		if err != nil {
+			return "", err
+		}
+		pkX, pkY := saveData.ECDSAPub.X(), saveData.ECDSAPub.Y()
+		pk := ecdsa.PublicKey{
+			Curve: tss.S256(),
+			X:     pkX,
+			Y:     pkY,
+		}
+
+		public := utils.GetPKFromECDSAPub(pk.X, pk.Y)
+		hexPk := hex.EncodeToString(public)
+		return hexPk, nil
+	case "eddsa":
+		saveData, _, err := r.GetStorage().LoadEDDSAKeygen(r.peerHome)
+		if err != nil {
+			return "", err
+		}
+		pkX, pkY := saveData.EDDSAPub.X(), saveData.EDDSAPub.Y()
+		pk := edwards.PublicKey{
+			Curve: tss.Edwards(),
+			X:     pkX,
+			Y:     pkY,
+		}
+
+		public := utils.GetPKFromEDDSAPub(pk.X, pk.Y)
+		hexPk := hex.EncodeToString(public)
+		return hexPk, nil
+	default:
+		return "", fmt.Errorf(models.WrongCryptoProtocolError)
+	}
 }
