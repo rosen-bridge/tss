@@ -756,7 +756,7 @@ func TestEDDSA_handleEndMessage(t *testing.T) {
 	app := mockedInterface.NewRosenTss(t)
 
 	conn := mockedNetwork.NewConnection(t)
-	conn.On("CallBack", mock.AnythingOfType("string"), mock.AnythingOfType("models.SignData")).Return(nil)
+	conn.On("CallBack", mock.AnythingOfType("string"), mock.AnythingOfType("models.SignData"), mock.AnythingOfType("string")).Return(nil)
 	app.On("GetConnection").Return(conn)
 
 	tests := []struct {
@@ -838,7 +838,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 		})
 	conn := mockedNetwork.NewConnection(t)
 	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(fmt.Errorf("message received"))
-	conn.On("CallBack", mock.AnythingOfType("string"), mock.AnythingOfType("models.SignData")).Return(
+	conn.On("CallBack", mock.AnythingOfType("string"), mock.AnythingOfType("models.SignData"), mock.AnythingOfType("string")).Return(
 		fmt.Errorf("message received"))
 	app.On("GetConnection").Return(conn)
 
