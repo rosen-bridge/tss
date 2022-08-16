@@ -192,7 +192,7 @@ func (s *operationECDSASign) handleEndMessage(rosenTss _interface.RosenTss, save
 	logging.Infof("signature: %v", signData.Signature)
 	logging.Info("ECDSA signing done.")
 
-	err := rosenTss.GetConnection().CallBack(s.operationSign.SignMessage.CallBackUrl, signData)
+	err := rosenTss.GetConnection().CallBack(s.operationSign.SignMessage.CallBackUrl, signData, "ok")
 	if err != nil {
 		return err
 	}

@@ -104,8 +104,10 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
 			logging.Errorf("en error occurred in %s sign loop, err: %+v", signMessage.Crypto, err)
-			os.Exit(1)
-
+			callbackErr := r.GetConnection().CallBack(signMessage.CallBackUrl, err.Error(), "error")
+			if callbackErr != nil {
+				logging.Error(err)
+			}
 		}
 		r.deleteInstance(messageId, operation.GetClassName())
 		logging.Infof("end of %s sign loop", signMessage.Crypto)
@@ -164,8 +166,6 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
 			logging.Errorf("en error occurred in %s keygen loop, err: %+v", keygenMessage.Crypto, err)
-			os.Exit(1)
-
 		}
 		r.deleteInstance(messageId, operation.GetClassName())
 		logging.Infof("end of %s keygen loop", keygenMessage.Crypto)
@@ -209,7 +209,6 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
 			logging.Errorf("en error occurred in %s regroup loop, err: %+v", regroupMessage.Crypto, err)
-			os.Exit(1)
 		}
 		r.deleteInstance(messageId, operation.GetClassName())
 		logging.Infof("end of %s regroup loop", regroupMessage.Crypto)

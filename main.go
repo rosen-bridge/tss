@@ -51,14 +51,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	logging := logger.NewSugar("main")
+
 	defer func() {
 		err := logger.Sync()
 		if err != nil {
-
+			logging.Error(err)
 		}
 	}()
-
-	logging := logger.NewSugar("main")
 
 	// creating new instance of echo framework
 	e := echo.New()
