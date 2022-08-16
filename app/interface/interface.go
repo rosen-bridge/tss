@@ -35,4 +35,5 @@ type RosenTss interface {
 	GetPrivate(string) string
 
 	GetOperations() []Operation
+	GetPublicKey(crypto string) (string, error)
 }

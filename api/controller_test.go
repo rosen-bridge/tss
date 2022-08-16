@@ -732,3 +732,111 @@ func TestController_Regroup(t *testing.T) {
 	}
 
 }
+
+/*	TestController_GetPk
+	TestCases:
+	testing message controller, there are 4 testcases.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- rosenTss GetPublicKey function
+*/
+func TestController_GetPk(t *testing.T) {
+	ecdsaPK, err := mocks.GetEcdsaPK()
+	if err != nil {
+		t.Error(err)
+	}
+	eddsaPK, err := mocks.GetEddsaPK()
+	if err != nil {
+		t.Error(err)
+	}
+	tests := []struct {
+		name        string
+		signMessage models.SignMessage
+		appConfig   func() _interface.RosenTss
+		wantErr     bool
+		statusCode  int
+	}{
+		{
+			name: "get eddsa pk",
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				app.On("GetPublicKey", mock.AnythingOfType("string")).Return(eddsaPK, nil)
+				return app
+			},
+			wantErr:    false,
+			statusCode: 200,
+		},
+		{
+			name: "get ecdsa pk",
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				app.On("GetPublicKey", mock.AnythingOfType("string")).Return(ecdsaPK, nil)
+				return app
+			},
+			wantErr:    false,
+			statusCode: 200,
+		},
+		{
+			name: "get wrong pk, error 500",
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				app.On("GetPublicKey", mock.AnythingOfType("string")).Return("", fmt.Errorf("wrong"))
+				return app
+			},
+			wantErr:    true,
+			statusCode: 500,
+		},
+		{
+			name: "get wrong pk, error 400",
+			appConfig: func() _interface.RosenTss {
+				app := mockedApp.NewRosenTss(t)
+				app.On("GetPublicKey", mock.AnythingOfType("string")).Return("", fmt.Errorf(models.WrongCryptoProtocolError))
+				return app
+			},
+			wantErr:    true,
+			statusCode: 400,
+		},
+	}
+
+	e := echo.New()
+	logging, _ = mocks.InitLog("controller")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := tt.appConfig()
+			controller := NewTssController(app)
+			getPkHandler := controller.GetPk()
+			marshal, err := json.Marshal(tt.signMessage)
+			if err != nil {
+				return
+			}
+			req := httptest.NewRequest(http.MethodGet, "/", bytes.NewBuffer(marshal))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+			c.SetPath("/getPk/:crypto")
+			c.SetParamNames("crypto")
+			c.SetParamValues("ecdsa")
+
+			// Assertions
+			err = getPkHandler(c)
+			e.HTTPErrorHandler(err, c)
+			httpError, _ := err.(*echo.HTTPError)
+			if err == nil {
+				assert.Equal(t, http.StatusOK, rec.Code)
+			} else {
+				if tt.wantErr {
+					t.Logf(err.Error())
+					assert.Equal(t, tt.statusCode, rec.Code)
+					if !strings.Contains(rec.Body.String(), httpError.Message.(string)) {
+						t.Errorf("wrong error: %v", rec.Body.String())
+					}
+				} else {
+					assert.Equal(t, http.StatusInternalServerError, rec.Code)
+				}
+			}
+
+		})
+	}
+
+}

@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/hex"
@@ -12,13 +13,12 @@ import (
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/labstack/gommon/log"
-	"go.uber.org/zap"
-	"rosen-bridge/tss/logger"
-
 	"github.com/rs/xid"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"math/big"
 	"path/filepath"
+	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
 	"runtime"
 	"strings"
@@ -246,4 +246,48 @@ func InitLog(name string) (*zap.SugaredLogger, error) {
 		return nil, err
 	}
 	return logger.NewSugar(name), nil
+}
+
+// GetPKFromECDSAPub returns the public key from an ECDSA public key
+func GetPKFromECDSAPub(x *big.Int, y *big.Int) []byte {
+	return elliptic.MarshalCompressed(elliptic.P256(), x, y)
+}
+
+// GetPKFromEDDSAPub returns the public key Serialized from an EDDSA public key.
+func GetPKFromEDDSAPub(x *big.Int, y *big.Int) []byte {
+	return edwards.NewPublicKey(x, y).Serialize()
+}
+
+func GetEcdsaPK() (string, error) {
+	saveData, _, err := LoadECDSAKeygenFixture(0)
+	if err != nil {
+		return "", err
+	}
+	pkX, pkY := saveData.ECDSAPub.X(), saveData.ECDSAPub.Y()
+	pk := ecdsa.PublicKey{
+		Curve: tss.S256(),
+		X:     pkX,
+		Y:     pkY,
+	}
+
+	public := GetPKFromECDSAPub(pk.X, pk.Y)
+	hexPk := hex.EncodeToString(public)
+	return hexPk, nil
+}
+
+func GetEddsaPK() (string, error) {
+	saveData, _, err := LoadEDDSAKeygenFixture(0)
+	if err != nil {
+		return "", err
+	}
+	pkX, pkY := saveData.EDDSAPub.X(), saveData.EDDSAPub.Y()
+	pk := edwards.PublicKey{
+		Curve: tss.Edwards(),
+		X:     pkX,
+		Y:     pkY,
+	}
+
+	public := GetPKFromEDDSAPub(pk.X, pk.Y)
+	hexPk := hex.EncodeToString(public)
+	return hexPk, nil
 }
