@@ -159,7 +159,7 @@ func TestConnection_CallBack(t *testing.T) {
 	}
 	logging, _ = mockUtils.InitLog("connection")
 	url := fmt.Sprintf("%s%s", callBackURLHost, callBackURLPath)
-	err := cnn.CallBack(url, saveSign)
+	err := cnn.CallBack(url, saveSign, "ok")
 	if err != nil {
 		t.Error(err)
 	}

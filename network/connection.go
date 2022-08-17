@@ -13,7 +13,7 @@ import (
 type Connection interface {
 	Publish(message models.GossipMessage) error
 	Subscribe(port string) error
-	CallBack(string, models.SignData) error
+	CallBack(string, interface{}, string) error
 }
 
 type HTTPClient interface {
@@ -126,9 +126,18 @@ func (c *connect) Subscribe(port string) error {
 }
 
 // CallBack sends sign data to this url
-func (c *connect) CallBack(url string, data models.SignData) error {
+func (c *connect) CallBack(url string, data interface{}, status string) error {
 	logging.Info("sending callback data")
-	jsonData, err := json.Marshal(data)
+
+	response := struct {
+		Message interface{} `json:"message"`
+		Status  string      `json:"status"`
+	}{
+		Message: data,
+		Status:  status,
+	}
+
+	jsonData, err := json.Marshal(response)
 	if err != nil {
 		return err
 	}
