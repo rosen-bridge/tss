@@ -80,10 +80,12 @@ type RegroupMessage struct {
 	NewThreshold int    `json:"newThreshold"`
 	OldThreshold int    `json:"oldThreshold"`
 	PeersCount   int    `json:"peersCount"`
+	CallBackUrl  string `json:"callBackUrl"`
 }
 
 type KeygenMessage struct {
-	PeersCount int    `json:"peersCount"`
-	Threshold  int    `json:"threshold"`
-	Crypto     string `json:"crypto"`
+	PeersCount  int    `json:"peersCount"`
+	Threshold   int    `json:"threshold"`
+	Crypto      string `json:"crypto"`
+	CallBackUrl string `json:"callBackUrl"`
 }

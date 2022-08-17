@@ -129,7 +129,7 @@ func TestController_Sign(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				ECDSAOperation := ecdsaKeygen.NewKeygenECDSAOperation()
+				ECDSAOperation := ecdsaKeygen.NewKeygenECDSAOperation(models.KeygenMessage{})
 				app.On("GetOperations").Return([]_interface.Operation{ECDSAOperation})
 				return app
 			},
@@ -145,7 +145,7 @@ func TestController_Sign(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation()
+				EDDSAOperation := eddsaKeygen.NewKeygenEDDSAOperation(models.KeygenMessage{})
 				app.On("GetOperations").Return([]_interface.Operation{EDDSAOperation})
 				return app
 			},

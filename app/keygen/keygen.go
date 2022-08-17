@@ -11,5 +11,6 @@ const (
 
 type OperationKeygen struct {
 	_interface.OperationHandler
-	LocalTssData models.TssData
+	LocalTssData  models.TssData
+	KeygenMessage models.KeygenMessage
 }

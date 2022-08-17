@@ -26,9 +26,13 @@ type operationECDSAKeygen struct {
 
 var logging *zap.SugaredLogger
 
-func NewKeygenECDSAOperation() _interface.Operation {
+func NewKeygenECDSAOperation(keygenMessage models.KeygenMessage) _interface.Operation {
 	logging = logger.NewSugar("ecdsa-keygen")
-	return &operationECDSAKeygen{}
+	return &operationECDSAKeygen{
+		keygen.OperationKeygen{
+			KeygenMessage: keygenMessage,
+		},
+	}
 }
 
 func (k *operationECDSAKeygen) Init(rosenTss _interface.RosenTss, receiverId string) error {
@@ -207,7 +211,23 @@ func (k *operationECDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 		return err
 	}
 
-	k.LocalTssData = models.TssData{}
+	data := struct {
+		PeersCount int    `json:"peersCount"`
+		Threshold  int    `json:"threshold"`
+		Crypto     string `json:"crypto"`
+		PubKey     string `json:"pubKey"`
+	}{
+		PeersCount: k.OperationKeygen.KeygenMessage.PeersCount,
+		Threshold:  k.OperationKeygen.KeygenMessage.Threshold,
+		Crypto:     k.OperationKeygen.KeygenMessage.Crypto,
+		PubKey:     encodedPK,
+	}
+
+	err = rosenTss.GetConnection().CallBack(k.OperationKeygen.KeygenMessage.CallBackUrl, data, "ok")
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

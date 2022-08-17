@@ -239,6 +239,25 @@ func (r *operationEDDSARegroup) handleEndMessage(rosenTss _interface.RosenTss, s
 		if err != nil {
 			return err
 		}
+
+		data := struct {
+			PeersCount   int    `json:"peersCount"`
+			OldThreshold int    `json:"oldThreshold"`
+			NewThreshold int    `json:"newThreshold"`
+			Crypto       string `json:"crypto"`
+			PubKey       string `json:"pubKey"`
+		}{
+			PeersCount:   r.operationRegroup.RegroupMessage.PeersCount,
+			OldThreshold: r.operationRegroup.RegroupMessage.OldThreshold,
+			NewThreshold: r.operationRegroup.RegroupMessage.NewThreshold,
+			Crypto:       r.operationRegroup.RegroupMessage.Crypto,
+			PubKey:       encodedPK,
+		}
+
+		err = rosenTss.GetConnection().CallBack(r.operationRegroup.RegroupMessage.CallBackUrl, data, "ok")
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
