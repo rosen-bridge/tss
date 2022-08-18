@@ -217,8 +217,6 @@ func (k *operationEDDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 		PubKey:     encodedPK,
 	}
 
-	fmt.Println("here")
-	fmt.Println(k.OperationKeygen.KeygenMessage)
 	err = rosenTss.GetConnection().CallBack(k.OperationKeygen.KeygenMessage.CallBackUrl, data, "ok")
 	if err != nil {
 		return err
