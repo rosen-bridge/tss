@@ -600,6 +600,46 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name:      "handling new party with state 0 party list less than peersCount",
+			peerState: 0,
+			gossipMessage: models.GossipMessage{
+				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: newPartyId.Id,
+				Name:       "partyId",
+			},
+			appConfig: func() _interface.RosenTss {
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+
+				app := mockedInterface.NewRosenTss(t)
+				app.On("GetConnection").Return(conn)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: newPartyId.Id,
+						Name:       "partyId",
+					})
+				return app
+			},
+			dataConfig: func() models.TssRegroupData {
+				localTssData := models.TssRegroupData{}
+				id1, err := mockUtils.CreateNewECDSAPartyId()
+				if err != nil {
+					t.Errorf("createNewParty error = %v", err)
+				}
+				localTssData.NewPartyIds = tss.SortPartyIDs(
+					append(localTssData.NewPartyIds.ToUnSorted(), id))
+				localTssData.NewPartyIds = tss.SortPartyIDs(
+					append(localTssData.NewPartyIds.ToUnSorted(), id1))
+				return localTssData
+			},
+			wantErr: false,
+		},
 	}
 	logging, err = mockUtils.InitLog("ecdsa-regroup")
 	if err != nil {
@@ -623,7 +663,7 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 						PeerState:    tt.peerState,
 						NewThreshold: 1,
 						OldThreshold: 1,
-						PeersCount:   4,
+						PeersCount:   5,
 						Crypto:       "ecdsa",
 					},
 				},

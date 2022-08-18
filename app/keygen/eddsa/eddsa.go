@@ -217,6 +217,8 @@ func (k *operationEDDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 		PubKey:     encodedPK,
 	}
 
+	fmt.Println("here")
+	fmt.Println(k.OperationKeygen.KeygenMessage)
 	err = rosenTss.GetConnection().CallBack(k.OperationKeygen.KeygenMessage.CallBackUrl, data, "ok")
 	if err != nil {
 		return err
@@ -262,16 +264,16 @@ func (k *operationEDDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 
 		case "fromKeygen":
 			if !utils.IsPartyExist(newParty, k.LocalTssData.PartyIds) {
-
 				k.LocalTssData.PartyIds = tss.SortPartyIDs(
 					append(k.LocalTssData.PartyIds.ToUnSorted(), newParty))
-
-				if len(k.LocalTssData.PartyIds) < meta.Threshold {
-					err := k.Init(rosenTss, "")
-					if err != nil {
-						return err
-					}
-				} else {
+			}
+			if len(k.LocalTssData.PartyIds) < (meta.PeersCount - 1) {
+				err := k.Init(rosenTss, "")
+				if err != nil {
+					return err
+				}
+			} else {
+				if k.LocalTssData.Params == nil {
 					err := k.setup(rosenTss)
 					if err != nil {
 						return err
@@ -280,7 +282,6 @@ func (k *operationEDDSAKeygen) partyIdMessageHandler(rosenTss _interface.RosenTs
 			}
 		default:
 			return fmt.Errorf("wrong message")
-
 		}
 	}
 	return nil

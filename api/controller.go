@@ -135,7 +135,7 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 		if err := c.Bind(&data); err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 		}
-		logging.Info("regroup data: %+v ", data)
+		logging.Infof("regroup data: %+v ", data)
 
 		forbiddenOperations := []string{data.Crypto + "Sign"}
 		err := tssController.checkOperation(forbiddenOperations)

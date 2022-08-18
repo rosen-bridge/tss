@@ -311,10 +311,13 @@ func (r *operationEDDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 					append(r.operationRegroup.LocalTssData.NewPartyIds.ToUnSorted(), newParty))
 			}
 		}
+		allPartiesLength := len(r.operationRegroup.LocalTssData.NewPartyIds) + len(r.operationRegroup.LocalTssData.OldPartyIds)
 		if r.operationRegroup.LocalTssData.RegroupingParams == nil {
 			switch r.operationRegroup.LocalTssData.PeerState {
 			case 0:
-				if len(r.operationRegroup.LocalTssData.OldPartyIds) >= r.operationRegroup.RegroupMessage.OldThreshold && len(r.operationRegroup.LocalTssData.NewPartyIds) > r.operationRegroup.RegroupMessage.NewThreshold {
+				if len(r.operationRegroup.LocalTssData.OldPartyIds) >= r.operationRegroup.RegroupMessage.OldThreshold &&
+					len(r.operationRegroup.LocalTssData.NewPartyIds) > r.operationRegroup.RegroupMessage.NewThreshold &&
+					allPartiesLength == (r.operationRegroup.RegroupMessage.PeersCount-1) {
 					err := r.setup(rosenTss)
 					if err != nil {
 						return err
@@ -326,7 +329,9 @@ func (r *operationEDDSARegroup) partyIdMessageHandler(rosenTss _interface.RosenT
 					}
 				}
 			case 1:
-				if len(r.operationRegroup.LocalTssData.OldPartyIds) > r.operationRegroup.RegroupMessage.OldThreshold && len(r.operationRegroup.LocalTssData.NewPartyIds) >= r.operationRegroup.RegroupMessage.NewThreshold {
+				if len(r.operationRegroup.LocalTssData.OldPartyIds) > r.operationRegroup.RegroupMessage.OldThreshold &&
+					len(r.operationRegroup.LocalTssData.NewPartyIds) >= r.operationRegroup.RegroupMessage.NewThreshold &&
+					allPartiesLength == (r.operationRegroup.RegroupMessage.PeersCount-1) {
 					err := r.setup(rosenTss)
 					if err != nil {
 						return err

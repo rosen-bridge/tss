@@ -355,6 +355,8 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 		name          string
 		gossipMessage models.GossipMessage
 		localTssData  models.TssData
+		appConfig     func() _interface.RosenTss
+		wantErr       bool
 	}{
 		{
 			name: "partyId message with t=1",
@@ -366,6 +368,29 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 				Name:       "partyId",
 			},
 			localTssData: localTssData,
+			appConfig: func() _interface.RosenTss {
+				// using mocked structs and functions
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+				app := mockedInterface.NewRosenTss(t)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromKeygen"),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
+				app.On("GetConnection").Return(conn)
+				app.On("GetMetaData").Return(
+					models.MetaData{
+						Threshold:  2,
+						PeersCount: 3,
+					},
+				)
+				return app
+			},
+			wantErr: false,
 		},
 		{
 			name: "partyId message with t=2",
@@ -377,28 +402,61 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 				Name:       "partyId",
 			},
 			localTssData: localTssDataWith2PartyIds,
+			appConfig: func() _interface.RosenTss {
+				// using mocked structs and functions
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+				app := mockedInterface.NewRosenTss(t)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromKeygen"),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "partyId",
+					})
+				app.On("GetConnection").Return(conn)
+				app.On("GetMetaData").Return(
+					models.MetaData{
+						Threshold:  2,
+						PeersCount: 3,
+					},
+				)
+				return app
+			},
+			wantErr: false,
+		},
+		{
+			name: "partyId message with wrong message",
+			gossipMessage: models.GossipMessage{
+				Message:    fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign"),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "",
+				Name:       "partyId",
+			},
+			localTssData: localTssDataWith2PartyIds,
+			appConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
+				app.On("GetMetaData").Return(
+					models.MetaData{
+						Threshold:  2,
+						PeersCount: 3,
+					},
+				)
+				return app
+			},
+			wantErr: true,
 		},
 	}
 
-	// using mocked structs and functions
-	conn := mockedNetwork.NewConnection(t)
-	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
-	app := mockedInterface.NewRosenTss(t)
-	app.On("GetConnection").Return(conn)
-	app.On("GetMetaData").Return(
-		models.MetaData{
-			Threshold:  2,
-			PeersCount: 3,
-		},
-	)
 	logging, err = mockUtils.InitLog("ecdsa-keygen")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, tt := range tests {
+		app := tt.appConfig()
 		t.Run(tt.name, func(t *testing.T) {
-			app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-				Return(tt.gossipMessage)
 			ecdsaKeygenOp := operationECDSAKeygen{
 				keygen.OperationKeygen{
 					LocalTssData: tt.localTssData,
@@ -406,7 +464,7 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 			}
 			// partyMessageHandler
 			err := ecdsaKeygenOp.partyIdMessageHandler(app, tt.gossipMessage)
-			if err != nil {
+			if err != nil && !tt.wantErr {
 				t.Error(err)
 			}
 
