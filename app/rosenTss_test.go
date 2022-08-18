@@ -1119,7 +1119,7 @@ func TestRosenTss_deleteInstance(t *testing.T) {
 				peerHome:   peerHome,
 			}
 			app.ChannelMap = tt.channelMap
-			EDDSAOperation := eddsaKeygenLocal.NewKeygenEDDSAOperation()
+			EDDSAOperation := eddsaKeygenLocal.NewKeygenEDDSAOperation(models.KeygenMessage{})
 			app.operations = append(app.operations, EDDSAOperation)
 
 			app.deleteInstance(channelId, EDDSAOperation.GetClassName())

@@ -106,7 +106,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 			logging.Errorf("en error occurred in %s sign loop, err: %+v", signMessage.Crypto, err)
 			callbackErr := r.GetConnection().CallBack(signMessage.CallBackUrl, err.Error(), "error")
 			if callbackErr != nil {
-				logging.Error(err)
+				logging.Error(callbackErr)
 			}
 		}
 		r.deleteInstance(messageId, operation.GetClassName())
@@ -148,9 +148,9 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 
 	switch keygenMessage.Crypto {
 	case "ecdsa":
-		operation = ecdsaKeygen.NewKeygenECDSAOperation()
+		operation = ecdsaKeygen.NewKeygenECDSAOperation(keygenMessage)
 	case "eddsa":
-		operation = eddsaKeygen.NewKeygenEDDSAOperation()
+		operation = eddsaKeygen.NewKeygenEDDSAOperation(keygenMessage)
 	default:
 		return fmt.Errorf(models.WrongCryptoProtocolError)
 	}
@@ -166,6 +166,10 @@ func (r *rosenTss) StartNewKeygen(keygenMessage models.KeygenMessage) error {
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
 			logging.Errorf("en error occurred in %s keygen loop, err: %+v", keygenMessage.Crypto, err)
+			callbackErr := r.GetConnection().CallBack(keygenMessage.CallBackUrl, err.Error(), "error")
+			if callbackErr != nil {
+				logging.Error(callbackErr)
+			}
 		}
 		r.deleteInstance(messageId, operation.GetClassName())
 		logging.Infof("end of %s keygen loop", keygenMessage.Crypto)
@@ -209,6 +213,10 @@ func (r *rosenTss) StartNewRegroup(regroupMessage models.RegroupMessage) error {
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
 			logging.Errorf("en error occurred in %s regroup loop, err: %+v", regroupMessage.Crypto, err)
+			callbackErr := r.GetConnection().CallBack(regroupMessage.CallBackUrl, err.Error(), "error")
+			if callbackErr != nil {
+				logging.Error(callbackErr)
+			}
 		}
 		r.deleteInstance(messageId, operation.GetClassName())
 		logging.Infof("end of %s regroup loop", regroupMessage.Crypto)

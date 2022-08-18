@@ -707,18 +707,22 @@ func TestECDSA_handleEndMessage(t *testing.T) {
 	}
 
 	// using mocked structs and functions
-	store := mockedStorage.NewStorage(t)
-	store.On("WriteData", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil)
-
 	logging, err = mockUtils.InitLog("ecdsa-keygen")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ecdsaKeygenOp := operationECDSAKeygen{}
 
+	store := mockedStorage.NewStorage(t)
+	store.On("WriteData", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	conn := mockedNetwork.NewConnection(t)
+	conn.On("CallBack", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	app := mockedInterface.NewRosenTss(t)
 	app.On("GetStorage").Return(store)
+	app.On("GetConnection").Return(conn)
 	app.On("GetPeerHome").Return("/tmp/.rosenTss")
 
 	for _, tt := range tests {
