@@ -364,7 +364,7 @@ func TestECDSA_GetClassName(t *testing.T) {
 
 /*	TestECDSA_partyIdMessageHandler
 	TestCases:
-	testing message controller, there is 3 testcases.
+	testing message controller, there are 7 testcases.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
 	there is models.GossipMessage, models.TssData used as test arguments.
@@ -390,7 +390,7 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 		dataConfig    func() models.TssRegroupData
 	}{
 		{
-			name:      "handling new party with state 0 with true threshold",
+			name:      "handling new party with state 0 with true peerCount condition",
 			peerState: 0,
 			gossipMessage: models.GossipMessage{
 				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
@@ -436,7 +436,7 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "handling new party with state 0 with false threshold",
+			name:      "handling new party with state 0 with false peerCount condition",
 			peerState: 0,
 			gossipMessage: models.GossipMessage{
 				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 0),
@@ -474,7 +474,7 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "handling new party with state 1 with true threshold",
+			name:      "handling new party with state 1 with true peerCount condition",
 			peerState: 1,
 			gossipMessage: models.GossipMessage{
 				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 1),
@@ -520,7 +520,7 @@ func TestECDSA_partyIdMessageHandler(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:      "handling new party with state 1 with false threshold",
+			name:      "handling new party with state 1 with false peerCount condition",
 			peerState: 1,
 			gossipMessage: models.GossipMessage{
 				Message:    fmt.Sprintf("%s,%s,%d,%s,%d", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromRegroup", 1),
