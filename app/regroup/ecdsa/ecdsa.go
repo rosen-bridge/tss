@@ -8,7 +8,6 @@ import (
 	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	ecdsaRegrouping "github.com/binance-chain/tss-lib/ecdsa/resharing"
 	"github.com/binance-chain/tss-lib/tss"
-	"github.com/mr-tron/base58"
 	"github.com/rs/xid"
 	"go.uber.org/zap"
 	"math/big"
@@ -236,9 +235,9 @@ func (r *operationECDSARegroup) handleEndMessage(rosenTss _interface.RosenTss, s
 		}
 
 		public := utils.GetPKFromECDSAPub(pk.X, pk.Y)
-		encodedPK := base58.Encode(public)
+		encodedPK := hex.EncodeToString(public)
 		logging.Infof("pk length: %d", len(public))
-		logging.Infof("base58 pk: %v", encodedPK)
+		logging.Infof("hex pk: %v", encodedPK)
 
 		logging.Infof("reasharing data: %v", saveData.ECDSAPub)
 

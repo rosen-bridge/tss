@@ -7,7 +7,6 @@ import (
 	"fmt"
 	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
-	"github.com/mr-tron/base58"
 	"github.com/rs/xid"
 	"go.uber.org/zap"
 	"math/big"
@@ -202,9 +201,9 @@ func (k *operationECDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 	}
 
 	public := utils.GetPKFromECDSAPub(pk.X, pk.Y)
-	encodedPK := base58.Encode(public)
+	encodedPK := hex.EncodeToString(public)
 	logging.Infof("pk length: %d", len(public))
-	logging.Infof("base58 pk: %v", encodedPK)
+	logging.Infof("hex pk: %v", encodedPK)
 
 	err = rosenTss.GetStorage().WriteData(saveData, rosenTss.GetPeerHome(), keygen.KeygenFileName, "ecdsa")
 	if err != nil {

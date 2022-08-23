@@ -7,7 +7,6 @@ import (
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
-	"github.com/mr-tron/base58"
 	"github.com/rs/xid"
 	"go.uber.org/zap"
 	"math/big"
@@ -196,9 +195,9 @@ func (k *operationEDDSAKeygen) handleEndMessage(rosenTss _interface.RosenTss, sa
 	}
 
 	public := utils.GetPKFromEDDSAPub(pk.X, pk.Y)
-	encodedPK := base58.Encode(public)
+	encodedPK := hex.EncodeToString(public)
 	logging.Infof("pk length: %d", len(public))
-	logging.Infof("base58 pk: %v", encodedPK)
+	logging.Infof("hex pk: %v", encodedPK)
 
 	err = rosenTss.GetStorage().WriteData(saveData, rosenTss.GetPeerHome(), keygen.KeygenFileName, "eddsa")
 	if err != nil {
