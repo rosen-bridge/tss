@@ -8,7 +8,6 @@ import (
 	eddsaRegrouping "github.com/binance-chain/tss-lib/eddsa/resharing"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
-	"github.com/mr-tron/base58"
 	"github.com/rs/xid"
 	"go.uber.org/zap"
 	"math/big"
@@ -229,9 +228,9 @@ func (r *operationEDDSARegroup) handleEndMessage(rosenTss _interface.RosenTss, s
 		}
 
 		public := utils.GetPKFromEDDSAPub(pk.X, pk.Y)
-		encodedPK := base58.Encode(public)
+		encodedPK := hex.EncodeToString(public)
 		logging.Infof("pk length: %d", len(public))
-		logging.Infof("base58 pk: %v", encodedPK)
+		logging.Infof("hex pk: %v", encodedPK)
 
 		logging.Infof("reasharing data: %v", saveData.EDDSAPub)
 

@@ -70,7 +70,7 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 		if err := c.Bind(&data); err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 		}
-		logging.Info("keygen data: %+v ", data)
+		logging.Infof("keygen data: %+v ", data)
 
 		forbiddenOperations := []string{data.Crypto + "Sign"}
 		err := tssController.checkOperation(forbiddenOperations)
@@ -102,7 +102,7 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 		if err := c.Bind(&data); err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 		}
-		logging.Info("sign data: %+v ", data)
+		logging.Infof("sign data: %+v ", data)
 
 		forbiddenOperations := []string{data.Crypto + "Keygen", data.Crypto + "Regroup"}
 		err := tssController.checkOperation(forbiddenOperations)
