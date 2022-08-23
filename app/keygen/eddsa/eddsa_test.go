@@ -327,7 +327,7 @@ func TestEDDSA_GetClassName(t *testing.T) {
 
 /*	TestEDDSA_partyIdMessageHandler
 	TestCases:
-	testing message controller, there is 2 testcases.
+	testing message controller, there are 2 testcases.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
 	there is models.GossipMessage, models.TssData used as test arguments.
