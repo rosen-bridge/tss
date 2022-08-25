@@ -237,7 +237,7 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 
 	logging.Infof("new message: %+v", gossipMsg.Name)
 
-	timeout := time.After(time.Second * 30)
+	timeout := time.After(time.Second * 5)
 	var state bool
 
 timoutLoop:
