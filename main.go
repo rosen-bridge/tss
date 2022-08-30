@@ -9,13 +9,10 @@ import (
 	"rosen-bridge/tss/api"
 	"rosen-bridge/tss/app"
 	"rosen-bridge/tss/logger"
+	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
 	"rosen-bridge/tss/utils"
-)
-
-var (
-	cfgFile string
 )
 
 func main() {
@@ -31,30 +28,25 @@ func main() {
 		"configFile", "./conf/conf.env", "config file")
 	flag.Parse()
 
-	err := initConfig(*configFile)
+	config, err := initConfig(*configFile)
 	if err != nil {
 		panic(err)
 	}
 
-	homeAddress := viper.GetString("HOME_ADDRESS")
-	absAddress, err := utils.GetAbsoluteAddress(homeAddress)
+	absAddress, err := utils.GetAbsoluteAddress(config.HomeAddress)
 	if err != nil {
 		panic(err)
 	}
 	logFile := fmt.Sprintf("%s/%s", absAddress, "tss.log")
-	logLevel := viper.GetString("LOG_LEVEL")
-	MaxSize := viper.GetInt("LOG_MAX_SIZE")
-	MaxBackups := viper.GetInt("LOG_MAX_BACKUPS")
-	MaxAge := viper.GetInt("LOG_MAX_AGE")
 
-	err = logger.Init(logFile, logLevel, MaxSize, MaxBackups, MaxAge, false)
+	err = logger.Init(logFile, config, false)
 	if err != nil {
 		panic(err)
 	}
 	logging := logger.NewSugar("main")
 
 	defer func() {
-		err := logger.Sync()
+		err = logger.Sync()
 		if err != nil {
 			logging.Error(err)
 		}
@@ -68,10 +60,10 @@ func main() {
 	conn := network.InitConnection(*publishPath, *subscriptionPath, *p2pPort)
 	localStorage := storage.NewStorage()
 
-	tss := app.NewRosenTss(conn, localStorage, homeAddress)
+	tss := app.NewRosenTss(conn, localStorage, config)
 
 	// setting up peer home based on configs
-	err = tss.SetPeerHome(homeAddress)
+	err = tss.SetPeerHome(config.HomeAddress)
 	if err != nil {
 		logging.Fatal(err)
 	}
@@ -90,22 +82,20 @@ func main() {
 }
 
 // initConfig reads in config file and ENV variables if set.
-func initConfig(configFile string) error {
-	if cfgFile != "" {
-		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-
-		// Search config in home directory with name "default" (without extension).
-		viper.SetConfigFile(configFile)
-
-	}
-
+func initConfig(configFile string) (models.Config, error) {
+	// Search config in home directory with name "default" (without extension).
+	viper.SetConfigFile(configFile)
 	viper.AutomaticEnv() // read in environment variables that match
 
 	// If a config file is found, read it in.
-	if err := viper.ReadInConfig(); err != nil {
-		return fmt.Errorf("error using config file: %s", err.Error())
+	err := viper.ReadInConfig()
+	if err != nil {
+		return models.Config{}, fmt.Errorf("error using config file: %s", err.Error())
 	}
-	return nil
+	conf := models.Config{}
+	err = viper.Unmarshal(&conf)
+	if err != nil {
+		return models.Config{}, fmt.Errorf("error Unmarshalling config file: %s", err.Error())
+	}
+	return conf, nil
 }

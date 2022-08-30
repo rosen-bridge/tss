@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
 	"os"
+	"rosen-bridge/tss/models"
 )
 
 const (
@@ -25,10 +26,10 @@ func Sync() error {
 	return globalLogger.Sync()
 }
 
-func Init(logFile string, logLevel string, MaxSize int, MaxBackups int, MaxAge int, dev bool) error {
+func Init(logFile string, config models.Config, dev bool) error {
 
 	var level zapcore.Level
-	switch logLevel {
+	switch config.LogLevel {
 	case DebugLevelStr:
 		level = zap.DebugLevel
 	case InfoLevelStr:
@@ -38,14 +39,14 @@ func Init(logFile string, logLevel string, MaxSize int, MaxBackups int, MaxAge i
 	case ErrorLevelStr:
 		level = zap.ErrorLevel
 	default:
-		return fmt.Errorf("unknown log level %s", logLevel)
+		return fmt.Errorf("unknown log level %s", config.LogLevel)
 	}
 
 	ws := zapcore.AddSync(&lumberjack.Logger{
 		Filename:   logFile,
-		MaxSize:    MaxSize, //MB
-		MaxBackups: MaxBackups,
-		MaxAge:     MaxAge, //days
+		MaxSize:    config.LogMaxSize, //MB
+		MaxBackups: config.LogMaxBackups,
+		MaxAge:     config.LogMaxAge, //days
 		Compress:   false,
 	})
 

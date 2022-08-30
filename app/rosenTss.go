@@ -9,7 +9,6 @@ import (
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/labstack/gommon/log"
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/blake2b"
 	"io/ioutil"
@@ -37,27 +36,29 @@ const (
 )
 
 type rosenTss struct {
-	ChannelMap map[string]chan models.GossipMessage
-	metaData   models.MetaData
-	storage    storage.Storage
-	connection network.Connection
-	Private    models.Private
-	peerHome   string
-	operations []_interface.Operation
+	ChannelMap        map[string]chan models.GossipMessage
+	metaData          models.MetaData
+	storage           storage.Storage
+	connection        network.Connection
+	Private           models.Private
+	peerHome          string
+	operations        []_interface.Operation
+	operationsTimeout int
 }
 
 var logging *zap.SugaredLogger
 
 // NewRosenTss Constructor of an app
-func NewRosenTss(connection network.Connection, storage storage.Storage, homeAddress string) _interface.RosenTss {
+func NewRosenTss(connection network.Connection, storage storage.Storage, config models.Config) _interface.RosenTss {
 	logging = logger.NewSugar("tss")
 	return &rosenTss{
-		ChannelMap: make(map[string]chan models.GossipMessage),
-		metaData:   models.MetaData{},
-		storage:    storage,
-		connection: connection,
-		Private:    models.Private{},
-		peerHome:   homeAddress,
+		ChannelMap:        make(map[string]chan models.GossipMessage),
+		metaData:          models.MetaData{},
+		storage:           storage,
+		connection:        connection,
+		Private:           models.Private{},
+		peerHome:          config.HomeAddress,
+		operationsTimeout: config.OperationTimeout,
 	}
 }
 
@@ -99,14 +100,14 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	operationState := true
 
 	go func() {
-		signTimeout := viper.GetInt("SIGN_TIMEOUT")
-		timeout := time.After(time.Second * time.Duration(signTimeout))
+		fmt.Printf("operationsTimeout: %d\n", r.operationsTimeout)
+		timeout := time.After(time.Second * time.Duration(r.operationsTimeout))
 		for {
 			select {
 			case <-timeout:
-				operationState = false
 				if _, ok := r.ChannelMap[messageId]; ok {
 					close(r.ChannelMap[messageId])
+					operationState = false
 				}
 				return
 			}

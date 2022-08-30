@@ -89,3 +89,12 @@ type KeygenMessage struct {
 	Crypto      string `json:"crypto"`
 	CallBackUrl string `json:"callBackUrl"`
 }
+
+type Config struct {
+	HomeAddress      string `mapstructure:"HOME_ADDRESS"`
+	LogLevel         string `mapstructure:"LOG_LEVEL"`
+	LogMaxSize       int    `mapstructure:"LOG_MAX_SIZE"`
+	LogMaxBackups    int    `mapstructure:"LOG_MAX_BACKUPS"`
+	LogMaxAge        int    `mapstructure:"LOG_MAX_AGE"`
+	OperationTimeout int    `mapstructure:"OPERATION_TIMEOUT"`
+}

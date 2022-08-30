@@ -410,9 +410,10 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 			Threshold:  2,
 			PeersCount: 3,
 		},
-		storage:    storage,
-		connection: conn,
-		peerHome:   peerHome,
+		storage:           storage,
+		connection:        conn,
+		peerHome:          peerHome,
+		operationsTimeout: 60,
 	}
 
 	// creating fake channels and sign data
@@ -495,9 +496,10 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 			Threshold:  2,
 			PeersCount: 3,
 		},
-		storage:    storage,
-		connection: conn,
-		peerHome:   peerHome,
+		storage:           storage,
+		connection:        conn,
+		peerHome:          peerHome,
+		operationsTimeout: 60,
 	}
 
 	// creating fake channels and sign data
