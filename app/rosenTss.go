@@ -100,7 +100,6 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	operationState := true
 
 	go func() {
-		fmt.Printf("operationsTimeout: %d\n", r.operationsTimeout)
 		timeout := time.After(time.Second * time.Duration(r.operationsTimeout))
 		for {
 			select {
