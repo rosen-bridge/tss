@@ -9,6 +9,7 @@ import (
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/labstack/gommon/log"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/blake2b"
 	"io/ioutil"
@@ -62,6 +63,7 @@ func NewRosenTss(connection network.Connection, storage storage.Storage, homeAdd
 
 // StartNewSign starts sign scenario for app based on given protocol.
 func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
+
 	log.Printf("Starting New Sign process")
 	err := r.SetMetaData(signMessage.Crypto)
 	if err != nil {
@@ -94,6 +96,22 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		return fmt.Errorf(models.WrongCryptoProtocolError)
 	}
 	r.operations = append(r.operations, operation)
+	operationState := true
+
+	go func() {
+		signTimeout := viper.GetInt("SIGN_TIMEOUT")
+		timeout := time.After(time.Second * time.Duration(signTimeout))
+		for {
+			select {
+			case <-timeout:
+				operationState = false
+				if _, ok := r.ChannelMap[messageId]; ok {
+					close(r.ChannelMap[messageId])
+				}
+				return
+			}
+		}
+	}()
 
 	err = operation.Init(r, "")
 	if err != nil {
@@ -103,6 +121,9 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		logging.Infof("calling loop for %s sign", signMessage.Crypto)
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
+			if !operationState {
+				err = fmt.Errorf("sign operation timeout")
+			}
 			logging.Errorf("en error occurred in %s sign loop, err: %+v", signMessage.Crypto, err)
 			callbackErr := r.GetConnection().CallBack(signMessage.CallBackUrl, err.Error(), "error")
 			if callbackErr != nil {
