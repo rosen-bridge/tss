@@ -4,12 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/labstack/echo/v4"
-	"github.com/spf13/viper"
 	_ "github.com/swaggo/echo-swagger/example/docs"
 	"rosen-bridge/tss/api"
 	"rosen-bridge/tss/app"
 	"rosen-bridge/tss/logger"
-	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
 	"rosen-bridge/tss/utils"
@@ -28,7 +26,7 @@ func main() {
 		"configFile", "./conf/conf.env", "config file")
 	flag.Parse()
 
-	config, err := initConfig(*configFile)
+	config, err := utils.InitConfig(*configFile)
 	if err != nil {
 		panic(err)
 	}
@@ -79,23 +77,4 @@ func main() {
 
 	api.InitRouting(e, tssController)
 	logging.Fatal(e.Start(fmt.Sprintf(":%s", *projectPort)))
-}
-
-// initConfig reads in config file and ENV variables if set.
-func initConfig(configFile string) (models.Config, error) {
-	// Search config in home directory with name "default" (without extension).
-	viper.SetConfigFile(configFile)
-	viper.AutomaticEnv() // read in environment variables that match
-
-	// If a config file is found, read it in.
-	err := viper.ReadInConfig()
-	if err != nil {
-		return models.Config{}, fmt.Errorf("error using config file: %s", err.Error())
-	}
-	conf := models.Config{}
-	err = viper.Unmarshal(&conf)
-	if err != nil {
-		return models.Config{}, fmt.Errorf("error Unmarshalling config file: %s", err.Error())
-	}
-	return conf, nil
 }

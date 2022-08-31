@@ -499,7 +499,7 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 
 /*	TestRosenTss_StartNewSign_EDDSA
 	TestCases:
-	testing message controller, there are 2 testcases.
+	testing message controller, there are 3 testcases.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
 	Dependencies:
@@ -620,7 +620,7 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 
 /*	TestRosenTss_StartNewKeygen_ECDSA
 	TestCases:
-	testing message controller, there are 2 testcases.
+	testing message controller, there are 3 testcases.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
 	Dependencies:
@@ -714,7 +714,7 @@ func TestRosenTss_StartNewKeygen_ECDSA(t *testing.T) {
 
 /*	TestRosenTss_StartNewKeygen_EDDSA
 	TestCases:
-	testing message controller, there are 2 testcases.
+	testing message controller, there are 3 testcases.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
 	Dependencies:

@@ -63,7 +63,6 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 	if err != nil {
 		return err
 	}
-	logging.Infof("data length:, %d", len(jsonData))
 	req.Header.Add("content-type", "application/json")
 	resp, err := c.Client.Do(req)
 	type response struct {
