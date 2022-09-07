@@ -44,6 +44,7 @@ type rosenTss struct {
 	peerHome          string
 	operations        []_interface.Operation
 	operationsTimeout int
+	messageTimeout    int
 }
 
 var logging *zap.SugaredLogger
@@ -59,6 +60,7 @@ func NewRosenTss(connection network.Connection, storage storage.Storage, config 
 		Private:           models.Private{},
 		peerHome:          config.HomeAddress,
 		operationsTimeout: config.OperationTimeout,
+		messageTimeout:    config.MessageTimeout,
 	}
 }
 
@@ -258,7 +260,7 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 
 	logging.Infof("new message: %+v", gossipMsg.Name)
 
-	timeout := time.After(time.Second * 5)
+	timeout := time.After(time.Second * time.Duration(r.messageTimeout))
 	var state bool
 
 timoutLoop:

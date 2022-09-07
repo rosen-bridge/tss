@@ -97,4 +97,5 @@ type Config struct {
 	LogMaxBackups    int    `mapstructure:"LOG_MAX_BACKUPS"`
 	LogMaxAge        int    `mapstructure:"LOG_MAX_AGE"`
 	OperationTimeout int    `mapstructure:"OPERATION_TIMEOUT"`
+	MessageTimeout   int    `mapstructure:"MESSAGE_TIMEOUT"`
 }
