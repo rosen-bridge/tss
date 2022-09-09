@@ -108,6 +108,9 @@ func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				if err != nil {
 					return err
 				}
+				if s.operationSign.LocalTssData.Params == nil {
+					return fmt.Errorf("this peer is no longer needed. the signing process has been started with the required peers")
+				}
 				err = s.partyUpdate(partyMsg)
 				if err != nil {
 					return err

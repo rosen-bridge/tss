@@ -10,7 +10,7 @@ make build
 
 ### config
 
-just set home address and log level you need.
+set peer home address, log configs and operation timeout in second.
 
 ### run command
 ```bash
@@ -36,11 +36,13 @@ There are 6 endpoint.
      --data-raw '{
      "peersCount" : 3,
      "threshold" : 2,
-     "crypto": "eddsa"
+     "crypto": "eddsa",
+     "callBackUrl": "http://localhost:5051"
      }'
      ```
 2. sign
    * used to sign a message between peers 
+   * *note*: At least threshold+1 parties can recover the private key
    ```bash
      curl --location --request POST 'localhost:4001/sign' \
      --header 'Content-Type: application/json' \
@@ -60,7 +62,8 @@ There are 6 endpoint.
      "newThreshold" : 2,
      "oldThreshold": 2,
      "crypto": "eddsa",
-     "peerState": 0
+     "peerState": 0,
+     "callBackUrl": "http://localhost:5051"
      }'
      ```
 4. message

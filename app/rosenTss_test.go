@@ -404,17 +404,6 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 		ecdsaKeygen.LocalPartySaveData{}, nil, nil)
 	conn := mockedNetwork.NewConnection(t)
 
-	app := rosenTss{
-		ChannelMap: make(map[string]chan models.GossipMessage),
-		metaData: models.MetaData{
-			Threshold:  2,
-			PeersCount: 3,
-		},
-		storage:    storage,
-		connection: conn,
-		peerHome:   peerHome,
-	}
-
 	// creating fake channels and sign data
 	message := models.SignMessage{
 		Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -437,22 +426,68 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 		channelMap map[string]chan models.GossipMessage
 		messageId  string
 		wantErr    bool
+		appConfig  func() rosenTss
 	}{
 		{
 			name:       "there is an channel map to messageId in channel map",
 			channelMap: channelMap,
 			wantErr:    true,
+			appConfig: func() rosenTss {
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.GossipMessage),
+					metaData: models.MetaData{
+						Threshold:  2,
+						PeersCount: 3,
+					},
+					storage:           storage,
+					connection:        conn,
+					peerHome:          peerHome,
+					operationsTimeout: 60,
+				}
+			},
+		},
+		{
+			name:       "there is an channel map to messageId in channel map early stop timeout",
+			channelMap: channelMap,
+			wantErr:    true,
+			appConfig: func() rosenTss {
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.GossipMessage),
+					metaData: models.MetaData{
+						Threshold:  2,
+						PeersCount: 3,
+					},
+					storage:           storage,
+					connection:        conn,
+					peerHome:          peerHome,
+					operationsTimeout: 0,
+				}
+			},
 		},
 		{
 			name:       "there is no channel map to messageId in channel map",
 			channelMap: channelMapWithoutMessageId,
 			wantErr:    false,
+			appConfig: func() rosenTss {
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.GossipMessage),
+					metaData: models.MetaData{
+						Threshold:  2,
+						PeersCount: 3,
+					},
+					storage:           storage,
+					connection:        conn,
+					peerHome:          peerHome,
+					operationsTimeout: 60,
+				}
+			},
 		},
 	}
 	logging, _ = mockUtils.InitLog("tss")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			app := tt.appConfig()
 			app.ChannelMap = tt.channelMap
 			err := app.StartNewSign(message)
 			if err != nil && !tt.wantErr {
@@ -464,7 +499,7 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 
 /*	TestRosenTss_StartNewSign_EDDSA
 	TestCases:
-	testing message controller, there are 2 testcases.
+	testing message controller, there are 3 testcases.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
 	Dependencies:
@@ -489,17 +524,6 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 		eddsaKeygen.LocalPartySaveData{}, nil, nil)
 	conn := mockedNetwork.NewConnection(t)
 
-	app := rosenTss{
-		ChannelMap: make(map[string]chan models.GossipMessage),
-		metaData: models.MetaData{
-			Threshold:  2,
-			PeersCount: 3,
-		},
-		storage:    storage,
-		connection: conn,
-		peerHome:   peerHome,
-	}
-
 	// creating fake channels and sign data
 	message := models.SignMessage{
 		Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -522,16 +546,61 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 		channelMap map[string]chan models.GossipMessage
 		messageId  string
 		wantErr    bool
+		appConfig  func() rosenTss
 	}{
 		{
 			name:       "there is an channel map to messageId in channel map",
 			channelMap: channelMap,
 			wantErr:    true,
+			appConfig: func() rosenTss {
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.GossipMessage),
+					metaData: models.MetaData{
+						Threshold:  2,
+						PeersCount: 3,
+					},
+					storage:           storage,
+					connection:        conn,
+					peerHome:          peerHome,
+					operationsTimeout: 60,
+				}
+			},
+		},
+		{
+			name:       "there is an channel map to messageId in channel map early stop with timeout",
+			channelMap: channelMap,
+			wantErr:    true,
+			appConfig: func() rosenTss {
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.GossipMessage),
+					metaData: models.MetaData{
+						Threshold:  2,
+						PeersCount: 3,
+					},
+					storage:           storage,
+					connection:        conn,
+					peerHome:          peerHome,
+					operationsTimeout: 0,
+				}
+			},
 		},
 		{
 			name:       "there is no channel map to messageId in channel map",
 			channelMap: channelMapWithoutMessageId,
 			wantErr:    false,
+			appConfig: func() rosenTss {
+				return rosenTss{
+					ChannelMap: make(map[string]chan models.GossipMessage),
+					metaData: models.MetaData{
+						Threshold:  2,
+						PeersCount: 3,
+					},
+					storage:           storage,
+					connection:        conn,
+					peerHome:          peerHome,
+					operationsTimeout: 60,
+				}
+			},
 		},
 	}
 
@@ -539,6 +608,7 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			app := tt.appConfig()
 			app.ChannelMap = tt.channelMap
 			err := app.StartNewSign(message)
 			if err != nil && !tt.wantErr {
@@ -550,7 +620,7 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 
 /*	TestRosenTss_StartNewKeygen_ECDSA
 	TestCases:
-	testing message controller, there are 2 testcases.
+	testing message controller, there are 3 testcases.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
 	Dependencies:
@@ -644,7 +714,7 @@ func TestRosenTss_StartNewKeygen_ECDSA(t *testing.T) {
 
 /*	TestRosenTss_StartNewKeygen_EDDSA
 	TestCases:
-	testing message controller, there are 2 testcases.
+	testing message controller, there are 3 testcases.
 	each test case runs as a subtests.
 	target and expected outPut clarified in each testCase
 	Dependencies:

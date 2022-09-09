@@ -4,8 +4,10 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"fmt"
+	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
+	"rosen-bridge/tss/models"
 
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
@@ -84,4 +86,23 @@ func GetAbsoluteAddress(address string) (string, error) {
 		return "", fmt.Errorf("wrong address format: %s", address)
 	}
 	return absAddress, nil
+}
+
+// InitConfig reads in config file and ENV variables if set.
+func InitConfig(configFile string) (models.Config, error) {
+	// Search config in home directory with name "default" (without extension).
+	viper.SetConfigFile(configFile)
+	viper.AutomaticEnv() // read in environment variables that match
+
+	// If a config file is found, read it in.
+	err := viper.ReadInConfig()
+	if err != nil {
+		return models.Config{}, fmt.Errorf("error using config file: %s", err.Error())
+	}
+	conf := models.Config{}
+	err = viper.Unmarshal(&conf)
+	if err != nil {
+		return models.Config{}, fmt.Errorf("error Unmarshalling config file: %s", err.Error())
+	}
+	return conf, nil
 }

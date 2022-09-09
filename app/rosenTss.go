@@ -36,32 +36,37 @@ const (
 )
 
 type rosenTss struct {
-	ChannelMap map[string]chan models.GossipMessage
-	metaData   models.MetaData
-	storage    storage.Storage
-	connection network.Connection
-	Private    models.Private
-	peerHome   string
-	operations []_interface.Operation
+	ChannelMap        map[string]chan models.GossipMessage
+	metaData          models.MetaData
+	storage           storage.Storage
+	connection        network.Connection
+	Private           models.Private
+	peerHome          string
+	operations        []_interface.Operation
+	operationsTimeout int
+	messageTimeout    int
 }
 
 var logging *zap.SugaredLogger
 
 // NewRosenTss Constructor of an app
-func NewRosenTss(connection network.Connection, storage storage.Storage, homeAddress string) _interface.RosenTss {
+func NewRosenTss(connection network.Connection, storage storage.Storage, config models.Config) _interface.RosenTss {
 	logging = logger.NewSugar("tss")
 	return &rosenTss{
-		ChannelMap: make(map[string]chan models.GossipMessage),
-		metaData:   models.MetaData{},
-		storage:    storage,
-		connection: connection,
-		Private:    models.Private{},
-		peerHome:   homeAddress,
+		ChannelMap:        make(map[string]chan models.GossipMessage),
+		metaData:          models.MetaData{},
+		storage:           storage,
+		connection:        connection,
+		Private:           models.Private{},
+		peerHome:          config.HomeAddress,
+		operationsTimeout: config.OperationTimeout,
+		messageTimeout:    config.MessageTimeout,
 	}
 }
 
 // StartNewSign starts sign scenario for app based on given protocol.
 func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
+
 	log.Printf("Starting New Sign process")
 	err := r.SetMetaData(signMessage.Crypto)
 	if err != nil {
@@ -94,6 +99,21 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		return fmt.Errorf(models.WrongCryptoProtocolError)
 	}
 	r.operations = append(r.operations, operation)
+	operationState := true
+
+	go func() {
+		timeout := time.After(time.Second * time.Duration(r.operationsTimeout))
+		for {
+			select {
+			case <-timeout:
+				if _, ok := r.ChannelMap[messageId]; ok {
+					close(r.ChannelMap[messageId])
+					operationState = false
+				}
+				return
+			}
+		}
+	}()
 
 	err = operation.Init(r, "")
 	if err != nil {
@@ -103,6 +123,9 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		logging.Infof("calling loop for %s sign", signMessage.Crypto)
 		err = operation.Loop(r, r.ChannelMap[messageId])
 		if err != nil {
+			if !operationState {
+				err = fmt.Errorf("sign operation timeout")
+			}
 			logging.Errorf("en error occurred in %s sign loop, err: %+v", signMessage.Crypto, err)
 			callbackErr := r.GetConnection().CallBack(signMessage.CallBackUrl, err.Error(), "error")
 			if callbackErr != nil {
@@ -237,7 +260,7 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 
 	logging.Infof("new message: %+v", gossipMsg.Name)
 
-	timeout := time.After(time.Second * 30)
+	timeout := time.After(time.Second * time.Duration(r.messageTimeout))
 	var state bool
 
 timoutLoop:

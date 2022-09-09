@@ -64,9 +64,7 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
-
 	resp, err := c.Client.Do(req)
-
 	type response struct {
 		Message string `json:"message"`
 	}
