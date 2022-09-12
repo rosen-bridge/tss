@@ -127,7 +127,14 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 				err = fmt.Errorf("sign operation timeout")
 			}
 			logging.Errorf("en error occurred in %s sign loop, err: %+v", signMessage.Crypto, err)
-			callbackErr := r.GetConnection().CallBack(signMessage.CallBackUrl, err.Error(), "error")
+			data := struct {
+				Err string `json:"error"`
+				M   string `json:"m"`
+			}{
+				Err: err.Error(),
+				M:   signMessage.Message,
+			}
+			callbackErr := r.GetConnection().CallBack(signMessage.CallBackUrl, data, "error")
 			if callbackErr != nil {
 				logging.Error(callbackErr)
 			}
