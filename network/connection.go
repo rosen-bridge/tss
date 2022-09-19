@@ -47,13 +47,15 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 	marshalledMessage, _ := json.Marshal(&msg)
 
 	type message struct {
-		Message string `json:"message"`
-		Channel string `json:"channel"`
+		Message  string `json:"message"`
+		Channel  string `json:"channel"`
+		Receiver string `json:"receiver"`
 	}
 
 	values := message{
-		Message: string(marshalledMessage),
-		Channel: "tss",
+		Message:  string(marshalledMessage),
+		Channel:  "tss",
+		Receiver: msg.ReceiverId,
 	}
 	jsonData, err := json.Marshal(values)
 	if err != nil {

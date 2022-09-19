@@ -157,10 +157,20 @@ func TestEDDSA_Loop(t *testing.T) {
 	endCh := make(chan common.SignatureData, len(localTssData.PartyIds))
 	party := eddsaSign.NewLocalParty(signData, localTssData.Params, saveData, outCh, endCh)
 
-	partyIDMessage := fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign")
+	registerMessage := models.Register{
+		Id:        newPartyId.Id,
+		Moniker:   newPartyId.Moniker,
+		Key:       newPartyId.KeyInt().String(),
+		Timestamp: time.Now().Format("2006-01-02 15:04"),
+		NoAnswer:  false,
+	}
+	marshal, err := json.Marshal(registerMessage)
+	if err != nil {
+		t.Errorf("registerMessage error = %v", err)
+	}
 
 	partyMessage := models.PartyMessage{
-		Message:     []byte(partyIDMessage),
+		Message:     marshal,
 		IsBroadcast: true,
 		GetFrom:     newPartyId,
 		To:          []*tss.PartyID{localTssData.PartyID},
@@ -181,14 +191,14 @@ func TestEDDSA_Loop(t *testing.T) {
 		AppConfig func() _interface.RosenTss
 	}{
 		{
-			name:     "partyId",
-			expected: "handling incoming partyId message from p2p, there must be no error out of err list",
+			name:     "register",
+			expected: "handling incoming register message from p2p, there must be no error out of err list",
 			message: models.GossipMessage{
-				Message:    partyIDMessage,
+				Message:    string(marshal),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 				SenderId:   "cahj2pgs4eqvn1eo1tp0",
 				ReceiverId: "",
-				Name:       "partyId",
+				Name:       "register",
 			},
 			AppConfig: func() _interface.RosenTss {
 				app := mockedInterface.NewRosenTss(t)
@@ -197,6 +207,17 @@ func TestEDDSA_Loop(t *testing.T) {
 						PeersCount: 3,
 						Threshold:  2,
 					})
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    string(marshal),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "register",
+					})
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+				app.On("GetConnection").Return(conn)
 				return app
 			},
 		},
@@ -274,6 +295,7 @@ func TestEDDSA_Loop(t *testing.T) {
 						Crypto:      "eddsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
+					PeersMap: make(map[string]string),
 				},
 			}
 			messageCh := make(chan models.GossipMessage, 100)
@@ -334,7 +356,7 @@ func TestEDDSA_GetClassName(t *testing.T) {
 	}
 }
 
-/*	TestEDDSA_partyIdMessageHandler
+/*	TestEDDSA_registerMessageHandler
 	TestCases:
 	testing message controller, there is 2 testcases.
 	each test case runs as a subtests.
@@ -348,7 +370,7 @@ func TestEDDSA_GetClassName(t *testing.T) {
 	- network.Publish function
 	- rosenTss GetMetaData, GetConnection, NewMessage functions
 */
-func TestEDDSA_partyIdMessageHandler(t *testing.T) {
+func TestEDDSA_registerMessageHandler(t *testing.T) {
 
 	// creating new localTssData and new partyIds
 	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
@@ -386,6 +408,18 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			Name:       "partyId",
 		})
 
+	registerMessage := models.Register{
+		Id:        newPartyId.Id,
+		Moniker:   newPartyId.Moniker,
+		Key:       newPartyId.KeyInt().String(),
+		Timestamp: time.Now().Format("2006-01-02 15:04"),
+		NoAnswer:  false,
+	}
+	marshal, err := json.Marshal(registerMessage)
+	if err != nil {
+		t.Errorf("registerMessage error = %v", err)
+	}
+
 	tests := []struct {
 		name          string
 		gossipMessage models.GossipMessage
@@ -393,13 +427,13 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 		localTssData  models.TssData
 	}{
 		{
-			name: "partyId message with partyId list less than threshold, there must be no error",
+			name: "register message with partyId list less than threshold, there must be no error",
 			gossipMessage: models.GossipMessage{
-				Message:    fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign"),
+				Message:    string(marshal),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 				SenderId:   "cahj2pgs4eqvn1eo1tp0",
 				ReceiverId: "",
-				Name:       "partyId",
+				Name:       "register",
 			},
 			signMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -409,13 +443,13 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 			localTssData: localTssData,
 		},
 		{
-			name: "partyId message with partyId list equal to threshold, there must be no error",
+			name: "register message with partyId list equal to threshold, there must be no error",
 			gossipMessage: models.GossipMessage{
-				Message:    fmt.Sprintf("%s,%s,%d,%s", newPartyId.Id, newPartyId.Moniker, newPartyId.KeyInt(), "fromSign"),
+				Message:    string(marshal),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 				SenderId:   "cahj2pgs4eqvn1eo1tp0",
 				ReceiverId: "",
-				Name:       "partyId",
+				Name:       "register",
 			},
 			signMessage: models.SignMessage{
 				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
@@ -423,6 +457,22 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 				CallBackUrl: "http://localhost:5050/callback/sign",
 			},
 			localTssData: localTssDataWith2PartyIds,
+		},
+		{
+			name: "register message with partyId list less than threshold, there must be no error, with receiverId",
+			gossipMessage: models.GossipMessage{
+				Message:    string(marshal),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				ReceiverId: "cahj2pgs4eqvn1eo1tp0",
+				Name:       "register",
+			},
+			signMessage: models.SignMessage{
+				Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+				Crypto:      "eddsa",
+				CallBackUrl: "http://localhost:5050/callback/sign",
+			},
+			localTssData: localTssData,
 		},
 	}
 
@@ -434,10 +484,11 @@ func TestEDDSA_partyIdMessageHandler(t *testing.T) {
 				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage:  tt.signMessage,
+					PeersMap:     make(map[string]string),
 				},
 			}
 			// partyMessageHandler
-			err := eddsaSignOp.partyIdMessageHandler(app, tt.gossipMessage)
+			err := eddsaSignOp.registerMessageHandler(app, tt.gossipMessage)
 			if err != nil {
 				t.Error(err)
 			}

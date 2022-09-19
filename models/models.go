@@ -32,11 +32,12 @@ type Message struct {
 }
 
 type GossipMessage struct {
-	MessageId  string `json:"messageId"` // keygen or sign or regroup
-	Name       string `json:"name"`
-	Message    string `json:"message"`
-	SenderId   string `json:"senderId"`
-	ReceiverId string `json:"receiverId"`
+	MessageId   string `json:"messageId"` // keygen or sign or regroup
+	Name        string `json:"name"`
+	Message     string `json:"message"`
+	SenderP2PId string `json:"senderP2PId"`
+	SenderId    string `json:"senderId"`
+	ReceiverId  string `json:"receiverId"`
 }
 
 type MetaData struct {
@@ -98,4 +99,12 @@ type Config struct {
 	LogMaxAge        int    `mapstructure:"LOG_MAX_AGE"`
 	OperationTimeout int    `mapstructure:"OPERATION_TIMEOUT"`
 	MessageTimeout   int    `mapstructure:"MESSAGE_TIMEOUT"`
+}
+
+type Register struct {
+	Id        string `json:"id"`
+	Moniker   string `json:"moniker"`
+	Key       string `json:"key"`
+	Timestamp string `json:"timestamp"`
+	NoAnswer  bool   `json:"noAnswer"`
 }

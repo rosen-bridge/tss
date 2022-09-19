@@ -16,7 +16,6 @@ import (
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/utils"
-	"strings"
 	"time"
 )
 
@@ -32,6 +31,7 @@ func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation 
 	return &operationEDDSASign{
 		operationSign: sign.OperationSign{
 			SignMessage: signMessage,
+			PeersMap:    make(map[string]string),
 		},
 	}
 }
@@ -54,13 +54,30 @@ func (s *operationEDDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 		s.savedData = data
 		s.operationSign.LocalTssData.PartyID = pID
 	}
-	message := fmt.Sprintf("%s,%s,%d,%s", s.operationSign.LocalTssData.PartyID.Id, s.operationSign.LocalTssData.PartyID.Moniker, s.operationSign.LocalTssData.PartyID.KeyInt(), "fromSign")
+	var noAnswer bool
+	if receiverId == "" {
+		noAnswer = false
+	} else {
+		noAnswer = true
+	}
+	message := models.Register{
+		Id:        s.operationSign.LocalTssData.PartyID.Id,
+		Moniker:   s.operationSign.LocalTssData.PartyID.Moniker,
+		Key:       s.operationSign.LocalTssData.PartyID.KeyInt().String(),
+		Timestamp: time.Now().Format("2006-01-02 15:04"),
+		NoAnswer:  noAnswer,
+	}
+	marshal, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
 	msgBytes, _ := hex.DecodeString(s.operationSign.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(signDataBytes[:]))
-	jsonMessage := rosenTss.NewMessage(receiverId, s.operationSign.LocalTssData.PartyID.Id, message, messageId, "partyId")
-	err := rosenTss.GetConnection().Publish(jsonMessage)
+	jsonMessage := rosenTss.NewMessage(receiverId, s.operationSign.LocalTssData.PartyID.Id, string(marshal), messageId, "register")
+	err = rosenTss.GetConnection().Publish(jsonMessage)
 	if err != nil {
 		return err
 	}
@@ -89,9 +106,9 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 			}
 			logging.Infof("msg.name: {%s}", msg.Name)
 			switch msg.Name {
-			case "partyId":
+			case "register":
 				if msg.Message != "" {
-					err := s.partyIdMessageHandler(rosenTss, msg)
+					err := s.registerMessageHandler(rosenTss, msg)
 					if err != nil {
 						return err
 					}
@@ -218,44 +235,45 @@ func (s *operationEDDSASign) gossipMessageHandler(rosenTss _interface.RosenTss, 
 	}
 }
 
-// PartyIdMessageHandler handles partyId message and if cals setup functions if patryIds list length was at least equal to the threshold
-func (s *operationEDDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
+// registerMessageHandler handles register message, and it calls setup functions if patryIds list length was at least equal to the threshold
+func (s *operationEDDSASign) registerMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
 
-	if gossipMessage.SenderId != s.operationSign.LocalTssData.PartyID.Id &&
-		(gossipMessage.ReceiverId == "" || gossipMessage.ReceiverId == s.operationSign.LocalTssData.PartyID.Id) {
-
-		logging.Info("received partyId message ",
+	if gossipMessage.SenderId != s.operationSign.LocalTssData.PartyID.Id {
+		if gossipMessage.ReceiverId != "" {
+			s.operationSign.PeersMap[s.operationSign.LocalTssData.PartyID.Id] = gossipMessage.ReceiverId
+		}
+		s.operationSign.PeersMap[gossipMessage.SenderId] = gossipMessage.SenderP2PId
+		logging.Info("received register message ",
 			fmt.Sprintf("from: %s", gossipMessage.SenderId))
-		partyIdParams := strings.Split(gossipMessage.Message, ",")
-		logging.Infof("partyIdParams: %v", partyIdParams)
-		key, _ := new(big.Int).SetString(partyIdParams[2], 10)
-		newParty := tss.NewPartyID(partyIdParams[0], partyIdParams[1], key)
+
+		registerMessage := &models.Register{}
+		err := json.Unmarshal([]byte(gossipMessage.Message), registerMessage)
+		if err != nil {
+			return err
+		}
+
+		logging.Infof("registerMessage: %+v", registerMessage)
+		key, _ := new(big.Int).SetString(registerMessage.Key, 10)
+		newParty := tss.NewPartyID(registerMessage.Id, registerMessage.Moniker, key)
 
 		meta := rosenTss.GetMetaData()
 
-		switch partyIdParams[3] {
+		if !registerMessage.NoAnswer {
+			err := s.Init(rosenTss, gossipMessage.SenderP2PId)
+			if err != nil {
+				return err
+			}
+		}
 
-		case "fromSign":
-			if !utils.IsPartyExist(newParty, s.operationSign.LocalTssData.PartyIds) {
-				s.operationSign.LocalTssData.PartyIds = tss.SortPartyIDs(
-					append(s.operationSign.LocalTssData.PartyIds.ToUnSorted(), newParty))
-
-				if len(s.operationSign.LocalTssData.PartyIds) < meta.Threshold {
-					err := s.Init(rosenTss, newParty.Id)
-					if err != nil {
-						return err
-					}
-				} else {
-
-					err := s.setup(rosenTss)
-					if err != nil {
-						return err
-					}
+		if !utils.IsPartyExist(newParty, s.operationSign.LocalTssData.PartyIds) {
+			s.operationSign.LocalTssData.PartyIds = tss.SortPartyIDs(
+				append(s.operationSign.LocalTssData.PartyIds.ToUnSorted(), newParty))
+			if len(s.operationSign.LocalTssData.PartyIds) >= meta.Threshold {
+				err = s.setup(rosenTss)
+				if err != nil {
+					return err
 				}
 			}
-
-		default:
-			return fmt.Errorf("wrong message")
 		}
 	}
 	return nil

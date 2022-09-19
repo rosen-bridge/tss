@@ -59,7 +59,7 @@ func main() {
 	localStorage := storage.NewStorage()
 
 	tss := app.NewRosenTss(conn, localStorage, config)
-
+	fmt.Printf("%+v", tss)
 	// setting up peer home based on configs
 	err = tss.SetPeerHome(config.HomeAddress)
 	if err != nil {

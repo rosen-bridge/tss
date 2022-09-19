@@ -9,4 +9,5 @@ type OperationSign struct {
 	_interface.OperationHandler
 	LocalTssData models.TssData
 	SignMessage  models.SignMessage
+	PeersMap     map[string]string
 }

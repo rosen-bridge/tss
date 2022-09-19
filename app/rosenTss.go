@@ -264,7 +264,7 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 	if err != nil {
 		return err
 	}
-
+	gossipMsg.SenderP2PId = message.Sender
 	logging.Infof("new message: %+v", gossipMsg.Name)
 
 	timeout := time.After(time.Second * time.Duration(r.messageTimeout))
