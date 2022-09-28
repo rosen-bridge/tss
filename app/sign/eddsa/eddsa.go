@@ -8,6 +8,7 @@ import (
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	eddsaSigning "github.com/binance-chain/tss-lib/eddsa/signing"
 	"github.com/binance-chain/tss-lib/tss"
+	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/blake2b"
 	"math/big"
@@ -64,7 +65,7 @@ func (s *operationEDDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 		Id:        s.operationSign.LocalTssData.PartyID.Id,
 		Moniker:   s.operationSign.LocalTssData.PartyID.Moniker,
 		Key:       s.operationSign.LocalTssData.PartyID.KeyInt().String(),
-		Timestamp: time.Now().Format("2006-01-02 15:04"),
+		Timestamp: time.Now().Unix() / 60,
 		NoAnswer:  noAnswer,
 	}
 	marshal, err := json.Marshal(message)
@@ -76,8 +77,7 @@ func (s *operationEDDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(signDataBytes[:]))
-	jsonMessage := rosenTss.NewMessage(receiverId, s.operationSign.LocalTssData.PartyID.Id, string(marshal), messageId, "register")
-	err = rosenTss.GetConnection().Publish(jsonMessage)
+	err = s.newMessage(rosenTss, receiverId, s.operationSign.LocalTssData.PartyID.Id, string(marshal), messageId, "register")
 	if err != nil {
 		return err
 	}
@@ -105,6 +105,10 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				return fmt.Errorf("channel closed")
 			}
 			logging.Infof("msg.name: {%s}", msg.Name)
+			err := s.verify(msg)
+			if err != nil {
+				return err
+			}
 			switch msg.Name {
 			case "register":
 				if msg.Message != "" {
@@ -185,8 +189,7 @@ func (s *operationEDDSASign) handleOutMessage(rosenTss _interface.RosenTss, part
 	}
 	messageBytes := blake2b.Sum256(signData.Bytes())
 	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(messageBytes[:]))
-	jsonMessage := rosenTss.NewMessage("", s.operationSign.LocalTssData.PartyID.Id, msgHex, messageId, "partyMsg")
-	err = rosenTss.GetConnection().Publish(jsonMessage)
+	err = s.newMessage(rosenTss, "", s.operationSign.LocalTssData.PartyID.Id, msgHex, messageId, "partyMsg")
 	if err != nil {
 		return err
 	}
@@ -329,9 +332,79 @@ func (s *operationEDDSASign) setup(rosenTss _interface.RosenTss) error {
 
 	messageBytes := blake2b.Sum256(signData.Bytes())
 	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(messageBytes[:]))
-	jsonMessage := rosenTss.NewMessage("", s.operationSign.LocalTssData.PartyID.Id, signData.String(), messageId, "sign")
+	err := s.newMessage(rosenTss, "", s.operationSign.LocalTssData.PartyID.Id, signData.String(), messageId, "sign")
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
-	err := rosenTss.GetConnection().Publish(jsonMessage)
+func (s *operationEDDSASign) signMessage(message []byte) ([]byte, error) {
+	private, _, _ := edwards.PrivKeyFromScalar(s.savedData.Xi.Bytes())
+	checksum := blake2b.Sum256(message)
+	signature, err := private.Sign(checksum[:])
+	if err != nil {
+		return nil, err
+	}
+	return signature.Serialize(), nil
+}
+
+func (s *operationEDDSASign) verify(msg models.GossipMessage) error {
+	var index int
+	for _, peer := range s.operationSign.LocalTssData.PartyIds {
+		if peer.Id == msg.SenderId {
+			for i, k := range s.savedData.Ks {
+				key := new(big.Int).SetBytes(peer.Key)
+				if key.Cmp(k) == 0 {
+					index = i
+				}
+			}
+		}
+	}
+	pk := edwards.NewPublicKey(s.savedData.BigXj[index].X(), s.savedData.BigXj[index].Y())
+	payload := models.Payload{
+		Message:    msg.Message,
+		MessageId:  msg.MessageId,
+		SenderId:   msg.SenderId,
+		ReceiverId: msg.ReceiverId,
+		Name:       msg.Name,
+	}
+	marshal, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	checksum := blake2b.Sum256(marshal)
+	signature, err := edwards.ParseDERSignature(msg.Signature)
+	if err != nil {
+		return err
+	}
+	result := edwards.Verify(pk, checksum[:], signature.R, signature.S)
+	if !result {
+		return fmt.Errorf("can not verify the message")
+	}
+	return nil
+}
+
+func (s *operationEDDSASign) newMessage(rosenTss _interface.RosenTss, receiverId string, senderId string, message string, messageId string, name string) error {
+	payload := models.Payload{
+		Message:    message,
+		MessageId:  messageId,
+		SenderId:   senderId,
+		ReceiverId: receiverId,
+		Name:       name,
+	}
+	marshal, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	signature, err := s.signMessage(marshal)
+	if err != nil {
+		return err
+	}
+	gossipMessage := rosenTss.NewMessage(receiverId, senderId, message, messageId, name)
+	gossipMessage.Signature = signature
+
+	err = rosenTss.GetConnection().Publish(gossipMessage)
 	if err != nil {
 		return err
 	}

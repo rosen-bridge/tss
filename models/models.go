@@ -32,12 +32,13 @@ type Message struct {
 }
 
 type GossipMessage struct {
-	MessageId   string `json:"messageId"` // keygen or sign or regroup
+	MessageId   string `json:"messageId"`
 	Name        string `json:"name"`
 	Message     string `json:"message"`
 	SenderP2PId string `json:"senderP2PId"`
 	SenderId    string `json:"senderId"`
 	ReceiverId  string `json:"receiverId"`
+	Signature   []byte `json:"signature"`
 }
 
 type MetaData struct {
@@ -105,6 +106,15 @@ type Register struct {
 	Id        string `json:"id"`
 	Moniker   string `json:"moniker"`
 	Key       string `json:"key"`
-	Timestamp string `json:"timestamp"`
+	Timestamp int64  `json:"timestamp"`
 	NoAnswer  bool   `json:"noAnswer"`
+}
+
+type Payload struct {
+	MessageId   string `json:"messageId"`
+	Name        string `json:"name"`
+	Message     string `json:"message"`
+	SenderP2PId string `json:"senderP2PId"`
+	SenderId    string `json:"senderId"`
+	ReceiverId  string `json:"receiverId"`
 }

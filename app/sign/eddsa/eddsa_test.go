@@ -38,6 +38,11 @@ import (
 */
 func TestEDDSA_Init(t *testing.T) {
 
+	saveData, _, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
+
 	// creating fake localTssData
 	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
 	if err != nil {
@@ -51,38 +56,54 @@ func TestEDDSA_Init(t *testing.T) {
 	}
 
 	// using mock functions
-	storage := mockedStorage.NewStorage(t)
-	storage.On("LoadEDDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
-	app := mockedInterface.NewRosenTss(t)
-	conn := mockedNetwork.NewConnection(t)
-	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
-	app.On("GetStorage").Return(storage)
-	app.On("GetConnection").Return(conn)
-	app.On("GetPeerHome").Return(".rosenTss")
-	app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(models.GossipMessage{
-			Message:    fmt.Sprintf("%s,%s,%d,%s", localTssData.PartyID.Id, localTssData.PartyID.Moniker, localTssData.PartyID.KeyInt(), "fromSign"),
-			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-			SenderId:   "cahj2pgs4eqvn1eo1tp0",
-			ReceiverId: "",
-			Name:       "partyId",
-		})
 
 	tests := []struct {
 		name         string
-		app          _interface.RosenTss
 		receiverId   string
 		localTssData models.TssData
+		appConfig    func() _interface.RosenTss
 	}{
 		{
-			name:         "creating partyId message with localTssData, there must be no error",
-			app:          app,
+			name: "creating register message with localTssData, there must be no error",
+			appConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+				app.On("GetConnection").Return(conn)
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s", localTssData.PartyID.Id, localTssData.PartyID.Moniker, localTssData.PartyID.KeyInt(), "fromSign"),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "register",
+					})
+				return app
+			},
 			receiverId:   "",
 			localTssData: localTssData,
 		},
 		{
-			name:         "creating partyId message without localTssData, there must be no error",
-			app:          app,
+			name: "creating register message without localTssData, there must be no error",
+			appConfig: func() _interface.RosenTss {
+				storage := mockedStorage.NewStorage(t)
+				storage.On("LoadEDDSAKeygen", mock.AnythingOfType("string")).Return(data, id, err)
+				app := mockedInterface.NewRosenTss(t)
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+				app.On("GetStorage").Return(storage)
+				app.On("GetConnection").Return(conn)
+				app.On("GetPeerHome").Return(".rosenTss")
+				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(models.GossipMessage{
+						Message:    fmt.Sprintf("%s,%s,%d,%s", localTssData.PartyID.Id, localTssData.PartyID.Moniker, localTssData.PartyID.KeyInt(), "fromSign"),
+						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						ReceiverId: "",
+						Name:       "register",
+					})
+				return app
+			},
 			receiverId:   "cahj2pgs4eqvn1eo1tp0",
 			localTssData: models.TssData{},
 		},
@@ -91,7 +112,9 @@ func TestEDDSA_Init(t *testing.T) {
 	logging, _ = mockUtils.InitLog("eddsa-sign")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			app := tt.appConfig()
 			eddsaSignOp := operationEDDSASign{
+				savedData: saveData,
 				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
@@ -101,7 +124,7 @@ func TestEDDSA_Init(t *testing.T) {
 					},
 				},
 			}
-			err := eddsaSignOp.Init(tt.app, tt.receiverId)
+			err := eddsaSignOp.Init(app, tt.receiverId)
 			if err != nil {
 				t.Errorf("Init failed: %v", err)
 			}
@@ -127,11 +150,15 @@ func TestEDDSA_Loop(t *testing.T) {
 	// pre-test part, faking data and using mocks
 
 	// reading eddsaKeygen.LocalPartySaveData from fixtures
-	saveData, Id1, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	saveData, Id1, err := mockUtils.LoadEDDSAKeygenFixture(1)
 	if err != nil {
 		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
 	}
-	_, Id2, err := mockUtils.LoadEDDSAKeygenFixture(1)
+	saveData2, Id2, err := mockUtils.LoadEDDSAKeygenFixture(2)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
+	_, Id3, err := mockUtils.LoadEDDSAKeygenFixture(0)
 	if err != nil {
 		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
 	}
@@ -144,6 +171,8 @@ func TestEDDSA_Loop(t *testing.T) {
 
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
+	localTssData.PartyIds = tss.SortPartyIDs(
+		append(localTssData.PartyIds.ToUnSorted(), Id3))
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), localTssData.PartyID))
 	signDataBytes, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
@@ -161,7 +190,7 @@ func TestEDDSA_Loop(t *testing.T) {
 		Id:        newPartyId.Id,
 		Moniker:   newPartyId.Moniker,
 		Key:       newPartyId.KeyInt().String(),
-		Timestamp: time.Now().Format("2006-01-02 15:04"),
+		Timestamp: time.Now().Unix() / 60,
 		NoAnswer:  false,
 	}
 	marshal, err := json.Marshal(registerMessage)
@@ -195,8 +224,8 @@ func TestEDDSA_Loop(t *testing.T) {
 			expected: "handling incoming register message from p2p, there must be no error out of err list",
 			message: models.GossipMessage{
 				Message:    string(marshal),
-				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				MessageId:  "eddsaccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   newPartyId.Id,
 				ReceiverId: "",
 				Name:       "register",
 			},
@@ -210,8 +239,8 @@ func TestEDDSA_Loop(t *testing.T) {
 				app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return(models.GossipMessage{
 						Message:    string(marshal),
-						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						MessageId:  "eddsaccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+						SenderId:   newPartyId.Id,
 						ReceiverId: "",
 						Name:       "register",
 					})
@@ -227,7 +256,7 @@ func TestEDDSA_Loop(t *testing.T) {
 			message: models.GossipMessage{
 				Message:    hex.EncodeToString(partyMessageBytes),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				SenderId:   newPartyId.Id,
 				ReceiverId: "",
 				Name:       "partyMsg",
 			},
@@ -243,7 +272,7 @@ func TestEDDSA_Loop(t *testing.T) {
 			message: models.GossipMessage{
 				Message:    signData.String(),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				SenderId:   newPartyId.Id,
 				ReceiverId: "",
 				Name:       "sign",
 			},
@@ -259,7 +288,7 @@ func TestEDDSA_Loop(t *testing.T) {
 			message: models.GossipMessage{
 				Message:    signData.String(),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-				SenderId:   "cahj2pgs4eqvn1eo1tp0",
+				SenderId:   newPartyId.Id,
 				ReceiverId: "",
 				Name:       "sign",
 			},
@@ -273,7 +302,7 @@ func TestEDDSA_Loop(t *testing.T) {
 					Return(models.GossipMessage{
 						Message:    signData.String(),
 						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-						SenderId:   "cahj2pgs4eqvn1eo1tp0",
+						SenderId:   newPartyId.Id,
 						ReceiverId: "",
 						Name:       "sign",
 					})
@@ -286,7 +315,10 @@ func TestEDDSA_Loop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.AppConfig()
-			eddsaSignOp := operationEDDSASign{
+			eddsaSignOpSender := &operationEDDSASign{
+				savedData: saveData2,
+			}
+			eddsaSignOp := &operationEDDSASign{
 				savedData: saveData,
 				operationSign: sign.OperationSign{
 					LocalTssData: localTssData,
@@ -299,6 +331,17 @@ func TestEDDSA_Loop(t *testing.T) {
 				},
 			}
 			messageCh := make(chan models.GossipMessage, 100)
+
+			payload := models.Payload{
+				Message:    tt.message.Message,
+				MessageId:  tt.message.MessageId,
+				SenderId:   tt.message.SenderId,
+				ReceiverId: tt.message.ReceiverId,
+				Name:       tt.message.Name,
+			}
+			marshal, _ := json.Marshal(payload)
+			signature, _ := eddsaSignOpSender.signMessage(marshal)
+			tt.message.Signature = signature
 
 			messageCh <- tt.message
 			go func() {
@@ -372,6 +415,10 @@ func TestEDDSA_GetClassName(t *testing.T) {
 */
 func TestEDDSA_registerMessageHandler(t *testing.T) {
 
+	saveData, _, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
 	// creating new localTssData and new partyIds
 	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
 	if err != nil {
@@ -405,14 +452,14 @@ func TestEDDSA_registerMessageHandler(t *testing.T) {
 			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 			SenderId:   "cahj2pgs4eqvn1eo1tp0",
 			ReceiverId: "",
-			Name:       "partyId",
+			Name:       "register",
 		})
 
 	registerMessage := models.Register{
 		Id:        newPartyId.Id,
 		Moniker:   newPartyId.Moniker,
 		Key:       newPartyId.KeyInt().String(),
-		Timestamp: time.Now().Format("2006-01-02 15:04"),
+		Timestamp: time.Now().Unix() / 60,
 		NoAnswer:  false,
 	}
 	marshal, err := json.Marshal(registerMessage)
@@ -486,6 +533,7 @@ func TestEDDSA_registerMessageHandler(t *testing.T) {
 					SignMessage:  tt.signMessage,
 					PeersMap:     make(map[string]string),
 				},
+				savedData: saveData,
 			}
 			// partyMessageHandler
 			err := eddsaSignOp.registerMessageHandler(app, tt.gossipMessage)
@@ -633,6 +681,10 @@ func TestEDDSA_partyUpdate(t *testing.T) {
 func TestEDDSA_setup(t *testing.T) {
 
 	// creating new localTssData and new partyId
+	saveData, _, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
 	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Errorf("createNewLocalEDDSAParty error = %v", err)
@@ -662,7 +714,7 @@ func TestEDDSA_setup(t *testing.T) {
 			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 			SenderId:   "cahj2pgs4eqvn1eo1tp0",
 			ReceiverId: "",
-			Name:       "partyId",
+			Name:       "register",
 		})
 
 	tests := []struct {
@@ -689,6 +741,7 @@ func TestEDDSA_setup(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaSignOp := operationEDDSASign{
+				savedData: saveData,
 				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
@@ -726,6 +779,11 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	}
 
 	// creating new localTssData
+	saveData, _, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
+
 	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Errorf("createNewLocalEDDSAParty error = %v", err)
@@ -739,7 +797,7 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 			SenderId:   "cahj2pgs4eqvn1eo1tp0",
 			ReceiverId: "",
-			Name:       "partyId",
+			Name:       "register",
 		})
 	conn := mockedNetwork.NewConnection(t)
 	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
@@ -763,6 +821,7 @@ func TestEDDSA_handleOutMessage(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaSignOp := operationEDDSASign{
+				savedData: saveData,
 				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
@@ -866,6 +925,11 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	}
 
 	// creating localTssData and new partyId
+	saveData, _, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
+
 	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
 	if err != nil {
 		t.Errorf("createNewLocalEDDSAParty error = %v", err)
@@ -885,7 +949,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 			MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 			SenderId:   "cahj2pgs4eqvn1eo1tp0",
 			ReceiverId: "",
-			Name:       "partyId",
+			Name:       "register",
 		})
 	conn := mockedNetwork.NewConnection(t)
 	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(fmt.Errorf("message received"))
@@ -921,6 +985,7 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eddsaSignOp := operationEDDSASign{
+				savedData: saveData,
 				operationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
@@ -947,6 +1012,184 @@ func TestEDDSA_gossipMessageHandler(t *testing.T) {
 				}
 			} else {
 				assert.Equal(t, result, true)
+			}
+		})
+	}
+}
+
+func TestEDDSA_signMessage(t *testing.T) {
+	// creating fake sign data
+
+	m, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
+
+	saveData, _, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		message []byte
+	}{
+		{
+			name:    "new signature",
+			message: m,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			eddsaSignOp := operationEDDSASign{
+				savedData: saveData,
+			}
+
+			_, err := eddsaSignOp.signMessage(tt.message)
+			if err != nil {
+				t.Errorf("signMessage error = %v", err)
+			}
+
+		})
+	}
+}
+
+func TestEDDSA_verify(t *testing.T) {
+	// creating fake sign data
+	saveData, Id1, err := mockUtils.LoadEDDSAKeygenFixture(1)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
+
+	saveData2, Id2, err := mockUtils.LoadEDDSAKeygenFixture(2)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
+	// creating localTssData and new partyId
+	localTssData := models.TssData{
+		PartyID: Id1,
+	}
+	newPartyId := Id2
+	localTssData.PartyIds = tss.SortPartyIDs(
+		append(localTssData.PartyIds.ToUnSorted(), localTssData.PartyID))
+	localTssData.PartyIds = tss.SortPartyIDs(
+		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
+
+	registerMessage := models.Register{
+		Id:        newPartyId.Id,
+		Moniker:   newPartyId.Moniker,
+		Key:       newPartyId.KeyInt().String(),
+		Timestamp: time.Now().Unix() / 60,
+		NoAnswer:  false,
+	}
+	marshal, err := json.Marshal(registerMessage)
+	if err != nil {
+		t.Errorf("error = %v", err)
+	}
+	payload := models.Payload{
+		Message:    string(marshal),
+		MessageId:  "eddsaccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+		SenderId:   newPartyId.Id,
+		ReceiverId: "",
+		Name:       "register",
+	}
+	marshal, err = json.Marshal(payload)
+	if err != nil {
+		t.Errorf("error = %v", err)
+	}
+
+	eddsaSignOp := operationEDDSASign{
+		savedData: saveData,
+		operationSign: sign.OperationSign{
+			LocalTssData: localTssData,
+		},
+	}
+	eddsaSignOpSigner := operationEDDSASign{
+		savedData: saveData2,
+	}
+
+	tests := []struct {
+		name    string
+		message []byte
+	}{
+		{
+			name:    "new signature",
+			message: marshal,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			signature, err := eddsaSignOpSigner.signMessage(tt.message)
+
+			gossipMessage := models.GossipMessage{
+				Message:    payload.Message,
+				MessageId:  payload.MessageId,
+				SenderId:   payload.SenderId,
+				ReceiverId: payload.ReceiverId,
+				Name:       payload.Name,
+				Signature:  signature,
+			}
+			err = eddsaSignOp.verify(gossipMessage)
+			if err != nil {
+				t.Errorf("verify error = %v", err)
+			}
+		})
+	}
+}
+
+func TestEDDSA_newMessage(t *testing.T) {
+	// creating localTssData and new partyId
+	saveData, _, err := mockUtils.LoadEDDSAKeygenFixture(1)
+	if err != nil {
+		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
+	}
+
+	localTssData, err := mockUtils.CreateNewLocalEDDSATSSData()
+	if err != nil {
+		t.Errorf("createNewLocalEDDSAParty error = %v", err)
+	}
+	newPartyId, err := mockUtils.CreateNewEDDSAPartyId()
+	if err != nil {
+		t.Errorf("CreateNewEDDSAPartyId error = %v", err)
+	}
+	localTssData.PartyIds = tss.SortPartyIDs(
+		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
+
+	message := models.GossipMessage{
+		Message:    "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+		MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+		SenderId:   "cahj2pgs4eqvn1eo1tp0",
+		ReceiverId: "",
+		Name:       "register",
+	}
+	// using mocked structs and functions
+	app := mockedInterface.NewRosenTss(t)
+	app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(message)
+	conn := mockedNetwork.NewConnection(t)
+	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(fmt.Errorf("message received"))
+	app.On("GetConnection").Return(conn)
+
+	tests := []struct {
+		name string
+	}{
+		{
+			name: "create and send new message to p2p",
+		},
+	}
+
+	logging, _ = mockUtils.InitLog("eddsa-sign")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			eddsaSignOp := operationEDDSASign{
+				savedData: saveData,
+				operationSign: sign.OperationSign{
+					LocalTssData: localTssData,
+				},
+			}
+
+			err := eddsaSignOp.newMessage(app, message.ReceiverId, message.SenderId, message.Message, message.MessageId, message.Name)
+			if err != nil && err.Error() != "message received" {
+				t.Errorf("newMessage error = %v", err)
 			}
 		})
 	}
