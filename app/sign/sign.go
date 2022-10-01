@@ -10,4 +10,5 @@ type OperationSign struct {
 	LocalTssData models.TssData
 	SignMessage  models.SignMessage
 	PeersMap     map[string]string
+	Signatures   map[string]string
 }

@@ -12,7 +12,6 @@ import (
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/rs/xid"
 	"go.uber.org/zap"
 	"io/ioutil"
@@ -117,18 +116,17 @@ func LoadEDDSAKeygenFixture(index int) (eddsaKeygen.LocalPartySaveData, *tss.Par
 	srcDirName := filepath.Dir(callerFileName)
 	rootFolder := fmt.Sprintf(testFixtureDirFormat, srcDirName)
 	files, err := ioutil.ReadDir(rootFolder)
-
-	keygenFile := files[index].Name()
-
 	if err != nil {
-		log.Error(err)
+		return eddsaKeygen.LocalPartySaveData{}, nil, err
 	}
+
 	if len(files) == 0 {
 		return eddsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
 	}
+	keygenFile := files[index].Name()
 
 	filePath := filepath.Join(rootFolder, keygenFile)
-	log.Infof("File: %v", filePath)
+	fmt.Printf("File: %v\n", filePath)
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return eddsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(
@@ -204,18 +202,16 @@ func LoadECDSAKeygenFixture(index int) (ecdsaKeygen.LocalPartySaveData, *tss.Par
 	srcDirName := filepath.Dir(callerFileName)
 	rootFolder := fmt.Sprintf(testFixtureDirFormat, srcDirName)
 	files, err := ioutil.ReadDir(rootFolder)
-
-	keygenFile := files[index].Name()
-
 	if err != nil {
-		log.Error(err)
+		return ecdsaKeygen.LocalPartySaveData{}, nil, err
 	}
 	if len(files) == 0 {
 		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
 	}
+	keygenFile := files[index].Name()
 
 	filePath := filepath.Join(rootFolder, keygenFile)
-	log.Infof("File: %v", filePath)
+	fmt.Printf("File: %v\n", filePath)
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return ecdsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(

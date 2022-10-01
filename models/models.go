@@ -118,3 +118,17 @@ type Payload struct {
 	SenderId    string `json:"senderId"`
 	ReceiverId  string `json:"receiverId"`
 }
+
+type SetupSign struct {
+	Hash      string             `json:"hash"`
+	Peers     tss.SortedPartyIDs `json:"peers"`
+	PeersMap  map[string]string  `json:"peersMap"`
+	Timestamp int64              `json:"timestamp"`
+	StarterId string             `json:"StarterId"`
+}
+
+type StartSign struct {
+	Hash       string            `json:"hash"`
+	Signatures map[string]string `json:"signatures"`
+	StarterId  string            `json:"StarterId"`
+}

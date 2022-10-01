@@ -10,6 +10,7 @@ import (
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"golang.org/x/crypto/blake2b"
 	"math/big"
 	_interface "rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/sign"
@@ -210,7 +211,17 @@ func TestEDDSA_Loop(t *testing.T) {
 		t.Error("failed to marshal message", err)
 	}
 
-	// creating new app from mocked rosenTss, handling mock function done in each case separately
+	messageBytes := blake2b.Sum256(signData.Bytes())
+	setupMessage := models.SetupSign{
+		Hash:      hex.EncodeToString(messageBytes[:]),
+		Peers:     localTssData.PartyIds,
+		Timestamp: time.Now().Unix() / 60,
+		StarterId: newPartyId.KeyInt().String(),
+	}
+	setupMessageMarshaled, err := json.Marshal(setupMessage)
+	if err != nil {
+		t.Errorf("setupMessageMarshaled error = %v", err)
+	}
 
 	// test cases
 	tests := []struct {
@@ -251,6 +262,35 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 		{
+			name:     "setup",
+			expected: "handling incoming setup message from p2p, there must be no error out of err list",
+			message: models.GossipMessage{
+				Message:    string(setupMessageMarshaled),
+				MessageId:  "eddsaccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   newPartyId.Id,
+				ReceiverId: "",
+				Name:       "setup",
+			},
+			AppConfig: func() _interface.RosenTss {
+				app := mockedInterface.NewRosenTss(t)
+				minutes := time.Now().Unix() / 60
+				if minutes%int64(3) == int64(0) {
+					app.On("NewMessage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+						Return(models.GossipMessage{
+							Message:    string(setupMessageMarshaled),
+							MessageId:  "eddsaccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+							SenderId:   newPartyId.Id,
+							ReceiverId: "",
+							Name:       "setup",
+						})
+					conn := mockedNetwork.NewConnection(t)
+					conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
+					app.On("GetConnection").Return(conn)
+				}
+				return app
+			},
+		},
+		{
 			name:     "partyMsg",
 			expected: "handling incoming partyMsg message from p2p, there must be no error out of err list",
 			message: models.GossipMessage{
@@ -267,14 +307,14 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 		{
-			name:     "sign with party",
+			name:     "start sign with party",
 			expected: "handling incoming sign message from p2p, there must be no error out of err list",
 			message: models.GossipMessage{
 				Message:    signData.String(),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 				SenderId:   newPartyId.Id,
 				ReceiverId: "",
-				Name:       "sign",
+				Name:       "startSign",
 			},
 			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = party
@@ -283,14 +323,14 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 		{
-			name:     "sign without party",
+			name:     "start sign without party",
 			expected: "handling incoming sign message from p2p, there must be no error out of err list",
 			message: models.GossipMessage{
 				Message:    signData.String(),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 				SenderId:   newPartyId.Id,
 				ReceiverId: "",
-				Name:       "sign",
+				Name:       "startSign",
 			},
 			AppConfig: func() _interface.RosenTss {
 				localTssData.Party = nil
@@ -304,7 +344,7 @@ func TestEDDSA_Loop(t *testing.T) {
 						MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 						SenderId:   newPartyId.Id,
 						ReceiverId: "",
-						Name:       "sign",
+						Name:       "startSign",
 					})
 				return app
 			},
@@ -327,7 +367,8 @@ func TestEDDSA_Loop(t *testing.T) {
 						Crypto:      "eddsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
-					PeersMap: make(map[string]string),
+					PeersMap:   make(map[string]string),
+					Signatures: make(map[string]string),
 				},
 			}
 			messageCh := make(chan models.GossipMessage, 100)
@@ -532,6 +573,7 @@ func TestEDDSA_registerMessageHandler(t *testing.T) {
 					LocalTssData: tt.localTssData,
 					SignMessage:  tt.signMessage,
 					PeersMap:     make(map[string]string),
+					Signatures:   make(map[string]string),
 				},
 				savedData: saveData,
 			}
