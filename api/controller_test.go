@@ -470,7 +470,7 @@ func TestController_Keygen(t *testing.T) {
 				app := mockedApp.NewRosenTss(t)
 				ECDSAOperation := ecdsaSign.NewSignECDSAOperation(models.SignMessage{
 					Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-					Crypto:      "eddsa",
+					Crypto:      "ecdsa",
 					CallBackUrl: "http://localhost:5050/callback/sign",
 				})
 				app.On("GetOperations").Return([]_interface.Operation{ECDSAOperation})
@@ -647,7 +647,7 @@ func TestController_Regroup(t *testing.T) {
 				app := mockedApp.NewRosenTss(t)
 				ECDSAOperation := ecdsaSign.NewSignECDSAOperation(models.SignMessage{
 					Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-					Crypto:      "eddsa",
+					Crypto:      "ecdsa",
 					CallBackUrl: "http://localhost:5050/callback/sign",
 				})
 				app.On("GetOperations").Return([]_interface.Operation{ECDSAOperation})

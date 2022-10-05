@@ -124,7 +124,7 @@ type SetupSign struct {
 	Peers     tss.SortedPartyIDs `json:"peers"`
 	PeersMap  map[string]string  `json:"peersMap"`
 	Timestamp int64              `json:"timestamp"`
-	StarterId string             `json:"StarterId"`
+	StarterId *tss.PartyID       `json:"StarterId"`
 }
 
 type StartSign struct {

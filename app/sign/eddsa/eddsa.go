@@ -28,12 +28,13 @@ type operationEDDSASign struct {
 var logging *zap.SugaredLogger
 
 func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation {
-	logging = logger.NewSugar("eddsa-sign")
+	logging = logger.NewSugar(signMessage.Crypto + "-sign")
 	return &operationEDDSASign{
 		operationSign: sign.OperationSign{
 			SignMessage: signMessage,
 			PeersMap:    make(map[string]string),
 			Signatures:  make(map[string]string),
+			Logger:      logging,
 		},
 	}
 }
@@ -56,29 +57,8 @@ func (s *operationEDDSASign) Init(rosenTss _interface.RosenTss, receiverId strin
 		s.savedData = data
 		s.operationSign.LocalTssData.PartyID = pID
 	}
-	var noAnswer bool
-	if receiverId == "" {
-		noAnswer = false
-	} else {
-		noAnswer = true
-	}
-	message := models.Register{
-		Id:        s.operationSign.LocalTssData.PartyID.Id,
-		Moniker:   s.operationSign.LocalTssData.PartyID.Moniker,
-		Key:       s.operationSign.LocalTssData.PartyID.KeyInt().String(),
-		Timestamp: time.Now().Unix() / 60,
-		NoAnswer:  noAnswer,
-	}
-	marshal, err := json.Marshal(message)
-	if err != nil {
-		return err
-	}
 
-	msgBytes, _ := hex.DecodeString(s.operationSign.SignMessage.Message)
-	signData := new(big.Int).SetBytes(msgBytes)
-	signDataBytes := blake2b.Sum256(signData.Bytes())
-	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(signDataBytes[:]))
-	err = s.newMessage(rosenTss, receiverId, s.operationSign.LocalTssData.PartyID.Id, string(marshal), messageId, "register")
+	err := s.operationSign.NewRegister(rosenTss, receiverId, s.signMessage)
 	if err != nil {
 		return err
 	}
@@ -92,6 +72,62 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 	signData := new(big.Int).SetBytes(msgBytes)
 
 	errorCh := make(chan error)
+
+	go func() {
+		index := int64(utils.IndexOf(s.savedData.Ks, s.savedData.ShareID))
+		length := int64(len(s.savedData.Ks))
+
+		for {
+			minutes := time.Now().Unix() / 60
+			if minutes%length == index && (time.Now().Unix()-(minutes*60)) < 50 {
+				if !utils.IsPartyExist(s.operationSign.LocalTssData.PartyID, s.operationSign.LocalTssData.PartyIds) {
+					err := s.operationSign.Setup(rosenTss, s.signMessage)
+					if err != nil {
+						logging.Errorf("setup function returns error: %+v", err)
+						errorCh <- err
+					}
+				}
+				return
+			} else {
+				time.Sleep(time.Second * time.Duration((length-minutes%length)*60-(time.Now().Unix()-(minutes*60))))
+			}
+		}
+	}()
+
+	go func() {
+		ticker := time.NewTicker(500 * time.Millisecond)
+		done := make(chan bool)
+
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if s.operationSign.SetupSignMessage.Hash != "" {
+					state := true
+					for _, peer := range s.operationSign.SetupSignMessage.Peers {
+						if !utils.IsPartyExist(peer, s.operationSign.LocalTssData.PartyIds) {
+							state = false
+						}
+					}
+					if state {
+						starterP2pId, ok := s.operationSign.PeersMap[s.operationSign.SetupSignMessage.StarterId.Id]
+						if !ok {
+							err := fmt.Errorf("peers with this id: %s, not founded", s.operationSign.SetupSignMessage.StarterId)
+							errorCh <- err
+						}
+						err := s.operationSign.SignStarter(rosenTss, starterP2pId, s.signMessage)
+						if err != nil {
+							errorCh <- err
+							return
+						}
+						ticker.Stop()
+						done <- true
+					}
+				}
+			}
+		}
+	}()
 
 	for {
 		select {
@@ -113,14 +149,14 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 			switch msg.Name {
 			case "register":
 				if msg.Message != "" {
-					err := s.registerMessageHandler(rosenTss, msg)
+					err := s.operationSign.RegisterMessageHandler(rosenTss, msg, s.savedData.Ks, s.savedData.ShareID, s.signMessage)
 					if err != nil {
 						return err
 					}
 				}
 			case "setup":
 				if msg.Message != "" {
-					err := s.setupMessageHandler(rosenTss, msg)
+					err := s.operationSign.SetupMessageHandler(rosenTss, msg, s.savedData.Ks, s.signMessage)
 					if err != nil {
 						return err
 					}
@@ -144,7 +180,7 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 				if s.operationSign.LocalTssData.Params == nil {
 					return fmt.Errorf("this peer is no longer needed. the signing process has been started with the required peers")
 				}
-				err = s.partyUpdate(partyMsg)
+				err = s.operationSign.PartyUpdate(partyMsg)
 				if err != nil {
 					return err
 				}
@@ -169,7 +205,7 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 					}
 					logging.Info("party started")
 					go func() {
-						result, err := s.gossipMessageHandler(rosenTss, outCh, endCh)
+						result, err := s.operationSign.GossipMessageHandler(rosenTss, outCh, endCh, s.signMessage)
 						if err != nil {
 							logging.Error(err)
 							errorCh <- err
@@ -188,176 +224,7 @@ func (s *operationEDDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan m
 
 // GetClassName returns the class name
 func (s *operationEDDSASign) GetClassName() string {
-	return "eddsaSign"
-}
-
-// HandleOutMessage handling party messages on out channel
-func (s *operationEDDSASign) handleOutMessage(rosenTss _interface.RosenTss, partyMsg tss.Message) error {
-	msgBytes, _ := hex.DecodeString(s.operationSign.SignMessage.Message)
-	signData := new(big.Int).SetBytes(msgBytes)
-	msgHex, err := s.operationSign.OperationHandler.PartyMessageHandler(partyMsg)
-	if err != nil {
-		return err
-	}
-	messageBytes := blake2b.Sum256(signData.Bytes())
-	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(messageBytes[:]))
-	err = s.newMessage(rosenTss, "", s.operationSign.LocalTssData.PartyID.Id, msgHex, messageId, "partyMsg")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// HandleEndMessage handling save data on end cahnnel of party
-func (s *operationEDDSASign) handleEndMessage(rosenTss _interface.RosenTss, saveData *common.SignatureData) error {
-
-	signData := models.SignData{
-		Signature: hex.EncodeToString(saveData.Signature),
-		R:         hex.EncodeToString(saveData.R),
-		S:         hex.EncodeToString(saveData.S),
-		M:         hex.EncodeToString(saveData.M),
-	}
-
-	logging.Infof("signData result: R: {%s}, S: {%s}, M:{%s}\n", signData.R, signData.S, signData.M)
-	logging.Infof("signature: %v", signData.Signature)
-	logging.Info("EDDSA signing done.")
-
-	err := rosenTss.GetConnection().CallBack(s.operationSign.SignMessage.CallBackUrl, signData, "ok")
-	if err != nil {
-		return err
-	}
-
-	return nil
-
-}
-
-// GossipMessageHandler handling all party messages on outCH and endCh
-func (s *operationEDDSASign) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData) (bool, error) {
-	for {
-		select {
-		case partyMsg := <-outCh:
-			err := s.handleOutMessage(rosenTss, partyMsg)
-			if err != nil {
-				return false, err
-			}
-		case save := <-endCh:
-			err := s.handleEndMessage(rosenTss, &save)
-			if err != nil {
-				return false, err
-			}
-			return true, nil
-		}
-	}
-}
-
-// registerMessageHandler handles register message, and it calls setup functions if patryIds list length was at least equal to the threshold
-func (s *operationEDDSASign) registerMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
-
-	if gossipMessage.SenderId != s.operationSign.LocalTssData.PartyID.Id {
-		if gossipMessage.ReceiverId != "" {
-			s.operationSign.PeersMap[s.operationSign.LocalTssData.PartyID.Id] = gossipMessage.ReceiverId
-		}
-		s.operationSign.PeersMap[gossipMessage.SenderId] = gossipMessage.SenderP2PId
-		logging.Info("received register message ",
-			fmt.Sprintf("from: %s", gossipMessage.SenderId))
-
-		registerMessage := &models.Register{}
-		err := json.Unmarshal([]byte(gossipMessage.Message), registerMessage)
-		if err != nil {
-			return err
-		}
-
-		logging.Infof("registerMessage: %+v", registerMessage)
-		key, _ := new(big.Int).SetString(registerMessage.Key, 10)
-		newParty := tss.NewPartyID(registerMessage.Id, registerMessage.Moniker, key)
-
-		meta := rosenTss.GetMetaData()
-
-		if !registerMessage.NoAnswer {
-			err := s.Init(rosenTss, gossipMessage.SenderP2PId)
-			if err != nil {
-				return err
-			}
-		}
-
-		if !utils.IsPartyExist(newParty, s.operationSign.LocalTssData.PartyIds) {
-			s.operationSign.LocalTssData.PartyIds = tss.SortPartyIDs(
-				append(s.operationSign.LocalTssData.PartyIds.ToUnSorted(), newParty))
-			if len(s.operationSign.LocalTssData.PartyIds) >= meta.Threshold {
-				index := utils.SliceIndex(len(s.savedData.Ks), func(i int) bool { return s.savedData.Ks[i] == s.savedData.ShareID })
-				minutes := time.Now().Unix() / 60
-				if (minutes%int64(len(s.savedData.Ks)) == int64(index)) && (time.Now().Unix()-(minutes*60)) < 50 {
-					err = s.setup(rosenTss)
-					if err != nil {
-						return err
-					}
-				}
-			}
-		}
-	}
-	return nil
-}
-
-// PartyUpdate updates partyIds in eddsa app party based on received message
-func (s *operationEDDSASign) partyUpdate(partyMsg models.PartyMessage) error {
-	dest := partyMsg.To
-	if dest == nil { // broadcast!
-
-		if s.operationSign.LocalTssData.Party.PartyID().Index == partyMsg.GetFrom.Index {
-			return nil
-		}
-		logging.Infof("updating party state")
-		err := s.operationSign.OperationHandler.SharedPartyUpdater(s.operationSign.LocalTssData.Party, partyMsg)
-		if err != nil {
-			return err
-		}
-
-	} else { // point-to-point!
-		if dest[0].Index == partyMsg.GetFrom.Index {
-			err := fmt.Errorf("party %d tried to send a message to itself (%d)", dest[0].Index, partyMsg.GetFrom.Index)
-			return err
-		}
-		logging.Infof("updating party state p2p")
-		err := s.operationSign.OperationHandler.SharedPartyUpdater(s.operationSign.LocalTssData.Party, partyMsg)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-	return nil
-}
-
-// Setup called after if Init up was successful. it used to create party params and sign message
-func (s *operationEDDSASign) setup(rosenTss _interface.RosenTss) error {
-	msgBytes, _ := hex.DecodeString(s.operationSign.SignMessage.Message)
-	signData := new(big.Int).SetBytes(msgBytes)
-
-	meta := rosenTss.GetMetaData()
-	logging.Infof("meta %+v", meta)
-
-	s.operationSign.LocalTssData.PartyIds = tss.SortPartyIDs(
-		append(s.operationSign.LocalTssData.PartyIds.ToUnSorted(), s.operationSign.LocalTssData.PartyID))
-
-	logging.Infof("partyIds {%+v}, local partyId index {%d}", s.operationSign.LocalTssData.PartyIds, s.operationSign.LocalTssData.PartyID.Index)
-
-	messageBytes := blake2b.Sum256(signData.Bytes())
-	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(messageBytes[:]))
-
-	setupMessage := models.SetupSign{
-		Hash:      hex.EncodeToString(messageBytes[:]),
-		Peers:     s.operationSign.LocalTssData.PartyIds,
-		Timestamp: time.Now().Unix() / 60,
-		StarterId: s.operationSign.LocalTssData.PartyID.KeyInt().String(),
-	}
-	marshal, err := json.Marshal(setupMessage)
-	if err != nil {
-		return err
-	}
-	err = s.newMessage(rosenTss, "", s.operationSign.LocalTssData.PartyID.Id, string(marshal), messageId, "setup")
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.operationSign.SignMessage.Crypto + "Sign"
 }
 
 func (s *operationEDDSASign) signMessage(message []byte) ([]byte, error) {
@@ -402,86 +269,6 @@ func (s *operationEDDSASign) verify(msg models.GossipMessage) error {
 	result := edwards.Verify(pk, checksum[:], signature.R, signature.S)
 	if !result {
 		return fmt.Errorf("can not verify the message")
-	}
-	return nil
-}
-
-func (s *operationEDDSASign) newMessage(rosenTss _interface.RosenTss, receiverId string, senderId string, message string, messageId string, name string) error {
-	payload := models.Payload{
-		Message:    message,
-		MessageId:  messageId,
-		SenderId:   senderId,
-		ReceiverId: receiverId,
-		Name:       name,
-	}
-	marshal, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	signature, err := s.signMessage(marshal)
-	if err != nil {
-		return err
-	}
-	gossipMessage := rosenTss.NewMessage(receiverId, senderId, message, messageId, name)
-	gossipMessage.Signature = signature
-
-	err = rosenTss.GetConnection().Publish(gossipMessage)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// setupMessageHandler handles setup message
-func (s *operationEDDSASign) setupMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
-
-	if gossipMessage.SenderId != s.operationSign.LocalTssData.PartyID.Id {
-
-		setupSignMessage := &models.SetupSign{}
-		err := json.Unmarshal([]byte(gossipMessage.Message), setupSignMessage)
-		if err != nil {
-			return err
-		}
-
-		logging.Infof("setupSignMessage: %+v", setupSignMessage)
-		index := utils.SliceIndex(len(s.savedData.Ks), func(i int) bool { return s.savedData.Ks[i].String() == setupSignMessage.StarterId })
-		minutes := time.Now().Unix() / 60
-		if minutes%int64(len(s.savedData.Ks)) != int64(index) {
-			logging.Errorf("it's not %s turn.", s.operationSign.LocalTssData.PartyIds[index])
-			return nil
-		}
-		for _, peer := range setupSignMessage.Peers {
-			if !utils.IsPartyExist(peer, s.operationSign.LocalTssData.PartyIds) {
-				receiverId := setupSignMessage.PeersMap[peer.Id]
-				err := s.Init(rosenTss, receiverId)
-				if err != nil {
-					return err
-				}
-			}
-		}
-
-		msgBytes, _ := hex.DecodeString(s.operationSign.SignMessage.Message)
-		signData := new(big.Int).SetBytes(msgBytes)
-		signDataBytes := blake2b.Sum256(signData.Bytes())
-
-		if setupSignMessage.Hash != hex.EncodeToString(signDataBytes[:]) {
-			return fmt.Errorf("wrogn hash to sign\nreceivedHash: %s\nexpectedHash: %s", setupSignMessage.Hash, hex.EncodeToString(signDataBytes[:]))
-		}
-
-		decodeString, err := hex.DecodeString(setupSignMessage.Hash)
-		if err != nil {
-			return err
-		}
-		signedMessage, err := s.signMessage(decodeString)
-		if err != nil {
-			return err
-		}
-
-		messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(signDataBytes[:]))
-		err = s.newMessage(rosenTss, gossipMessage.SenderP2PId, s.operationSign.LocalTssData.PartyID.Id, string(signedMessage), messageId, "sign")
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }

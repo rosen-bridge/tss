@@ -66,7 +66,6 @@ func NewRosenTss(connection network.Connection, storage storage.Storage, config 
 
 // StartNewSign starts sign scenario for app based on given protocol.
 func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
-
 	log.Printf("Starting New Sign process")
 	err := r.SetMetaData(signMessage.Crypto)
 	if err != nil {
@@ -90,6 +89,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	}
 
 	var operation _interface.Operation
+	println(signMessage.Crypto)
 	switch signMessage.Crypto {
 	case "ecdsa":
 		operation = ecdsaSign.NewSignECDSAOperation(signMessage)

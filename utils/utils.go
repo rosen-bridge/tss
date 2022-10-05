@@ -107,10 +107,10 @@ func InitConfig(configFile string) (models.Config, error) {
 	return conf, nil
 }
 
-// SliceIndex finds index of element in the slice
-func SliceIndex(limit int, predicate func(i int) bool) int {
-	for i := 0; i < limit; i++ {
-		if predicate(i) {
+// IndexOf finds index of element in a slice of bigInt
+func IndexOf(collection []*big.Int, el *big.Int) int {
+	for i, x := range collection {
+		if x.Cmp(el) == 0 {
 			return i
 		}
 	}

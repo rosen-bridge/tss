@@ -14,6 +14,7 @@ import (
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/rs/xid"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/blake2b"
 	"io/ioutil"
 	"math/big"
 	"path/filepath"
@@ -294,4 +295,40 @@ func GetEddsaPK() (string, error) {
 	public := GetPKFromEDDSAPub(pk.X, pk.Y)
 	hexPk := hex.EncodeToString(public)
 	return hexPk, nil
+}
+
+func EDDSASigner(savedData eddsaKeygen.LocalPartySaveData) func(message []byte) ([]byte, error) {
+	return func(message []byte) ([]byte, error) {
+		private, _, _ := edwards.PrivKeyFromScalar(savedData.Xi.Bytes())
+		checksum := blake2b.Sum256(message)
+		signature, err := private.Sign(checksum[:])
+		if err != nil {
+			return nil, err
+		}
+		return signature.Serialize(), nil
+	}
+}
+
+func ECDSASigner(savedData ecdsaKeygen.LocalPartySaveData) func(message []byte) ([]byte, error) {
+	return func(message []byte) ([]byte, error) {
+		private := new(ecdsa.PrivateKey)
+		private.PublicKey.Curve = tss.S256()
+		private.D = savedData.Xi
+
+		var index int
+		for i, k := range savedData.Ks {
+			if savedData.ShareID == k {
+				index = i
+			}
+		}
+
+		private.PublicKey.X, private.PublicKey.Y = savedData.BigXj[index].X(), savedData.BigXj[index].Y()
+
+		checksum := blake2b.Sum256(message)
+		signature, err := private.Sign(rand.Reader, checksum[:], nil)
+		if err != nil {
+			panic(err)
+		}
+		return signature, nil
+	}
 }
