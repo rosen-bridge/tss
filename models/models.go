@@ -32,13 +32,13 @@ type Message struct {
 }
 
 type GossipMessage struct {
-	MessageId   string `json:"messageId"`
-	Name        string `json:"name"`
-	Message     string `json:"message"`
-	SenderP2PId string `json:"senderP2PId"`
-	SenderId    string `json:"senderId"`
-	ReceiverId  string `json:"receiverId"`
-	Signature   []byte `json:"signature"`
+	MessageId  string `json:"messageId"`
+	Name       string `json:"name"`
+	Message    string `json:"message"`
+	SenderId   string `json:"senderId"`
+	ReceiverId string `json:"receiverId"`
+	Signature  []byte `json:"signature"`
+	Index      int    `json:"index"`
 }
 
 type MetaData struct {
@@ -93,13 +93,17 @@ type KeygenMessage struct {
 }
 
 type Config struct {
-	HomeAddress      string `mapstructure:"HOME_ADDRESS"`
-	LogLevel         string `mapstructure:"LOG_LEVEL"`
-	LogMaxSize       int    `mapstructure:"LOG_MAX_SIZE"`
-	LogMaxBackups    int    `mapstructure:"LOG_MAX_BACKUPS"`
-	LogMaxAge        int    `mapstructure:"LOG_MAX_AGE"`
-	OperationTimeout int    `mapstructure:"OPERATION_TIMEOUT"`
-	MessageTimeout   int    `mapstructure:"MESSAGE_TIMEOUT"`
+	HomeAddress               string `mapstructure:"HOME_ADDRESS"`
+	LogLevel                  string `mapstructure:"LOG_LEVEL"`
+	LogMaxSize                int    `mapstructure:"LOG_MAX_SIZE"`
+	LogMaxBackups             int    `mapstructure:"LOG_MAX_BACKUPS"`
+	LogMaxAge                 int    `mapstructure:"LOG_MAX_AGE"`
+	OperationTimeout          int    `mapstructure:"OPERATION_TIMEOUT"`
+	MessageTimeout            int    `mapstructure:"MESSAGE_TIMEOUT"`
+	LeastProcessRemainingTime int64  `mapstructure:"LEAST_PROCESS_REMAINING_TIME"`
+	TurnFactor                int64  `mapstructure:"TURN_FACTOR"`
+	SetupBroadcastInterval    int64  `mapstructure:"SETUP_BROADCAST_INTERVAL"`
+	SignStartTimeTracker      int64  `mapstructure:"SIGN_START_TIME_TRACKER"`
 }
 
 type Register struct {
@@ -111,12 +115,10 @@ type Register struct {
 }
 
 type Payload struct {
-	MessageId   string `json:"messageId"`
-	Name        string `json:"name"`
-	Message     string `json:"message"`
-	SenderP2PId string `json:"senderP2PId"`
-	SenderId    string `json:"senderId"`
-	ReceiverId  string `json:"receiverId"`
+	MessageId string `json:"messageId"`
+	Name      string `json:"name"`
+	Message   string `json:"message"`
+	SenderId  string `json:"senderId"`
 }
 
 type SetupSign struct {

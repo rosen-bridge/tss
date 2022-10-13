@@ -3,12 +3,15 @@ package ecdsa
 import (
 	"encoding/hex"
 	"encoding/json"
+	"math/big"
+	"testing"
+	"time"
+
 	"github.com/binance-chain/tss-lib/common"
 	ecdsaSign "github.com/binance-chain/tss-lib/ecdsa/signing"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/crypto/blake2b"
-	"math/big"
 	_interface "rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/sign"
 	mockUtils "rosen-bridge/tss/mocks"
@@ -17,8 +20,6 @@ import (
 	mockedStorage "rosen-bridge/tss/mocks/storage"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/utils"
-	"testing"
-	"time"
 )
 
 /*	TestECDSA_Init
@@ -94,15 +95,18 @@ func TestECDSA_Init(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.appConfig()
-			ecdsaSignOp := operationECDSASign{
+			signerStorage := signer{
 				savedData: saveData,
-				operationSign: sign.OperationSign{
+			}
+			ecdsaSignOp := operationECDSASign{
+				OperationSign: sign.OperationSign{
 					LocalTssData: tt.localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
 						Crypto:      "ecdsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
+					Signer: signerStorage,
 				},
 			}
 			err := ecdsaSignOp.Init(app, tt.receiverId)
@@ -150,7 +154,7 @@ func TestECDSA_Loop(t *testing.T) {
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), localTssData.PartyID))
-	signDataBytes, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
+	signDataBytes, _ := utils.Decoder("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
 	signData := new(big.Int).SetBytes(signDataBytes)
 
 	// creating new tss party for ecdsa sign
@@ -305,32 +309,37 @@ func TestECDSA_Loop(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			app := tt.AppConfig()
+			signerStorage := signer{
+				savedData: saveData,
+			}
+			signerStorage2 := signer{
+				savedData: saveData,
+			}
 			ecdsaSignOpSender := operationECDSASign{
-				savedData: saveData2,
+				OperationSign: sign.OperationSign{
+					Signer: signerStorage2,
+				},
 			}
 			ecdsaSignOp := operationECDSASign{
-				savedData: saveData,
-				operationSign: sign.OperationSign{
+				OperationSign: sign.OperationSign{
 					LocalTssData: localTssData,
 					SignMessage: models.SignMessage{
 						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
 						Crypto:      "ecdsa",
 						CallBackUrl: "http://localhost:5050/callback/sign",
 					},
-					PeersMap:   make(map[string]string),
 					Signatures: make(map[string]string),
 					Logger:     logging,
+					Signer:     signerStorage,
 				},
 			}
-			ecdsaSignOp.operationSign.PeersMap[newPartyId.Id] = "12D3KooWKT8NYknfaLUG3xtjNdtoTqVDxr1QrunghxSWWM8zdLrH"
 			messageCh := make(chan models.GossipMessage, 100)
 
 			payload := models.Payload{
-				Message:    tt.message.Message,
-				MessageId:  tt.message.MessageId,
-				SenderId:   tt.message.SenderId,
-				ReceiverId: tt.message.ReceiverId,
-				Name:       tt.message.Name,
+				Message:   tt.message.Message,
+				MessageId: tt.message.MessageId,
+				SenderId:  tt.message.SenderId,
+				Name:      tt.message.Name,
 			}
 			marshal, _ := json.Marshal(payload)
 			signature, _ := ecdsaSignOpSender.signMessage(marshal)
@@ -397,7 +406,7 @@ func TestECDSA_GetClassName(t *testing.T) {
 func TestECDSA_signMessage(t *testing.T) {
 	// creating fake sign data
 
-	m, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
+	m, _ := utils.Decoder("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
 
 	saveData, _, err := mockUtils.LoadECDSAKeygenFixture(0)
 	if err != nil {

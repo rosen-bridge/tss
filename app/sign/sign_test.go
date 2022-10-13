@@ -15,6 +15,7 @@ import (
 	_interface "rosen-bridge/tss/app/interface"
 	mockUtils "rosen-bridge/tss/mocks"
 	mockedInterface "rosen-bridge/tss/mocks/app/interface"
+	mocks "rosen-bridge/tss/mocks/app/sign"
 	mockedNetwork "rosen-bridge/tss/mocks/network"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/utils"
@@ -146,6 +147,17 @@ func TestEDDSASign_RegisterMessageHandler(t *testing.T) {
 				Signatures:   make(map[string]string),
 				Logger:       logger,
 			}
+			signerFunction := mockUtils.EDDSASigner(saveData)
+			signer := mocks.NewSigner(t)
+			signer.On("Sign", mock.AnythingOfType("[]byte")).Run(func(args mock.Arguments) ([]byte, err) {
+				message := args.Get(0).([]byte)
+				signed, err := signerFunction(message)
+				if err != nil {
+					return nil, err
+				}
+				return signed, nil
+			})
+
 			// partyMessageHandler
 			err := eddsaSignOp.RegisterMessageHandler(app, tt.gossipMessage, saveData.Ks, saveData.ShareID, mockUtils.EDDSASigner(saveData))
 			if err != nil {

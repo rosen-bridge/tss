@@ -3,17 +3,19 @@ package utils
 import (
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
-	"github.com/spf13/viper"
+	"math/big"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/viper"
 	"rosen-bridge/tss/models"
 
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/blake2b"
-	"math/big"
 )
 
 // GenerateECDSAKey generates a new ECDSA key pair
@@ -115,4 +117,12 @@ func IndexOf(collection []*big.Int, el *big.Int) int {
 		}
 	}
 	return -1
+}
+
+func Decoder(message string) ([]byte, error) {
+	return hex.DecodeString(message)
+}
+
+func Encoder(message []byte) string {
+	return hex.EncodeToString(message)
 }

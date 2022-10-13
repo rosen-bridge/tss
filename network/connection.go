@@ -14,6 +14,7 @@ type Connection interface {
 	Publish(message models.GossipMessage) error
 	Subscribe(port string) error
 	CallBack(string, interface{}, string) error
+	GetPeerId() (string, error)
 }
 
 type HTTPClient interface {
@@ -153,4 +154,36 @@ func (c *connect) CallBack(url string, data interface{}, status string) error {
 		return fmt.Errorf("not ok response: {%v}", resp.Body)
 	}
 	return nil
+}
+
+// GetPeerId to get p2pId
+func (c *connect) GetPeerId() (string, error) {
+	logging.Infof("Getting PeerId")
+
+	req, err := http.NewRequest(http.MethodGet, c.subscriptionUrl, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("content-type", "application/json")
+
+	resp, err := c.Client.Do(req)
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("not ok response: {%v}", resp.Body)
+	}
+
+	type response struct {
+		Status string `json:"status"`
+		PeerId string `json:"peerId"`
+	}
+	var res = response{}
+	err = json.NewDecoder(resp.Body).Decode(&res)
+	if err != nil {
+		return "", err
+	}
+	if res.Status != "ok" {
+		return "", fmt.Errorf("not ok response: {%s}", res.Status)
+	}
+
+	return res.PeerId, nil
 }

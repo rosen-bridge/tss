@@ -3,12 +3,15 @@ package eddsa
 import (
 	"encoding/hex"
 	"encoding/json"
+	"math/big"
+	"testing"
+	"time"
+
 	"github.com/binance-chain/tss-lib/common"
 	eddsaSign "github.com/binance-chain/tss-lib/eddsa/signing"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/stretchr/testify/mock"
 	"golang.org/x/crypto/blake2b"
-	"math/big"
 	_interface "rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/sign"
 	mockUtils "rosen-bridge/tss/mocks"
@@ -16,8 +19,7 @@ import (
 	mockedNetwork "rosen-bridge/tss/mocks/network"
 	mockedStorage "rosen-bridge/tss/mocks/storage"
 	"rosen-bridge/tss/models"
-	"testing"
-	"time"
+	"rosen-bridge/tss/utils"
 )
 
 /*	TestEDDSA_Init
@@ -158,7 +160,7 @@ func TestEDDSA_Loop(t *testing.T) {
 		append(localTssData.PartyIds.ToUnSorted(), Id3))
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), localTssData.PartyID))
-	signDataBytes, _ := hex.DecodeString("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
+	signDataBytes, _ := utils.Decoder("951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70")
 	signData := new(big.Int).SetBytes(signDataBytes)
 
 	// creating new tss party for eddsa sign
@@ -331,7 +333,7 @@ func TestEDDSA_Loop(t *testing.T) {
 				Name:       tt.message.Name,
 			}
 			marshal, _ := json.Marshal(payload)
-			signature, _ := eddsaSignOpSender.signMessage(marshal)
+			signature, _ := eddsaSignOpSender.Sign(marshal)
 			tt.message.Signature = signature
 
 			messageCh <- tt.message
@@ -416,7 +418,7 @@ func TestEDDSA_signMessage(t *testing.T) {
 				savedData: saveData,
 			}
 
-			_, err := eddsaSignOp.signMessage(tt.message)
+			_, err := eddsaSignOp.Sign(tt.message)
 			if err != nil {
 				t.Errorf("signMessage error = %v", err)
 			}
@@ -491,7 +493,7 @@ func TestEDDSA_verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			signature, err := eddsaSignOpSigner.signMessage(tt.message)
+			signature, err := eddsaSignOpSigner.Sign(tt.message)
 
 			gossipMessage := models.GossipMessage{
 				Message:    payload.Message,
@@ -501,7 +503,7 @@ func TestEDDSA_verify(t *testing.T) {
 				Name:       payload.Name,
 				Signature:  signature,
 			}
-			err = eddsaSignOp.verify(gossipMessage)
+			err = eddsaSignOp.Verify(gossipMessage)
 			if err != nil {
 				t.Errorf("verify error = %v", err)
 			}

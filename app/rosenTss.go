@@ -2,19 +2,21 @@ package app
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/labstack/gommon/log"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/blake2b"
-	"io/ioutil"
-	"math/big"
-	"os"
-	"path/filepath"
 	"rosen-bridge/tss/app/interface"
 	ecdsaKeygen "rosen-bridge/tss/app/keygen/ecdsa"
 	eddsaKeygen "rosen-bridge/tss/app/keygen/eddsa"
@@ -27,8 +29,6 @@ import (
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
 	"rosen-bridge/tss/utils"
-	"strings"
-	"time"
 )
 
 const (
@@ -36,15 +36,15 @@ const (
 )
 
 type rosenTss struct {
-	ChannelMap        map[string]chan models.GossipMessage
-	metaData          models.MetaData
-	storage           storage.Storage
-	connection        network.Connection
-	Private           models.Private
-	peerHome          string
-	operations        []_interface.Operation
-	operationsTimeout int
-	messageTimeout    int
+	ChannelMap map[string]chan models.GossipMessage
+	metaData   models.MetaData
+	storage    storage.Storage
+	connection network.Connection
+	Private    models.Private
+	Config     models.Config
+	peerHome   string
+	operations []_interface.Operation
+	P2pId      string
 }
 
 var logging *zap.SugaredLogger
@@ -53,14 +53,12 @@ var logging *zap.SugaredLogger
 func NewRosenTss(connection network.Connection, storage storage.Storage, config models.Config) _interface.RosenTss {
 	logging = logger.NewSugar("tss")
 	return &rosenTss{
-		ChannelMap:        make(map[string]chan models.GossipMessage),
-		metaData:          models.MetaData{},
-		storage:           storage,
-		connection:        connection,
-		Private:           models.Private{},
-		peerHome:          config.HomeAddress,
-		operationsTimeout: config.OperationTimeout,
-		messageTimeout:    config.MessageTimeout,
+		ChannelMap: make(map[string]chan models.GossipMessage),
+		metaData:   models.MetaData{},
+		storage:    storage,
+		connection: connection,
+		Private:    models.Private{},
+		Config:     config,
 	}
 }
 
@@ -72,10 +70,10 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 		return err
 	}
 
-	msgBytes, _ := hex.DecodeString(signMessage.Message)
+	msgBytes, _ := utils.Decoder(signMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
-	signDataHash := hex.EncodeToString(signDataBytes[:])
+	signDataHash := utils.Encoder(signDataBytes[:])
 	log.Printf("signDtaHash: %v", signDataHash)
 
 	messageId := fmt.Sprintf("%s%s", signMessage.Crypto, signDataHash)
@@ -102,7 +100,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	operationState := true
 
 	go func() {
-		timeout := time.After(time.Second * time.Duration(r.operationsTimeout))
+		timeout := time.After(time.Second * time.Duration(r.Config.OperationTimeout))
 		for {
 			select {
 			case <-timeout:
@@ -264,10 +262,10 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 	if err != nil {
 		return err
 	}
-	gossipMsg.SenderP2PId = message.Sender
+
 	logging.Infof("new message: %+v", gossipMsg.Name)
 
-	timeout := time.After(time.Second * time.Duration(r.messageTimeout))
+	timeout := time.After(time.Second * time.Duration(r.Config.MessageTimeout))
 	var state bool
 
 timoutLoop:
@@ -366,7 +364,8 @@ func (r *rosenTss) GetMetaData() models.MetaData {
 }
 
 // NewMessage creates gossip messages before publish
-func (r *rosenTss) NewMessage(receiverId string, senderId string, message string, messageId string, name string) models.GossipMessage {
+func (r *rosenTss) NewMessage(receiverId string, senderId string, message string, messageId string,
+	name string) models.GossipMessage {
 
 	m := models.GossipMessage{
 		Message:    message,
@@ -425,7 +424,7 @@ func (r *rosenTss) GetPublicKey(crypto string) (string, error) {
 		}
 
 		public := utils.GetPKFromECDSAPub(pk.X, pk.Y)
-		hexPk := hex.EncodeToString(public)
+		hexPk := utils.Encoder(public)
 		return hexPk, nil
 	case "eddsa":
 		saveData, _, err := r.GetStorage().LoadEDDSAKeygen(r.peerHome)
@@ -440,9 +439,29 @@ func (r *rosenTss) GetPublicKey(crypto string) (string, error) {
 		}
 
 		public := utils.GetPKFromEDDSAPub(pk.X, pk.Y)
-		hexPk := hex.EncodeToString(public)
+		hexPk := utils.Encoder(public)
 		return hexPk, nil
 	default:
 		return "", fmt.Errorf(models.WrongCryptoProtocolError)
 	}
+}
+
+// SetP2pId set p2p to the variable
+func (r *rosenTss) SetP2pId() error {
+	p2pId, err := r.GetConnection().GetPeerId()
+	if err != nil {
+		return err
+	}
+	r.P2pId = p2pId
+	return nil
+}
+
+// GetP2pId get p2pId
+func (r *rosenTss) GetP2pId() string {
+	return r.P2pId
+}
+
+// GetConfig get Config
+func (r *rosenTss) GetConfig() models.Config {
+	return r.Config
 }

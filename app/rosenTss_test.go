@@ -4,20 +4,21 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"golang.org/x/crypto/blake2b"
 	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"golang.org/x/crypto/blake2b"
 	eddsaKeygenLocal "rosen-bridge/tss/app/keygen/eddsa"
 	mockUtils "rosen-bridge/tss/mocks"
 	mockedNetwork "rosen-bridge/tss/mocks/network"
 	mockedStorage "rosen-bridge/tss/mocks/storage"
 	"rosen-bridge/tss/models"
 	"rosen-bridge/tss/utils"
-	"testing"
 )
 
 /*	TestRosenTss_SetMetadata
@@ -411,7 +412,7 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 		Crypto:      "ecdsa",
 		CallBackUrl: "http://localhost:5050/callback/sign",
 	}
-	msgBytes, _ := hex.DecodeString(message.Message)
+	msgBytes, _ := utils.Decoder(message.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := fmt.Sprintf("%s%s", "ecdsa", hex.EncodeToString(signDataBytes[:]))
@@ -441,10 +442,12 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 						Threshold:  2,
 						PeersCount: 3,
 					},
-					storage:           storage,
-					connection:        conn,
-					peerHome:          peerHome,
-					operationsTimeout: 60,
+					storage:    storage,
+					connection: conn,
+					peerHome:   peerHome,
+					Config: models.Config{
+						OperationTimeout: 60,
+					},
 				}
 			},
 			message: message,
@@ -460,10 +463,12 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 						Threshold:  2,
 						PeersCount: 3,
 					},
-					storage:           storage,
-					connection:        conn,
-					peerHome:          peerHome,
-					operationsTimeout: 0,
+					storage:    storage,
+					connection: conn,
+					peerHome:   peerHome,
+					Config: models.Config{
+						OperationTimeout: 60,
+					},
 				}
 			},
 			message: message,
@@ -480,10 +485,12 @@ func TestRosenTss_StartNewSign_ECDSA(t *testing.T) {
 						Threshold:  2,
 						PeersCount: 3,
 					},
-					storage:           storage,
-					connection:        conn,
-					peerHome:          peerHome,
-					operationsTimeout: 60,
+					storage:    storage,
+					connection: conn,
+					peerHome:   peerHome,
+					Config: models.Config{
+						OperationTimeout: 60,
+					},
 				}
 
 			},
@@ -543,7 +550,7 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 		Crypto:      "eddsa",
 		CallBackUrl: "http://localhost:5050/callback/sign",
 	}
-	msgBytes, _ := hex.DecodeString(message.Message)
+	msgBytes, _ := utils.Decoder(message.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := fmt.Sprintf("%s%s", "eddsa", hex.EncodeToString(signDataBytes[:]))
@@ -572,10 +579,12 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 						Threshold:  2,
 						PeersCount: 3,
 					},
-					storage:           storage,
-					connection:        conn,
-					peerHome:          peerHome,
-					operationsTimeout: 60,
+					storage:    storage,
+					connection: conn,
+					peerHome:   peerHome,
+					Config: models.Config{
+						OperationTimeout: 60,
+					},
 				}
 			},
 		},
@@ -590,10 +599,12 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 						Threshold:  2,
 						PeersCount: 3,
 					},
-					storage:           storage,
-					connection:        conn,
-					peerHome:          peerHome,
-					operationsTimeout: 0,
+					storage:    storage,
+					connection: conn,
+					peerHome:   peerHome,
+					Config: models.Config{
+						OperationTimeout: 0,
+					},
 				}
 			},
 		},
@@ -609,10 +620,12 @@ func TestRosenTss_StartNewSign_EDDSA(t *testing.T) {
 						Threshold:  2,
 						PeersCount: 3,
 					},
-					storage:           storage,
-					connection:        conn,
-					peerHome:          peerHome,
-					operationsTimeout: 60,
+					storage:    storage,
+					connection: conn,
+					peerHome:   peerHome,
+					Config: models.Config{
+						OperationTimeout: 60,
+					},
 				}
 			},
 		},
@@ -655,8 +668,10 @@ func TestRosenTss_StartNewKeygen_ECDSA(t *testing.T) {
 
 	storage := mockedStorage.NewStorage(t)
 	storage.On("WriteData",
-		mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
-	storage.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
+		mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"),
+		mock.AnythingOfType("string")).Return(nil)
+	storage.On("LoadPrivate", mock.AnythingOfType("string"),
+		mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
 
 	conn := mockedNetwork.NewConnection(t)
 	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
@@ -749,8 +764,10 @@ func TestRosenTss_StartNewKeygen_EDDSA(t *testing.T) {
 
 	storage := mockedStorage.NewStorage(t)
 	storage.On("WriteData",
-		mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
-	storage.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
+		mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"),
+		mock.AnythingOfType("string")).Return(nil)
+	storage.On("LoadPrivate", mock.AnythingOfType("string"),
+		mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
 
 	conn := mockedNetwork.NewConnection(t)
 	conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
@@ -898,7 +915,8 @@ func TestRosenTss_GetPrivate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store := mockedStorage.NewStorage(t)
-			store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(tt.private.Private, nil)
+			store.On("LoadPrivate", mock.AnythingOfType("string"),
+				mock.AnythingOfType("string")).Return(tt.private.Private, nil)
 			app := rosenTss{
 				peerHome: peerHome,
 				storage:  store,
@@ -976,7 +994,8 @@ func TestRosenTss_StartNewRegroup_ECDSA(t *testing.T) {
 			},
 			appConfig: func() rosenTss {
 				store := mockedStorage.NewStorage(t)
-				store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
+				store.On("LoadPrivate", mock.AnythingOfType("string"),
+					mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
 
 				conn := mockedNetwork.NewConnection(t)
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
@@ -1002,7 +1021,8 @@ func TestRosenTss_StartNewRegroup_ECDSA(t *testing.T) {
 			appConfig: func() rosenTss {
 				store := mockedStorage.NewStorage(t)
 				store.On("WriteData",
-					mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+					mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"),
+					mock.AnythingOfType("string")).Return(nil)
 				store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", nil)
 				conn := mockedNetwork.NewConnection(t)
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
@@ -1098,7 +1118,8 @@ func TestRosenTss_StartNewRegroup_EDDSA(t *testing.T) {
 			},
 			appConfig: func() rosenTss {
 				store := mockedStorage.NewStorage(t)
-				store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
+				store.On("LoadPrivate", mock.AnythingOfType("string"),
+					mock.AnythingOfType("string")).Return(hex.EncodeToString(priv), nil)
 
 				conn := mockedNetwork.NewConnection(t)
 				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(nil)
@@ -1124,7 +1145,8 @@ func TestRosenTss_StartNewRegroup_EDDSA(t *testing.T) {
 			appConfig: func() rosenTss {
 				store := mockedStorage.NewStorage(t)
 				store.On("WriteData",
-					mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil)
+					mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"),
+					mock.AnythingOfType("string")).Return(nil)
 				store.On("LoadPrivate", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", nil)
 
 				conn := mockedNetwork.NewConnection(t)
