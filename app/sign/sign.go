@@ -27,7 +27,7 @@ type Handler interface {
 	Sign([]byte) ([]byte, error)
 	Verify(models.GossipMessage) error
 	MessageHandler(_interface.RosenTss, models.GossipMessage, string, models.TssData, *OperationSign) error
-	SetData(_interface.RosenTss) (*tss.PartyID, error)
+	LoadData(_interface.RosenTss) (*tss.PartyID, error)
 	GetData() ([]*big.Int, *big.Int)
 }
 
@@ -46,14 +46,14 @@ func (s *OperationSign) Init(rosenTss _interface.RosenTss, receiverId string) er
 
 	s.Logger.Info("Init called")
 
-	pID, err := s.SetData(rosenTss)
+	pID, err := s.LoadData(rosenTss)
 	if err != nil {
 		s.Logger.Error(err)
 		return err
 	}
 	s.LocalTssData.PartyID = pID
 
-	err = s.NewRegister(rosenTss, receiverId)
+	err = s.NewRegister(rosenTss, "")
 	if err != nil {
 		return err
 	}
@@ -97,16 +97,17 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 			if err != nil {
 				return err
 			}
+
 			switch msg.Name {
 			case register:
-				if msg.Message != "" {
+				if msg.Message != "" && s.LocalTssData.Party != nil {
 					err := s.RegisterMessageHandler(rosenTss, msg)
 					if err != nil {
 						return err
 					}
 				}
 			case setup:
-				if msg.Message != "" {
+				if msg.Message != "" && s.LocalTssData.Party != nil {
 					ks, _ := s.GetData()
 					err := s.SetupMessageHandler(rosenTss, msg, ks)
 					if err != nil {
@@ -114,12 +115,14 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 					}
 				}
 			case signMessage:
-				if msg.Message != "" {
+				if msg.Message != "" && s.LocalTssData.Party != nil {
 					//TODO: handle sign message
 				}
 			case partyMsg:
-				s.Logger.Info("received party message:",
-					fmt.Sprintf("from: %s", msg.SenderId))
+				s.Logger.Info(
+					"received party message:",
+					fmt.Sprintf("from: %s", msg.SenderId),
+				)
 				msgBytes, err := utils.Decoder(msg.Message)
 				if err != nil {
 					return err
@@ -137,13 +140,15 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 					return err
 				}
 			case startSign:
-				go func() {
-					err := s.MessageHandler(rosenTss, msg, s.SignMessage.Message, s.LocalTssData, s)
-					if err != nil {
-						s.Logger.Errorf("StartSignHandler returns error: %+v", err)
-						errorCh <- err
-					}
-				}()
+				if msg.Message != "" && s.LocalTssData.Party != nil {
+					go func() {
+						err := s.MessageHandler(rosenTss, msg, s.SignMessage.Message, s.LocalTssData, s)
+						if err != nil {
+							s.Logger.Errorf("StartSignHandler returns error: %+v", err)
+							errorCh <- err
+						}
+					}()
+				}
 			}
 		}
 	}
@@ -226,7 +231,8 @@ func (s *OperationSign) HandleEndMessage(rosenTss _interface.RosenTss, signature
 
 // GossipMessageHandler handling all party messages on outCH and endCh
 func (s *OperationSign) GossipMessageHandler(
-	rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData) (bool, error) {
+	rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData,
+) (bool, error) {
 	for {
 		select {
 		case partyMsg := <-outCh:
@@ -290,8 +296,10 @@ func (s *OperationSign) NewRegister(rosenTss _interface.RosenTss, receiverId str
 func (s *OperationSign) RegisterMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
 
 	if gossipMessage.SenderId != s.LocalTssData.PartyID.Id {
-		s.Logger.Info("received register message ",
-			fmt.Sprintf("from: %s", gossipMessage.SenderId))
+		s.Logger.Info(
+			"received register message ",
+			fmt.Sprintf("from: %s", gossipMessage.SenderId),
+		)
 
 		registerMessage := &models.Register{}
 		err := json.Unmarshal([]byte(gossipMessage.Message), registerMessage)
@@ -312,7 +320,8 @@ func (s *OperationSign) RegisterMessageHandler(rosenTss _interface.RosenTss, gos
 
 		if !utils.IsPartyExist(newParty, s.LocalTssData.PartyIds) {
 			s.LocalTssData.PartyIds = tss.SortPartyIDs(
-				append(s.LocalTssData.PartyIds.ToUnSorted(), newParty))
+				append(s.LocalTssData.PartyIds.ToUnSorted(), newParty),
+			)
 		}
 	}
 	return nil
@@ -324,21 +333,30 @@ func (s *OperationSign) Setup(rosenTss _interface.RosenTss) error {
 	signData := new(big.Int).SetBytes(msgBytes)
 
 	s.LocalTssData.PartyIds = tss.SortPartyIDs(
-		append(s.LocalTssData.PartyIds.ToUnSorted(), s.LocalTssData.PartyID))
+		append(s.LocalTssData.PartyIds.ToUnSorted(), s.LocalTssData.PartyID),
+	)
 
 	s.Logger.Infof("partyIds {%+v}, local partyId index {%d}", s.LocalTssData.PartyIds, s.LocalTssData.PartyID.Index)
 
 	messageBytes := blake2b.Sum256(signData.Bytes())
 	messageId := fmt.Sprintf("%s%s", s.SignMessage.Crypto, utils.Encoder(messageBytes[:]))
 
-	// TDOO: use old setup message if exist
+	turnDuration := rosenTss.GetConfig().TurnDuration
+	round := time.Now().Unix() / turnDuration
 
-	setupMessage := models.SetupSign{
-		Hash:      utils.Encoder(messageBytes[:]),
-		Peers:     s.LocalTssData.PartyIds,
-		Timestamp: time.Now().Unix() / 60,
-		StarterId: s.LocalTssData.PartyID,
+	//use old setup message if exist
+	var setupMessage models.SetupSign
+	if s.SetupSignMessage.Hash != "" {
+		setupMessage = s.SetupSignMessage
+	} else {
+		setupMessage = models.SetupSign{
+			Hash:      utils.Encoder(messageBytes[:]),
+			Peers:     s.LocalTssData.PartyIds,
+			Timestamp: round,
+			StarterId: s.LocalTssData.PartyID,
+		}
 	}
+
 	marshal, err := json.Marshal(setupMessage)
 	if err != nil {
 		return err
@@ -392,8 +410,10 @@ func (s *OperationSign) NewMessage(rosenTss _interface.RosenTss, payload models.
 }
 
 // SetupMessageHandler handles setup message
-func (s *OperationSign) SetupMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage,
-	ks []*big.Int) error {
+func (s *OperationSign) SetupMessageHandler(
+	rosenTss _interface.RosenTss, gossipMessage models.GossipMessage,
+	ks []*big.Int,
+) error {
 
 	if gossipMessage.SenderId != s.LocalTssData.PartyID.Id {
 
@@ -405,17 +425,27 @@ func (s *OperationSign) SetupMessageHandler(rosenTss _interface.RosenTss, gossip
 
 		s.Logger.Infof("setup Message data: %+v", setupSignMessage)
 
-		index := utils.IndexOf(ks, setupSignMessage.StarterId.KeyInt())
-		minutes := time.Now().Unix() / 60
-		if minutes%int64(len(ks)) != int64(index) {
+		turnDuration := rosenTss.GetConfig().TurnDuration
+		round := time.Now().Unix() / turnDuration
+
+		if round%int64(len(ks)) != int64(gossipMessage.Index) {
 			s.Logger.Errorf("it's not %s turn.", gossipMessage.SenderId)
 			return nil
 		}
 
+		msgBytes, _ := utils.Decoder(s.SignMessage.Message)
+		signData := new(big.Int).SetBytes(msgBytes)
+		signDataBytes := blake2b.Sum256(signData.Bytes())
+		if s.SetupSignMessage.Hash != utils.Encoder(signDataBytes[:]) {
+			return fmt.Errorf(
+				"wrogn hash to sign\nreceivedHash: %s\nexpectedHash: %s", s.SetupSignMessage.Hash,
+				utils.Encoder(signDataBytes[:]),
+			)
+		}
+
 		for _, peer := range setupSignMessage.Peers {
 			if !utils.IsPartyExist(peer, s.LocalTssData.PartyIds) {
-				receiverId := setupSignMessage.PeersMap[peer.Id]
-				err := s.NewRegister(rosenTss, receiverId)
+				err := s.NewRegister(rosenTss, peer.Id)
 				if err != nil {
 					return err
 				}
@@ -430,11 +460,6 @@ func (s *OperationSign) SignStarter(rosenTss _interface.RosenTss, senderId strin
 	msgBytes, _ := utils.Decoder(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
-
-	if s.SetupSignMessage.Hash != utils.Encoder(signDataBytes[:]) {
-		return fmt.Errorf("wrogn hash to sign\nreceivedHash: %s\nexpectedHash: %s", s.SetupSignMessage.Hash,
-			utils.Encoder(signDataBytes[:]))
-	}
 
 	messageId := fmt.Sprintf("%s%s", s.SignMessage.Crypto, utils.Encoder(signDataBytes[:]))
 
@@ -453,7 +478,7 @@ func (s *OperationSign) SignStarter(rosenTss _interface.RosenTss, senderId strin
 }
 
 func (s *OperationSign) SignStarterThread(rosenTss _interface.RosenTss) error {
-	ticker := time.NewTicker(time.Millisecond * time.Duration(rosenTss.GetConfig().SignStartTimeTracker))
+	ticker := time.NewTicker(time.Second * time.Duration(rosenTss.GetConfig().SignStartTimeTracker))
 	done := make(chan bool)
 
 	for {
@@ -462,13 +487,13 @@ func (s *OperationSign) SignStarterThread(rosenTss _interface.RosenTss) error {
 			return nil
 		case <-ticker.C:
 			if s.SetupSignMessage.Hash != "" {
-				state := true
+				allPeersExist := true
 				for _, peer := range s.SetupSignMessage.Peers {
 					if !utils.IsPartyExist(peer, s.LocalTssData.PartyIds) {
-						state = false
+						allPeersExist = false
 					}
 				}
-				if state {
+				if allPeersExist {
 					err := s.SignStarter(rosenTss, s.SetupSignMessage.StarterId.Id)
 					if err != nil {
 						return err
@@ -481,17 +506,21 @@ func (s *OperationSign) SignStarterThread(rosenTss _interface.RosenTss) error {
 	}
 }
 
-func (s *OperationSign) SetupThread(rosenTss _interface.RosenTss, ks []*big.Int, shareID *big.Int,
-	threshold int) error {
+func (s *OperationSign) SetupThread(
+	rosenTss _interface.RosenTss, ks []*big.Int, shareID *big.Int,
+	threshold int,
+) error {
 	index := int64(utils.IndexOf(ks, shareID))
 	length := int64(len(ks))
 
+	turnDuration := rosenTss.GetConfig().TurnDuration
 	for {
-		minutes := time.Now().Unix() / 60
-		if minutes%length == rosenTss.GetConfig().TurnFactor*index &&
-			(time.Now().Unix()-(minutes*60)) < rosenTss.GetConfig().LeastProcessRemainingTime {
+		round := time.Now().Unix() / turnDuration
+
+		if round%length == index &&
+			(time.Now().Unix()-(round*turnDuration)) < rosenTss.GetConfig().LeastProcessRemainingTime {
 			if len(s.LocalTssData.PartyIds) >= threshold {
-				if s.LocalTssData.Party.PartyID() == nil {
+				if s.LocalTssData.Party != nil {
 					err := s.Setup(rosenTss)
 					if err != nil {
 						s.Logger.Errorf("setup function returns error: %+v", err)
@@ -503,12 +532,18 @@ func (s *OperationSign) SetupThread(rosenTss _interface.RosenTss, ks []*big.Int,
 				}
 			}
 		} else {
-			if minutes%length < index {
-				time.Sleep(time.Second * time.Duration(
-					(index-minutes%length)*60-(time.Now().Unix()-(minutes*60))))
+			if round%length < index {
+				time.Sleep(
+					time.Second * time.Duration(
+						(index-round%length)*turnDuration-(time.Now().Unix()-(round*turnDuration)),
+					),
+				)
 			} else {
-				time.Sleep(time.Second * time.Duration(
-					(length-minutes%length+index)*60-(time.Now().Unix()-(minutes*60))))
+				time.Sleep(
+					time.Second * time.Duration(
+						(length-round%length+index)*turnDuration-(time.Now().Unix()-(round*turnDuration)),
+					),
+				)
 			}
 		}
 	}

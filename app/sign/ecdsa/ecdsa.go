@@ -97,16 +97,20 @@ func (s handler) Verify(msg models.GossipMessage) error {
 	return nil
 }
 
-func (s handler) MessageHandler(rosenTss _interface.RosenTss, msg models.GossipMessage,
-	signMessage string, localTssData models.TssData, operationSign *sign.OperationSign) error {
+func (s handler) MessageHandler(
+	rosenTss _interface.RosenTss, msg models.GossipMessage,
+	signMessage string, localTssData models.TssData, operationSign *sign.OperationSign,
+) error {
 
 	errorCh := make(chan error, 1)
 
 	msgBytes, _ := utils.Decoder(signMessage)
 	signData := new(big.Int).SetBytes(msgBytes)
 
-	logging.Info("received startSign message: ",
-		fmt.Sprintf("from: %s", msg.SenderId))
+	logging.Info(
+		"received startSign message: ",
+		fmt.Sprintf("from: %s", msg.SenderId),
+	)
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
 	endCh := make(chan common.SignatureData, len(localTssData.PartyIds))
 	for {
@@ -120,7 +124,8 @@ func (s handler) MessageHandler(rosenTss _interface.RosenTss, msg models.GossipM
 
 	if localTssData.Party == nil {
 		localTssData.Party = ecdsaSigning.NewLocalParty(
-			signData, localTssData.Params, s.savedData, outCh, endCh)
+			signData, localTssData.Params, s.savedData, outCh, endCh,
+		)
 		if err := localTssData.Party.Start(); err != nil {
 			errorCh <- err
 		}
@@ -138,7 +143,7 @@ func (s handler) MessageHandler(rosenTss _interface.RosenTss, msg models.GossipM
 	return nil
 }
 
-func (s handler) SetData(rosenTss _interface.RosenTss) (*tss.PartyID, error) {
+func (s handler) LoadData(rosenTss _interface.RosenTss) (*tss.PartyID, error) {
 	data, pID, err := rosenTss.GetStorage().LoadECDSAKeygen(rosenTss.GetPeerHome())
 	if err != nil {
 		logging.Error(err)

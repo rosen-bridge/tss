@@ -93,17 +93,18 @@ type KeygenMessage struct {
 }
 
 type Config struct {
-	HomeAddress               string `mapstructure:"HOME_ADDRESS"`
-	LogLevel                  string `mapstructure:"LOG_LEVEL"`
-	LogMaxSize                int    `mapstructure:"LOG_MAX_SIZE"`
-	LogMaxBackups             int    `mapstructure:"LOG_MAX_BACKUPS"`
-	LogMaxAge                 int    `mapstructure:"LOG_MAX_AGE"`
-	OperationTimeout          int    `mapstructure:"OPERATION_TIMEOUT"`
-	MessageTimeout            int    `mapstructure:"MESSAGE_TIMEOUT"`
-	LeastProcessRemainingTime int64  `mapstructure:"LEAST_PROCESS_REMAINING_TIME"`
-	TurnFactor                int64  `mapstructure:"TURN_FACTOR"`
-	SetupBroadcastInterval    int64  `mapstructure:"SETUP_BROADCAST_INTERVAL"`
-	SignStartTimeTracker      int64  `mapstructure:"SIGN_START_TIME_TRACKER"`
+	HomeAddress               string  `mapstructure:"HOME_ADDRESS"`
+	LogLevel                  string  `mapstructure:"LOG_LEVEL"`
+	LogMaxSize                int     `mapstructure:"LOG_MAX_SIZE"`
+	LogMaxBackups             int     `mapstructure:"LOG_MAX_BACKUPS"`
+	LogMaxAge                 int     `mapstructure:"LOG_MAX_AGE"`
+	OperationTimeout          int     `mapstructure:"OPERATION_TIMEOUT"`
+	MessageTimeout            int     `mapstructure:"MESSAGE_TIMEOUT"`
+	LeastProcessRemainingTime int64   `mapstructure:"LEAST_PROCESS_REMAINING_TIME"`
+	TurnFactor                int64   `mapstructure:"TURN_FACTOR"`
+	SetupBroadcastInterval    int64   `mapstructure:"SETUP_BROADCAST_INTERVAL"`
+	SignStartTimeTracker      float64 `mapstructure:"SIGN_START_TIME_TRACKER"`
+	TurnDuration              int64   `mapstructure:"TRUN_DURATION"`
 }
 
 type Register struct {
@@ -124,7 +125,6 @@ type Payload struct {
 type SetupSign struct {
 	Hash      string             `json:"hash"`
 	Peers     tss.SortedPartyIDs `json:"peers"`
-	PeersMap  map[string]string  `json:"peersMap"`
 	Timestamp int64              `json:"timestamp"`
 	StarterId *tss.PartyID       `json:"StarterId"`
 }
