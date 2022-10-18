@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+
 	"github.com/labstack/echo/v4"
 	_ "github.com/swaggo/echo-swagger/example/docs"
 	"rosen-bridge/tss/api"
@@ -59,7 +60,6 @@ func main() {
 	localStorage := storage.NewStorage()
 
 	tss := app.NewRosenTss(conn, localStorage, config)
-
 	// setting up peer home based on configs
 	err = tss.SetPeerHome(config.HomeAddress)
 	if err != nil {
@@ -74,6 +74,12 @@ func main() {
 
 	// running echo framework
 	tssController := api.NewTssController(tss)
+
+	// get p2pId
+	err = tss.SetP2pId()
+	if err != nil {
+		logging.Error(err)
+	}
 
 	api.InitRouting(e, tssController)
 	logging.Fatal(e.Start(fmt.Sprintf(":%s", *projectPort)))
