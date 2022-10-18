@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/binance-chain/tss-lib/common"
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
@@ -31,11 +32,11 @@ var logging *zap.SugaredLogger
 var eddsaHandler handler
 
 func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation {
-	logging = logger.NewSugar("eddsa-sign")
+	logging = logger.NewSugar(signMessage.Crypto + "-sign")
 	return &operationEDDSASign{
 		OperationSign: sign.OperationSign{
 			SignMessage: signMessage,
-			Signatures:  make(map[string][]byte),
+			Signatures:  make(map[string]string),
 			Logger:      logging,
 			Handler:     &eddsaHandler,
 		},
@@ -88,7 +89,6 @@ func (s *handler) MessageHandler(
 
 	errorCh := make(chan error, 1)
 
-	meta := rosenTss.GetMetaData()
 	msgBytes, _ := utils.Decoder(signMessage)
 	signData := new(big.Int).SetBytes(msgBytes)
 
@@ -96,25 +96,17 @@ func (s *handler) MessageHandler(
 		"received startSign message: ",
 		fmt.Sprintf("from: %s", msg.SenderId),
 	)
-
-	startSign := &models.StartSign{}
-	err := json.Unmarshal([]byte(msg.Message), startSign)
-	if err != nil {
-		return err
-	}
-
-	_, ok := startSign.Signatures[localTssData.PartyID.Id]
-	if !ok {
-		return fmt.Errorf("this peer is not in the list of signatures")
-	}
-
-	if len(startSign.Signatures) < meta.Threshold {
-		return fmt.Errorf("there is not eanough signature")
-	}
-	localTssData.PartyIds = startSign.Peers
-
 	outCh := make(chan tss.Message, len(localTssData.PartyIds))
 	endCh := make(chan common.SignatureData, len(localTssData.PartyIds))
+	for {
+		if localTssData.Params == nil {
+			time.Sleep(time.Second)
+			continue
+		} else {
+			break
+		}
+	}
+
 	if localTssData.Party == nil {
 		localTssData.Party = eddsaSigning.NewLocalParty(
 			signData, localTssData.Params, s.savedData, outCh, endCh,
