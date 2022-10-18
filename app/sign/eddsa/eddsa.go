@@ -32,7 +32,7 @@ var logging *zap.SugaredLogger
 var eddsaHandler handler
 
 func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation {
-	logging = logger.NewSugar(signMessage.Crypto + "-sign")
+	logging = logger.NewSugar("eddsa-sign")
 	return &operationEDDSASign{
 		OperationSign: sign.OperationSign{
 			SignMessage: signMessage,
@@ -45,7 +45,7 @@ func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation 
 
 // GetClassName returns the class name
 func (s *operationEDDSASign) GetClassName() string {
-	return s.SignMessage.Crypto + "Sign"
+	return "eddsaSign"
 }
 
 func (s *handler) Sign(message []byte) ([]byte, error) {
