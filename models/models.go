@@ -134,4 +134,5 @@ type StartSign struct {
 	Signatures map[string][]byte  `json:"signatures"`
 	StarterId  string             `json:"starterId"`
 	Peers      tss.SortedPartyIDs `json:"peers"`
+	Timestamp  int64              `json:"timestamp"`
 }
