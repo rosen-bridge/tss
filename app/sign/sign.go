@@ -111,14 +111,14 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 
 			switch msg.Name {
 			case registerMessage:
-				if msg.Message != "" && s.LocalTssData.Party != nil {
+				if msg.Message != "" && s.LocalTssData.Party == nil {
 					err := s.RegisterMessageHandler(rosenTss, msg)
 					if err != nil {
 						return err
 					}
 				}
 			case setupMessage:
-				if msg.Message != "" && s.LocalTssData.Party != nil {
+				if msg.Message != "" && s.LocalTssData.Party == nil {
 					keyList, _ := s.GetData()
 					err := s.SetupMessageHandler(rosenTss, msg, keyList)
 					if err != nil {
@@ -126,7 +126,7 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 					}
 				}
 			case signMessage:
-				if msg.Message != "" && s.LocalTssData.Party != nil {
+				if msg.Message != "" && s.LocalTssData.Party == nil {
 					keyList, sharedId := s.GetData()
 					err := s.SignMessageHandler(rosenTss, msg, keyList, sharedId)
 					if err != nil {
@@ -156,8 +156,7 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 					return err
 				}
 			case startSignMessage:
-				if msg.Message != "" && s.LocalTssData.Party != nil {
-
+				if msg.Message != "" && s.LocalTssData.Party == nil {
 					err := s.StartSignMessageHandler(rosenTss, msg)
 					if err != nil {
 						return err
@@ -376,8 +375,8 @@ func (s *OperationSign) Setup(rosenTss _interface.RosenTss) error {
 
 	//use old setup message if exist
 	var setupSignMessage models.SetupSign
-	if s.SetupSignMessage.Hash != "" {
-		setupSignMessage = s.SetupSignMessage
+	if s.SelfSetupSignMessage.Hash != "" {
+		setupSignMessage = s.SelfSetupSignMessage
 	} else {
 		setupSignMessage = models.SetupSign{
 			Hash:      utils.Encoder(messageBytes[:]),
@@ -466,7 +465,7 @@ func (s *OperationSign) SetupMessageHandler(
 		msgBytes, _ := utils.Decoder(s.SignMessage.Message)
 		signData := new(big.Int).SetBytes(msgBytes)
 		signDataBytes := blake2b.Sum256(signData.Bytes())
-		if s.SetupSignMessage.Hash != utils.Encoder(signDataBytes[:]) {
+		if setupSignMessage.Hash != utils.Encoder(signDataBytes[:]) {
 			return fmt.Errorf(
 				"wrogn hash to sign\nreceivedHash: %s\nexpectedHash: %s", s.SetupSignMessage.Hash,
 				utils.Encoder(signDataBytes[:]),
@@ -503,7 +502,7 @@ func (s *OperationSign) SignStarter(rosenTss _interface.RosenTss, senderId strin
 		return err
 	}
 	payload := models.Payload{
-		Message:   string(signature),
+		Message:   utils.Encoder(signature),
 		MessageId: messageId,
 		SenderId:  s.LocalTssData.PartyID.Id,
 		Name:      signMessage,
@@ -525,7 +524,7 @@ func (s *OperationSign) SignStarterThread(rosenTss _interface.RosenTss) {
 		case <-done:
 			return
 		case <-ticker.C:
-			if s.LocalTssData.Party == nil {
+			if s.LocalTssData.Party != nil {
 				ticker.Stop()
 				done <- true
 				break
@@ -606,28 +605,31 @@ func (s *OperationSign) SignMessageHandler(
 		signDataBytes := blake2b.Sum256(signData.Bytes())
 
 		// check and verify the sign in the payload message
-		marshal, err := json.Marshal(s.SetupSignMessage)
+		marshal, err := json.Marshal(s.SelfSetupSignMessage)
 		if err != nil {
 			return err
 		}
-		err = s.Verify(marshal, []byte(gossipMessage.Message), gossipMessage.Index)
+		decodedSign, err := utils.Decoder(gossipMessage.Message)
 		if err != nil {
 			return err
 		}
-		// check the sender be in the list peers of setup message
-		for i, peer := range s.SetupSignMessage.Peers {
-			if i == gossipMessage.Index && peer.Id != gossipMessage.SenderId {
-				return fmt.Errorf("sender not exist in the list of peers")
-			}
-		}
-		if gossipMessage.Message != utils.Encoder(signDataBytes[:]) {
-			return fmt.Errorf(
-				"wrogn hash to sign\nreceivedHash: %s\nexpectedHash: %s", gossipMessage.Message,
-				utils.Encoder(signDataBytes[:]),
-			)
+		err = s.Verify(marshal, decodedSign, gossipMessage.Index)
+		if err != nil {
+			return err
 		}
 
-		s.Signatures[gossipMessage.SenderId] = gossipMessage.Signature
+		// check the sender be in the list peers of setup message
+		var peerFounded bool
+		for _, peer := range s.SelfSetupSignMessage.Peers {
+			if peer.Id != gossipMessage.SenderId {
+				peerFounded = true
+			}
+		}
+		if !peerFounded {
+			return fmt.Errorf("sender not exist in the list of peers")
+		}
+
+		s.Signatures[gossipMessage.SenderId] = decodedSign
 		if len(s.Signatures) >= meta.Threshold {
 			messageId := fmt.Sprintf("%s%s", s.SignMessage.Crypto, utils.Encoder(signDataBytes[:]))
 			index := int64(utils.IndexOf(keyList, shareID))
@@ -652,7 +654,7 @@ func (s *OperationSign) SignMessageHandler(
 					return err
 				}
 				payload := models.Payload{
-					Message:   string(marshal),
+					Message:   utils.Encoder(marshal),
 					MessageId: messageId,
 					SenderId:  s.LocalTssData.PartyID.Id,
 					Name:      startSignMessage,
@@ -661,6 +663,8 @@ func (s *OperationSign) SignMessageHandler(
 				if err != nil {
 					return nil
 				}
+
+				// TODO: start party
 
 			}
 		}
@@ -676,13 +680,18 @@ func (s *OperationSign) StartSignMessageHandler(rosenTss _interface.RosenTss, ms
 		fmt.Sprintf("from: %s", msg.SenderId),
 	)
 	startSign := models.StartSign{}
-	err := json.Unmarshal([]byte(msg.Message), &startSign)
+	decoder, err := utils.Decoder(msg.Message)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(decoder, &startSign)
 	if err != nil {
 		return err
 	}
 
 	// check to valid the sign process data hash is valid
-	if startSign.Hash != s.SelfSetupSignMessage.Hash {
+	//TODO: verify with own data hash
+	if startSign.Hash != s.SetupSignMessage.Hash {
 		return fmt.Errorf(
 			"wrogn hash to sign, receivedHash: %s, expectedHash: %s",
 			startSign.Hash,
@@ -709,10 +718,13 @@ func (s *OperationSign) StartSignMessageHandler(rosenTss _interface.RosenTss, ms
 
 	// verify that every signature are valid
 	keyList, _ := s.GetData()
+	//TODO: make new setup sign message and fill with gossip data
 	marshal, err := json.Marshal(s.SelfSetupSignMessage)
 	if err != nil {
 		return err
 	}
+	// TODO: for on signature
+	// TODO: signature map[index] []byte
 	for _, peer := range startSign.Peers {
 		for index, key := range keyList {
 			if key.Cmp(peer.KeyInt()) == 0 {
@@ -720,6 +732,7 @@ func (s *OperationSign) StartSignMessageHandler(rosenTss _interface.RosenTss, ms
 				if err != nil {
 					return fmt.Errorf("can not verify every signatures")
 				}
+
 			}
 		}
 	}
@@ -728,6 +741,7 @@ func (s *OperationSign) StartSignMessageHandler(rosenTss _interface.RosenTss, ms
 
 func (s *OperationSign) CreateParty() (chan tss.Message, chan common.SignatureData, error) {
 	// creating and starting party
+	// TODO: use s.SignMessage.Message for sigData
 	msgBytes, err := utils.Decoder(s.SelfSetupSignMessage.Hash)
 	if err != nil {
 		return nil, nil, err
