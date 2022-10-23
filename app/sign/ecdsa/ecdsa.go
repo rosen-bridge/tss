@@ -34,7 +34,7 @@ func NewSignECDSAOperation(signMessage models.SignMessage) _interface.Operation 
 	return &operationECDSASign{
 		OperationSign: sign.OperationSign{
 			SignMessage: signMessage,
-			Signatures:  make(map[string][]byte),
+			Signatures:  make(map[int][]byte),
 			Logger:      logging,
 			Handler:     &ecdsaHandler,
 		},

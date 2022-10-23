@@ -33,7 +33,7 @@ func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation 
 	return &operationEDDSASign{
 		OperationSign: sign.OperationSign{
 			SignMessage: signMessage,
-			Signatures:  make(map[string][]byte),
+			Signatures:  make(map[int][]byte),
 			Logger:      logging,
 			Handler:     &eddsaHandler,
 		},
