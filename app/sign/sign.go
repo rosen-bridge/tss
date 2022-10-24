@@ -289,7 +289,7 @@ func (s *OperationSign) NewRegister(rosenTss _interface.RosenTss, receiverId str
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	messageId := fmt.Sprintf("%s%s", s.SignMessage.Crypto, utils.Encoder(signDataBytes[:]))
 	payload := models.Payload{
-		Message:   string(marshal),
+		Message:   utils.Encoder(marshal),
 		MessageId: messageId,
 		SenderId:  s.LocalTssData.PartyID.Id,
 		Name:      registerMessage,
@@ -312,7 +312,11 @@ func (s *OperationSign) RegisterMessageHandler(rosenTss _interface.RosenTss, gos
 		)
 
 		registerMessage := &models.Register{}
-		err := json.Unmarshal([]byte(gossipMessage.Message), registerMessage)
+		decodedMessage, err := utils.Decoder(gossipMessage.Message)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(decodedMessage, registerMessage)
 		if err != nil {
 			return err
 		}
@@ -373,7 +377,7 @@ func (s *OperationSign) Setup(rosenTss _interface.RosenTss) error {
 	}
 
 	payload := models.Payload{
-		Message:   string(marshal),
+		Message:   utils.Encoder(marshal),
 		MessageId: messageId,
 		SenderId:  s.LocalTssData.PartyID.Id,
 		Name:      setupMessage,
@@ -428,7 +432,11 @@ func (s *OperationSign) SetupMessageHandler(
 	if gossipMessage.SenderId != s.LocalTssData.PartyID.Id {
 
 		setupSignMessage := models.SetupSign{}
-		err := json.Unmarshal([]byte(gossipMessage.Message), &setupSignMessage)
+		decodedMessage, err := utils.Decoder(gossipMessage.Message)
+		if err != nil {
+			return err
+		}
+		err = json.Unmarshal(decodedMessage, &setupSignMessage)
 		if err != nil {
 			return err
 		}
