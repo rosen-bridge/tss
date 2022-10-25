@@ -37,14 +37,14 @@ type Handler interface {
 }
 
 type OperationSign struct {
-	_interface.OperationHandler
-	LocalTssData         models.TssData
-	SignMessage          models.SignMessage
-	Signatures           map[int][]byte
-	Logger               *zap.SugaredLogger
-	SetupSignMessage     models.SetupSign
 	SelfSetupSignMessage models.SetupSign
+	LocalTssData         models.TssData
+	SetupSignMessage     models.SetupSign
+	_interface.OperationHandler
 	Handler
+	Signatures  map[int][]byte
+	Logger      *zap.SugaredLogger
+	SignMessage models.SignMessage
 }
 
 // Init initializes the eddsa sign partyId and creates partyId message
@@ -720,7 +720,7 @@ func (s *OperationSign) StartSignMessageHandler(
 			}
 		}
 		if !peerFound {
-			return fmt.Errorf("the signer <%d> is not in the peers list", index)
+			continue
 		}
 
 		err := s.Verify(marshal, signature, index)
