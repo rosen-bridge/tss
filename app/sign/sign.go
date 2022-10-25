@@ -37,14 +37,14 @@ type Handler interface {
 }
 
 type OperationSign struct {
-	SelfSetupSignMessage models.SetupSign
-	LocalTssData         models.TssData
-	SetupSignMessage     models.SetupSign
 	_interface.OperationHandler
+	LocalTssData         models.TssData
+	SignMessage          models.SignMessage
+	Signatures           map[int][]byte
+	Logger               *zap.SugaredLogger
+	SetupSignMessage     models.SetupSign
+	SelfSetupSignMessage models.SetupSign
 	Handler
-	Signatures  map[int][]byte
-	Logger      *zap.SugaredLogger
-	SignMessage models.SignMessage
 }
 
 // Init initializes the eddsa sign partyId and creates partyId message

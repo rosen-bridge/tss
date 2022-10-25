@@ -52,18 +52,18 @@ type Private struct {
 }
 
 type TssData struct {
-	Party    tss.Party
 	PartyID  *tss.PartyID
 	Params   *tss.Parameters
 	PartyIds tss.SortedPartyIDs
+	Party    tss.Party
 }
 
 type TssRegroupData struct {
-	Party            tss.Party
 	PartyID          *tss.PartyID
 	RegroupingParams *tss.ReSharingParameters
 	NewPartyIds      tss.SortedPartyIDs
 	OldPartyIds      tss.SortedPartyIDs
+	Party            tss.Party
 	PeerState        int
 }
 
@@ -77,19 +77,19 @@ type PartyMessage struct {
 }
 
 type RegroupMessage struct {
+	PeerState    int    `json:"peerState"` // 0 for old and 1 for new
 	Crypto       string `json:"crypto"`
-	CallBackUrl  string `json:"callBackUrl"`
-	PeerState    int    `json:"peerState"`
 	NewThreshold int    `json:"newThreshold"`
 	OldThreshold int    `json:"oldThreshold"`
 	PeersCount   int    `json:"peersCount"`
+	CallBackUrl  string `json:"callBackUrl"`
 }
 
 type KeygenMessage struct {
-	Crypto      string `json:"crypto"`
-	CallBackUrl string `json:"callBackUrl"`
 	PeersCount  int    `json:"peersCount"`
 	Threshold   int    `json:"threshold"`
+	Crypto      string `json:"crypto"`
+	CallBackUrl string `json:"callBackUrl"`
 }
 
 type Config struct {
@@ -123,10 +123,10 @@ type Payload struct {
 }
 
 type SetupSign struct {
-	StarterId *tss.PartyID       `json:"starterId"`
 	Hash      string             `json:"hash"`
 	Peers     tss.SortedPartyIDs `json:"peers"`
 	Timestamp int64              `json:"timestamp"`
+	StarterId *tss.PartyID       `json:"starterId"`
 }
 
 type StartSign struct {
