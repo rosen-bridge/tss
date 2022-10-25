@@ -1,10 +1,8 @@
 package eddsa
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/binance-chain/tss-lib/common"
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
@@ -17,7 +15,6 @@ import (
 	"rosen-bridge/tss/app/sign"
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
-	"rosen-bridge/tss/utils"
 )
 
 type operationEDDSASign struct {
@@ -36,7 +33,7 @@ func NewSignEDDSAOperation(signMessage models.SignMessage) _interface.Operation 
 	return &operationEDDSASign{
 		OperationSign: sign.OperationSign{
 			SignMessage: signMessage,
-			Signatures:  make(map[string]string),
+			Signatures:  make(map[int][]byte),
 			Logger:      logging,
 			Handler:     &eddsaHandler,
 		},
@@ -48,8 +45,8 @@ func (s *operationEDDSASign) GetClassName() string {
 	return "eddsaSign"
 }
 
-func (s *handler) Sign(message []byte) ([]byte, error) {
-	private, _, _ := edwards.PrivKeyFromScalar(s.savedData.Xi.Bytes())
+func (h *handler) Sign(message []byte) ([]byte, error) {
+	private, _, _ := edwards.PrivKeyFromScalar(h.savedData.Xi.Bytes())
 	checksum := blake2b.Sum256(message)
 	signature, err := private.Sign(checksum[:])
 	if err != nil {
@@ -58,20 +55,11 @@ func (s *handler) Sign(message []byte) ([]byte, error) {
 	return signature.Serialize(), nil
 }
 
-func (s *handler) Verify(msg models.GossipMessage) error {
-	pk := edwards.NewPublicKey(s.savedData.BigXj[msg.Index].X(), s.savedData.BigXj[msg.Index].Y())
-	payload := models.Payload{
-		Message:   msg.Message,
-		MessageId: msg.MessageId,
-		SenderId:  msg.SenderId,
-		Name:      msg.Name,
-	}
-	marshal, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	checksum := blake2b.Sum256(marshal)
-	signature, err := edwards.ParseDERSignature(msg.Signature)
+func (h *handler) Verify(msg []byte, sign []byte, index int) error {
+	pk := edwards.NewPublicKey(h.savedData.BigXj[index].X(), h.savedData.BigXj[index].Y())
+
+	checksum := blake2b.Sum256(msg)
+	signature, err := edwards.ParseDERSignature(sign)
 	if err != nil {
 		return err
 	}
@@ -82,53 +70,25 @@ func (s *handler) Verify(msg models.GossipMessage) error {
 	return nil
 }
 
-func (s *handler) MessageHandler(
-	rosenTss _interface.RosenTss, msg models.GossipMessage,
-	signMessage string, localTssData models.TssData, operationSign *sign.OperationSign,
+func (h *handler) StartParty(
+	localTssData models.TssData,
+	signData *big.Int,
+	outCh chan tss.Message,
+	endCh chan common.SignatureData,
 ) error {
-
-	errorCh := make(chan error, 1)
-
-	msgBytes, _ := utils.Decoder(signMessage)
-	signData := new(big.Int).SetBytes(msgBytes)
-
-	logging.Info(
-		"received startSign message: ",
-		fmt.Sprintf("from: %s", msg.SenderId),
-	)
-	outCh := make(chan tss.Message, len(localTssData.PartyIds))
-	endCh := make(chan common.SignatureData, len(localTssData.PartyIds))
-	for {
-		if localTssData.Params == nil {
-			time.Sleep(time.Second)
-			continue
-		} else {
-			break
-		}
-	}
-
 	if localTssData.Party == nil {
 		localTssData.Party = eddsaSigning.NewLocalParty(
-			signData, localTssData.Params, s.savedData, outCh, endCh,
+			signData, localTssData.Params, h.savedData, outCh, endCh,
 		)
 		if err := localTssData.Party.Start(); err != nil {
-			errorCh <- err
-		}
-		logging.Info("party started")
-
-		result, err := operationSign.GossipMessageHandler(rosenTss, outCh, endCh)
-		if err != nil {
-			logging.Error(err)
 			return err
 		}
-		if result {
-			return fmt.Errorf("close channel")
-		}
+		logging.Info("party started")
 	}
 	return nil
 }
 
-func (s *handler) LoadData(rosenTss _interface.RosenTss) (*tss.PartyID, error) {
+func (h *handler) LoadData(rosenTss _interface.RosenTss) (*tss.PartyID, error) {
 	data, pID, err := rosenTss.GetStorage().LoadEDDSAKeygen(rosenTss.GetPeerHome())
 	if err != nil {
 		logging.Error(err)
@@ -138,11 +98,11 @@ func (s *handler) LoadData(rosenTss _interface.RosenTss) (*tss.PartyID, error) {
 		logging.Error("pIDs is nil")
 		return nil, err
 	}
-	s.savedData = data
+	h.savedData = data
 	pID.Id = rosenTss.GetP2pId()
 	return pID, nil
 }
 
-func (s *handler) GetData() ([]*big.Int, *big.Int) {
-	return s.savedData.Ks, s.savedData.ShareID
+func (h *handler) GetData() ([]*big.Int, *big.Int) {
+	return h.savedData.Ks, h.savedData.ShareID
 }
