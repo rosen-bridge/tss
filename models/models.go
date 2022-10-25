@@ -132,7 +132,7 @@ type SetupSign struct {
 type StartSign struct {
 	Hash       string             `json:"hash"`
 	Signatures map[int][]byte     `json:"signatures"`
-	StarterId  string             `json:"starterId"`
+	StarterId  *tss.PartyID       `json:"starterId"`
 	Peers      tss.SortedPartyIDs `json:"peers"`
 	Timestamp  int64              `json:"timestamp"`
 }
