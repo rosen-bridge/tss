@@ -101,7 +101,6 @@ type Config struct {
 	OperationTimeout          int     `mapstructure:"OPERATION_TIMEOUT"`
 	MessageTimeout            int     `mapstructure:"MESSAGE_TIMEOUT"`
 	LeastProcessRemainingTime int64   `mapstructure:"LEAST_PROCESS_REMAINING_TIME"`
-	TurnFactor                int64   `mapstructure:"TURN_FACTOR"`
 	SetupBroadcastInterval    int64   `mapstructure:"SETUP_BROADCAST_INTERVAL"`
 	SignStartTimeTracker      float64 `mapstructure:"SIGN_START_TIME_TRACKER"`
 	TurnDuration              int64   `mapstructure:"TRUN_DURATION"`

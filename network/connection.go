@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"net/http"
+
+	"go.uber.org/zap"
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
 )
@@ -24,19 +25,22 @@ type HTTPClient interface {
 type connect struct {
 	publishUrl      string
 	subscriptionUrl string
+	getPeerIDUrl    string
 	subscribeId     string
 	Client          HTTPClient
 }
 
 var logging *zap.SugaredLogger
 
-func InitConnection(publishPath string, subscriptionPath string, p2pPort string) Connection {
+func InitConnection(publishPath string, subscriptionPath string, p2pPort string, getPeerIDPath string) Connection {
 	publishUrl := fmt.Sprintf("http://localhost:%s%s", p2pPort, publishPath)
 	subscriptionUrl := fmt.Sprintf("http://localhost:%s%s", p2pPort, subscriptionPath)
+	getPeerIDUrl := fmt.Sprintf("http://localhost:%s%s", p2pPort, getPeerIDPath)
 	logging = logger.NewSugar("connection")
 	return &connect{
 		publishUrl:      publishUrl,
 		subscriptionUrl: subscriptionUrl,
+		getPeerIDUrl:    getPeerIDUrl,
 		Client:          &http.Client{},
 	}
 
@@ -44,7 +48,6 @@ func InitConnection(publishPath string, subscriptionPath string, p2pPort string)
 
 // Publish publishes a message to p2p
 func (c *connect) Publish(msg models.GossipMessage) error {
-	logging.Infof("message published: {%+v}", msg.Name)
 	marshalledMessage, _ := json.Marshal(&msg)
 
 	type message struct {
@@ -83,6 +86,8 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 	if res.Message != "ok" {
 		return fmt.Errorf("not ok response: {%s}", res.Message)
 	}
+
+	logging.Infof("new {%s} message published", msg.Name)
 
 	return nil
 }
@@ -160,7 +165,7 @@ func (c *connect) CallBack(url string, data interface{}, status string) error {
 func (c *connect) GetPeerId() (string, error) {
 	logging.Infof("Getting PeerId")
 
-	req, err := http.NewRequest(http.MethodGet, c.subscriptionUrl, nil)
+	req, err := http.NewRequest(http.MethodGet, c.getPeerIDUrl, nil)
 	if err != nil {
 		return "", err
 	}
@@ -174,7 +179,7 @@ func (c *connect) GetPeerId() (string, error) {
 
 	type response struct {
 		Status string `json:"status"`
-		PeerId string `json:"peerId"`
+		PeerId string `json:"message"`
 	}
 	var res = response{}
 	err = json.NewDecoder(resp.Body).Decode(&res)
@@ -184,6 +189,9 @@ func (c *connect) GetPeerId() (string, error) {
 	if res.Status != "ok" {
 		return "", fmt.Errorf("not ok response: {%s}", res.Status)
 	}
-
+	if res.PeerId == "" {
+		return "", fmt.Errorf("nil peerId")
+	}
+	logging.Infof("response: %+v", res)
 	return res.PeerId, nil
 }

@@ -4,12 +4,13 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
@@ -88,9 +89,11 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 				return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 			}
 		}
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
@@ -121,9 +124,11 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 			}
 		}
 
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
@@ -154,32 +159,33 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 			}
 		}
 
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
 //Message returns echo handler, receiving message from p2p and passing to related channel
 func (tssController *tssController) Message() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		logging.Info("message called")
-
 		var data models.Message
 
 		if err := c.Bind(&data); err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 		}
-		logging.Infof("message data: %+v ", data)
 
 		err := tssController.rosenTss.MessageHandler(data)
 		if err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 		}
 
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
@@ -195,9 +201,11 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 		if err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 		}
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
@@ -213,13 +221,15 @@ func (tssController *tssController) Export() echo.HandlerFunc {
 		zipWriter := zip.NewWriter(buf)
 
 		var files []string
-		err := filepath.Walk(peerHome, func(path string, info os.FileInfo, err error) error {
-			if info.IsDir() {
+		err := filepath.Walk(
+			peerHome, func(path string, info os.FileInfo, err error) error {
+				if info.IsDir() {
+					return nil
+				}
+				files = append(files, path)
 				return nil
-			}
-			files = append(files, path)
-			return nil
-		})
+			},
+		)
 		if err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 		}
