@@ -149,7 +149,7 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 					return err
 				}
 				for {
-					if s.LocalTssData.Params == nil {
+					if s.LocalTssData.Party == nil {
 						time.Sleep(100 * time.Millisecond)
 					} else {
 						break
