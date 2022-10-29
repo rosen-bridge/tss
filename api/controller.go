@@ -178,9 +178,8 @@ func (tssController *tssController) Message() echo.HandlerFunc {
 
 		err := tssController.rosenTss.MessageHandler(data)
 		if err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			logging.Error(err)
 		}
-
 		return c.JSON(
 			http.StatusOK, response{
 				Message: "ok",

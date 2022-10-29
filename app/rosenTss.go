@@ -267,18 +267,17 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 
 	var state bool
 	for i, start := 0, time.Now(); ; i++ {
-		if i%10 == 0 {
-			if time.Since(start) > time.Second*time.Duration(r.Config.MessageTimeout) {
-				logging.Error("timeout")
-				state = false
-				break
-			}
-			if _, ok := r.ChannelMap[gossipMsg.MessageId]; ok {
-				r.ChannelMap[gossipMsg.MessageId] <- gossipMsg
-				state = true
-				break
-			}
+		if time.Since(start) > time.Second*time.Duration(r.Config.MessageTimeout) {
+			logging.Error("message timeout")
+			state = false
+			break
 		}
+		if _, ok := r.ChannelMap[gossipMsg.MessageId]; ok {
+			r.ChannelMap[gossipMsg.MessageId] <- gossipMsg
+			state = true
+			break
+		}
+		time.Sleep(time.Millisecond * 500)
 	}
 	if !state {
 		return fmt.Errorf("channel not found: %+v", gossipMsg.MessageId)
