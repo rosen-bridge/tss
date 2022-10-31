@@ -51,11 +51,9 @@ func (h *handler) Sign(message []byte) ([]byte, error) {
 	private.PublicKey.Curve = tss.S256()
 	private.D = h.savedData.Xi
 
-	var index int
-	for i, k := range h.savedData.Ks {
-		if h.savedData.ShareID == k {
-			index = i
-		}
+	index, err := h.savedData.OriginalIndex()
+	if err != nil {
+		return nil, err
 	}
 
 	private.PublicKey.X, private.PublicKey.Y = h.savedData.BigXj[index].X(), h.savedData.BigXj[index].Y()

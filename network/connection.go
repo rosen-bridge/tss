@@ -87,7 +87,7 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 		return fmt.Errorf("not ok response: {%s}", res.Message)
 	}
 
-	logging.Infof("new {%s} message published", msg.Name)
+	logging.Infof("new {%s} message published, message: %+v", msg.Name, msg.Message)
 
 	return nil
 }
