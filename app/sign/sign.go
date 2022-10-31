@@ -155,6 +155,7 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 						break
 					}
 				}
+				s.Logger.Infof("party: %+v", s.LocalTssData.Party)
 				err = s.PartyUpdate(partyMsg)
 				if err != nil {
 					return err
@@ -550,8 +551,7 @@ func (s *OperationSign) SetupThread(
 
 	for {
 		round := time.Now().Unix() / turnDuration
-		if round%length == index &&
-			(time.Now().Unix()-(round*turnDuration)) < rosenTss.GetConfig().LeastProcessRemainingTime {
+		if round%length == index && int64(time.Now().Second()) < rosenTss.GetConfig().LeastProcessRemainingTime {
 			if len(s.LocalTssData.PartyIds) > threshold {
 				if s.LocalTssData.Party == nil {
 					s.Logger.Infof(
@@ -575,13 +575,13 @@ func (s *OperationSign) SetupThread(
 			if round%length < index {
 				time.Sleep(
 					time.Second * time.Duration(
-						(index-round%length)*turnDuration-(time.Now().Unix()-(round*turnDuration)),
+						(index-round%length)*turnDuration-int64(time.Now().Second()),
 					),
 				)
 			} else {
 				time.Sleep(
 					time.Second * time.Duration(
-						(length-round%length+index)*turnDuration-(time.Now().Unix()-(round*turnDuration)),
+						(length-round%length+index)*turnDuration-int64(time.Now().Second()),
 					),
 				)
 			}
@@ -641,8 +641,7 @@ func (s *OperationSign) SignMessageHandler(
 			turnDuration := rosenTss.GetConfig().TurnDuration
 			round := time.Now().Unix() / turnDuration
 
-			if round%length == index &&
-				(time.Now().Unix()-(round*turnDuration)) < rosenTss.GetConfig().LeastProcessRemainingTime {
+			if round%length == index && int64(time.Now().Second()) < rosenTss.GetConfig().LeastProcessRemainingTime {
 
 				//use hash signature data as message
 				//timestamp: round added to start sign
@@ -704,6 +703,15 @@ func (s *OperationSign) StartSignMessageHandler(
 	hash := utils.Encoder(signDataBytes[:])
 	if startSign.Hash != hash {
 		return nil, fmt.Errorf("wrogn hash to sign, receivedHash: %s, expectedHash: %s", startSign.Hash, hash)
+	}
+
+	turnDuration := rosenTss.GetConfig().TurnDuration
+	round := time.Now().Unix() / turnDuration
+
+	if round%int64(len(keyList)) != int64(msg.Index) {
+		err = fmt.Errorf("it's not %s turn", msg.SenderId)
+		s.Logger.Error(err)
+		return nil, err
 	}
 
 	s.Logger.Info("verifying every single signature in the startSign message")

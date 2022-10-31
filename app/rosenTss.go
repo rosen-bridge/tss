@@ -263,7 +263,7 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 		return err
 	}
 
-	logging.Infof("callback route called. new message %+v", gossipMsg.Name)
+	logging.Infof("callback route called. new %+v message from: %+v", gossipMsg.Name, gossipMsg.SenderId)
 
 	var state bool
 	for i, start := 0, time.Now(); ; i++ {
