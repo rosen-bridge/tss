@@ -629,6 +629,11 @@ func (s *OperationSign) SignMessageHandler(
 
 		err = s.Verify(marshal, decodedSign, gossipMessage.Index)
 		if err != nil {
+			s.Logger.Errorf(
+				"can not verify the sign message, message: %s, sign: %s",
+				string(marshal),
+				string(decodedSign),
+			)
 			return err
 		}
 
@@ -659,7 +664,7 @@ func (s *OperationSign) SignMessageHandler(
 					Hash:       utils.Encoder(signDataBytes[:]),
 					Signatures: s.Signatures,
 					StarterId:  s.LocalTssData.PartyID,
-					Peers:      s.LocalTssData.PartyIds,
+					Peers:      s.SelfSetupSignMessage.Peers,
 					Timestamp:  round,
 				}
 				marshal, err := json.Marshal(startSign)
@@ -678,7 +683,9 @@ func (s *OperationSign) SignMessageHandler(
 				}
 
 				// start party
-				s.CreateParty(rosenTss, s.LocalTssData.PartyIds, errorCh)
+				s.CreateParty(rosenTss, s.SelfSetupSignMessage.Peers, errorCh)
+			} else {
+				s.SelfSetupSignMessage = models.SetupSign{}
 			}
 		}
 	}
@@ -732,6 +739,13 @@ func (s *OperationSign) StartSignMessageHandler(
 	}
 	marshal, err := json.Marshal(setupSignMessage)
 	if err != nil {
+		return nil, err
+	}
+
+	localPeerExist := utils.IsPartyExist(s.LocalTssData.PartyID, startSign.Peers)
+	if !localPeerExist {
+		err = fmt.Errorf("this party is not part of signing process")
+		s.Logger.Error(err)
 		return nil, err
 	}
 
