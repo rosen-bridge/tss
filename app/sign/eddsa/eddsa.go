@@ -46,7 +46,10 @@ func (s *operationEDDSASign) GetClassName() string {
 }
 
 func (h *handler) Sign(message []byte) ([]byte, error) {
-	private, _, _ := edwards.PrivKeyFromScalar(h.savedData.Xi.Bytes())
+	private, _, err := edwards.PrivKeyFromScalar(h.savedData.Xi.Bytes())
+	if err != nil {
+		return nil, err
+	}
 	checksum := blake2b.Sum256(message)
 	signature, err := private.Sign(checksum[:])
 	if err != nil {
@@ -71,15 +74,19 @@ func (h *handler) Verify(msg []byte, sign []byte, index int) error {
 }
 
 func (h *handler) StartParty(
-	localTssData models.TssData,
+	localTssData *models.TssData,
+	peers tss.SortedPartyIDs,
+	threshold int,
 	signData *big.Int,
 	outCh chan tss.Message,
 	endCh chan common.SignatureData,
 ) error {
 	if localTssData.Party == nil {
-		localTssData.Party = eddsaSigning.NewLocalParty(
-			signData, localTssData.Params, h.savedData, outCh, endCh,
-		)
+		ctx := tss.NewPeerContext(peers)
+		logging.Info("creating party parameters")
+		localTssData.Params = tss.NewParameters(tss.Edwards(), ctx, localTssData.PartyID, len(peers), threshold)
+
+		localTssData.Party = eddsaSigning.NewLocalParty(signData, localTssData.Params, h.savedData, outCh, endCh)
 		if err := localTssData.Party.Start(); err != nil {
 			return err
 		}
@@ -99,6 +106,7 @@ func (h *handler) LoadData(rosenTss _interface.RosenTss) (*tss.PartyID, error) {
 		return nil, err
 	}
 	h.savedData = data
+	pID.Moniker = fmt.Sprintf("tssPeer/%s", rosenTss.GetP2pId())
 	pID.Id = rosenTss.GetP2pId()
 	return pID, nil
 }

@@ -64,7 +64,7 @@ func NewRosenTss(connection network.Connection, storage storage.Storage, config 
 
 // StartNewSign starts sign scenario for app based on given protocol.
 func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
-	log.Printf("Starting New Sign process")
+	logging.Info("Starting New Sign process")
 	err := r.SetMetaData(signMessage.Crypto)
 	if err != nil {
 		return err
@@ -74,14 +74,14 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	signDataHash := utils.Encoder(signDataBytes[:])
-	log.Printf("signDtaHash: %v", signDataHash)
+	logging.Infof("encoded sign data: %v", signDataHash)
 
 	messageId := fmt.Sprintf("%s%s", signMessage.Crypto, signDataHash)
 	_, ok := r.ChannelMap[messageId]
 	if !ok {
 		messageCh := make(chan models.GossipMessage, 100)
 		r.ChannelMap[messageId] = messageCh
-		logging.Infof("creating new channel in StartNewSign: %v", messageId)
+		logging.Infof("new communication channel for signning process: %v", messageId)
 	} else {
 		return fmt.Errorf(models.DuplicatedMessageIdError)
 	}
@@ -263,27 +263,22 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 		return err
 	}
 
-	logging.Infof("new message: %+v", gossipMsg.Name)
+	logging.Infof("callback route called. new %+v message from: %+v", gossipMsg.Name, gossipMsg.SenderId)
 
-	timeout := time.After(time.Second * time.Duration(r.Config.MessageTimeout))
 	var state bool
-
-timoutLoop:
-	for {
-		select {
-		case <-timeout:
-			logging.Error("timeout")
+	for i, start := 0, time.Now(); ; i++ {
+		if time.Since(start) > time.Second*time.Duration(r.Config.MessageTimeout) {
+			logging.Error("message timeout")
 			state = false
-			break timoutLoop
-		default:
-			if _, ok := r.ChannelMap[gossipMsg.MessageId]; ok {
-				r.ChannelMap[gossipMsg.MessageId] <- gossipMsg
-				state = true
-				break timoutLoop
-			}
+			break
 		}
+		if _, ok := r.ChannelMap[gossipMsg.MessageId]; ok {
+			r.ChannelMap[gossipMsg.MessageId] <- gossipMsg
+			state = true
+			break
+		}
+		time.Sleep(time.Millisecond * 500)
 	}
-
 	if !state {
 		return fmt.Errorf("channel not found: %+v", gossipMsg.MessageId)
 	} else {
@@ -346,12 +341,14 @@ func (r *rosenTss) SetMetaData(crypto string) error {
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf(
-			"{%#v}\n could not open the File for party in the expected location: %s. run keygen first.", err, filePath)
+			"{%#v}\n could not open the File for party in the expected location: %s. run keygen first.",
+			err,
+			filePath,
+		)
 	}
 	var meta models.MetaData
 	if err = json.Unmarshal(bz, &meta); err != nil {
-		return fmt.Errorf(
-			"{%#v}\n could not unmarshal data for party located at: %s", err, filePath)
+		return fmt.Errorf("{%#v}\n could not unmarshal data for party located at: %s", err, filePath)
 	}
 
 	r.metaData = meta
@@ -364,8 +361,13 @@ func (r *rosenTss) GetMetaData() models.MetaData {
 }
 
 // NewMessage creates gossip messages before publish
-func (r *rosenTss) NewMessage(receiverId string, senderId string, message string, messageId string,
-	name string) models.GossipMessage {
+func (r *rosenTss) NewMessage(
+	receiverId string,
+	senderId string,
+	message string,
+	messageId string,
+	name string,
+) models.GossipMessage {
 
 	m := models.GossipMessage{
 		Message:    message,
