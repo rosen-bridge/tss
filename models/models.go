@@ -10,6 +10,7 @@ const (
 	OperationIsRunningError  = "operation is running"
 	NoKeygenDataFoundError   = "no keygen data found"
 	WrongCryptoProtocolError = "wrong crypto protocol"
+	NotPartOfSigningProcess  = "this party is not part of signing process"
 )
 
 type SignMessage struct {
@@ -122,16 +123,16 @@ type Payload struct {
 }
 
 type SetupSign struct {
-	Hash      string             `json:"hash"`
-	Peers     tss.SortedPartyIDs `json:"peers"`
-	Timestamp int64              `json:"timestamp"`
-	StarterId *tss.PartyID       `json:"starterId"`
+	Hash      string        `json:"hash"`
+	Peers     []tss.PartyID `json:"peers"`
+	Timestamp int64         `json:"timestamp"`
+	StarterId string        `json:"starterId"`
 }
 
 type StartSign struct {
-	Hash       string             `json:"hash"`
-	Signatures map[int][]byte     `json:"signatures"`
-	StarterId  *tss.PartyID       `json:"starterId"`
-	Peers      tss.SortedPartyIDs `json:"peers"`
-	Timestamp  int64              `json:"timestamp"`
+	Hash       string         `json:"hash"`
+	Signatures map[int][]byte `json:"signatures"`
+	StarterId  string         `json:"starterId"`
+	Peers      []tss.PartyID  `json:"peers"`
+	Timestamp  int64          `json:"timestamp"`
 }

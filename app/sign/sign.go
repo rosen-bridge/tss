@@ -174,7 +174,10 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 					peers, err := s.StartSignMessageHandler(rosenTss, msg, keyList)
 					if err != nil {
 						s.Logger.Error(err)
-						continue
+						if err.Error() == models.NotPartOfSigningProcess {
+							return nil
+						}
+						return err
 					}
 					s.CreateParty(rosenTss, peers, errorCh)
 				}
@@ -372,6 +375,10 @@ func (s *OperationSign) Setup(rosenTss _interface.RosenTss) error {
 	turnDuration := rosenTss.GetConfig().TurnDuration
 	round := time.Now().Unix() / turnDuration
 
+	var peers []tss.PartyID
+	for _, peer := range s.LocalTssData.PartyIds {
+		peers = append(peers, *peer)
+	}
 	//use old setup message if exist
 	var setupSignMessage models.SetupSign
 	if s.SelfSetupSignMessage.Hash != "" {
@@ -379,9 +386,9 @@ func (s *OperationSign) Setup(rosenTss _interface.RosenTss) error {
 	} else {
 		setupSignMessage = models.SetupSign{
 			Hash:      utils.Encoder(messageBytes[:]),
-			Peers:     s.LocalTssData.PartyIds,
+			Peers:     peers,
 			Timestamp: round,
-			StarterId: s.LocalTssData.PartyID,
+			StarterId: s.LocalTssData.PartyID.Id,
 		}
 	}
 
@@ -477,7 +484,7 @@ func (s *OperationSign) SetupMessageHandler(
 		}
 
 		for _, peer := range setupSignMessage.Peers {
-			if !utils.IsPartyExist(peer, s.LocalTssData.PartyIds) {
+			if !utils.IsPartyExist(&peer, s.LocalTssData.PartyIds) {
 				err := s.NewRegister(rosenTss, peer.Id)
 				if err != nil {
 					return err
@@ -485,6 +492,7 @@ func (s *OperationSign) SetupMessageHandler(
 			}
 		}
 		s.SetupSignMessage = setupSignMessage
+		s.SelfSetupSignMessage = models.SetupSign{}
 	}
 	return nil
 }
@@ -511,7 +519,7 @@ func (s *OperationSign) SignStarter(rosenTss _interface.RosenTss) error {
 		SenderId:  s.LocalTssData.PartyID.Id,
 		Name:      signMessage,
 	}
-	err = s.NewMessage(rosenTss, payload, s.SetupSignMessage.StarterId.Id)
+	err = s.NewMessage(rosenTss, payload, s.SetupSignMessage.StarterId)
 	if err != nil {
 		return err
 	}
@@ -536,7 +544,7 @@ func (s *OperationSign) SignStarterThread(rosenTss _interface.RosenTss) {
 			if s.SetupSignMessage.Hash != "" {
 				allPeersExist := true
 				for _, peer := range s.SetupSignMessage.Peers {
-					if !utils.IsPartyExist(peer, s.LocalTssData.PartyIds) {
+					if !utils.IsPartyExist(&peer, s.LocalTssData.PartyIds) {
 						allPeersExist = false
 					}
 				}
@@ -663,7 +671,7 @@ func (s *OperationSign) SignMessageHandler(
 				startSign := models.StartSign{
 					Hash:       utils.Encoder(signDataBytes[:]),
 					Signatures: s.Signatures,
-					StarterId:  s.LocalTssData.PartyID,
+					StarterId:  s.LocalTssData.PartyID.Id,
 					Peers:      s.SelfSetupSignMessage.Peers,
 					Timestamp:  round,
 				}
@@ -696,7 +704,7 @@ func (s *OperationSign) StartSignMessageHandler(
 	rosenTss _interface.RosenTss,
 	msg models.GossipMessage,
 	keyList []*big.Int,
-) (tss.SortedPartyIDs, error) {
+) ([]tss.PartyID, error) {
 
 	startSign := models.StartSign{}
 	decoder, err := utils.Decoder(msg.Message)
@@ -742,11 +750,14 @@ func (s *OperationSign) StartSignMessageHandler(
 		return nil, err
 	}
 
-	localPeerExist := utils.IsPartyExist(s.LocalTssData.PartyID, startSign.Peers)
+	var localPeerExist bool
+	for _, peer := range startSign.Peers {
+		if s.LocalTssData.PartyID.Id == peer.Id {
+			localPeerExist = true
+		}
+	}
 	if !localPeerExist {
-		err = fmt.Errorf("this party is not part of signing process")
-		s.Logger.Error(err)
-		return nil, err
+		return nil, fmt.Errorf(models.NotPartOfSigningProcess)
 	}
 
 	var validSignsCount int
@@ -779,7 +790,7 @@ func (s *OperationSign) StartSignMessageHandler(
 	return startSign.Peers, nil
 }
 
-func (s *OperationSign) CreateParty(rosenTss _interface.RosenTss, peers tss.SortedPartyIDs, errorCh chan error) {
+func (s *OperationSign) CreateParty(rosenTss _interface.RosenTss, peers []tss.PartyID, errorCh chan error) {
 	s.Logger.Info("creating and starting party")
 	msgBytes, _ := utils.Decoder(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
@@ -788,7 +799,11 @@ func (s *OperationSign) CreateParty(rosenTss _interface.RosenTss, peers tss.Sort
 	endCh := make(chan common.SignatureData, len(s.LocalTssData.PartyIds))
 
 	threshold := rosenTss.GetMetaData().Threshold
-	err := s.StartParty(&s.LocalTssData, peers, threshold, signData, outCh, endCh)
+	var unsortedPeers []*tss.PartyID
+	for _, peer := range peers {
+		unsortedPeers = append(unsortedPeers, tss.NewPartyID(peer.Id, peer.Moniker, peer.KeyInt()))
+	}
+	err := s.StartParty(&s.LocalTssData, tss.SortPartyIDs(unsortedPeers), threshold, signData, outCh, endCh)
 	if err != nil {
 		errorCh <- err
 		return
