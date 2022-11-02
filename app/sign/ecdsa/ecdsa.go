@@ -93,8 +93,13 @@ func (h *handler) StartParty(
 	if localTssData.Party == nil {
 		ctx := tss.NewPeerContext(peers)
 		logging.Info("creating party parameters")
-		localTssData.Params = tss.NewParameters(tss.S256(), ctx, localTssData.PartyID, len(peers), threshold)
-
+		var localPartyId *tss.PartyID
+		for _, peer := range peers {
+			if peer.Id == localTssData.PartyID.Id {
+				localPartyId = peer
+			}
+		}
+		localTssData.Params = tss.NewParameters(tss.S256(), ctx, localPartyId, len(peers), threshold)
 		localTssData.Party = ecdsaSigning.NewLocalParty(signData, localTssData.Params, h.savedData, outCh, endCh)
 		if err := localTssData.Party.Start(); err != nil {
 			return err
