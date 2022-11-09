@@ -2,12 +2,13 @@ package utils
 
 import (
 	"fmt"
-	"github.com/binance-chain/tss-lib/tss"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
-	"rosen-bridge/tss/mocks"
 	"testing"
+
+	"github.com/binance-chain/tss-lib/tss"
+	"github.com/stretchr/testify/assert"
+	"rosen-bridge/tss/mocks"
 )
 
 /*	TestUtils_IsPartyExist
@@ -54,12 +55,14 @@ func TestUtils_IsPartyExist(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := IsPartyExist(tt.partyId, tt.partyIds)
-			if result != tt.expected {
-				t.Error(err)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				result := IsPartyExist(tt.partyId, tt.partyIds)
+				if result != tt.expected {
+					t.Error(err)
+				}
+			},
+		)
 	}
 }
 
@@ -99,18 +102,20 @@ func TestUtils_GetErgoAddressFromPK(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := GetErgoAddressFromPK(tt.pk, tt.testNet)
-			t.Log(result)
-			t.Log(len(result))
-			if tt.testNet {
-				assert.Equal(t, result[:1], "3")
-				assert.Equal(t, len(result), 52)
-			} else {
-				assert.Equal(t, result[:1], "9")
-				assert.Equal(t, len(result), 51)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				result := GetErgoAddressFromPK(tt.pk, tt.testNet)
+				t.Log(result)
+				t.Log(len(result))
+				if tt.testNet {
+					assert.Equal(t, result[:1], "3")
+					assert.Equal(t, len(result), 52)
+				} else {
+					assert.Equal(t, result[:1], "9")
+					assert.Equal(t, len(result), 51)
+				}
+			},
+		)
 	}
 }
 
@@ -168,12 +173,14 @@ func TestUtils_GetAbsoluteAddress(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := GetAbsoluteAddress(tt.homeAddress)
-			if err != nil && !tt.wantErr {
-				t.Fatal(err)
-			}
-			assert.Equal(t, result, tt.expected)
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				result, err := GetAbsoluteAddress(tt.homeAddress)
+				if err != nil && !tt.wantErr {
+					t.Fatal(err)
+				}
+				assert.Equal(t, result, tt.expected)
+			},
+		)
 	}
 }

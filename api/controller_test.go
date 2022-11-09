@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/labstack/echo/v4"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
+	"testing"
+
+	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	_interface "rosen-bridge/tss/app/interface"
 	ecdsaKeygen "rosen-bridge/tss/app/keygen/ecdsa"
 	eddsaKeygen "rosen-bridge/tss/app/keygen/eddsa"
@@ -18,8 +21,6 @@ import (
 	"rosen-bridge/tss/mocks"
 	mockedApp "rosen-bridge/tss/mocks/app/interface"
 	"rosen-bridge/tss/models"
-	"strings"
-	"testing"
 )
 
 /*	TestController_Sign
@@ -81,7 +82,10 @@ func TestController_Sign(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewSign", mock.AnythingOfType("models.SignMessage")).Return(fmt.Errorf(models.DuplicatedMessageIdError))
+				app.On(
+					"StartNewSign",
+					mock.AnythingOfType("models.SignMessage"),
+				).Return(fmt.Errorf(models.DuplicatedMessageIdError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -97,7 +101,10 @@ func TestController_Sign(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewSign", mock.AnythingOfType("models.SignMessage")).Return(fmt.Errorf(models.NoKeygenDataFoundError))
+				app.On(
+					"StartNewSign",
+					mock.AnythingOfType("models.SignMessage"),
+				).Return(fmt.Errorf(models.NoKeygenDataFoundError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -157,38 +164,40 @@ func TestController_Sign(t *testing.T) {
 	e := echo.New()
 	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := tt.appConfig()
-			controller := NewTssController(app)
-			signHandler := controller.Sign()
-			marshal, err := json.Marshal(tt.signMessage)
-			if err != nil {
-				return
-			}
-			req := httptest.NewRequest(http.MethodPost, "/sign", bytes.NewBuffer(marshal))
-			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-
-			// Assertions
-			err = signHandler(c)
-			e.HTTPErrorHandler(err, c)
-			httpError, _ := err.(*echo.HTTPError)
-			if err == nil {
-				assert.Equal(t, http.StatusOK, rec.Code)
-			} else {
-				if tt.wantErr {
-					t.Logf(err.Error())
-					assert.Equal(t, tt.statusCode, rec.Code)
-					if !strings.Contains(rec.Body.String(), httpError.Message.(string)) {
-						t.Errorf("wrong error: %v", rec.Body.String())
-					}
-				} else {
-					assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		t.Run(
+			tt.name, func(t *testing.T) {
+				app := tt.appConfig()
+				controller := NewTssController(app)
+				signHandler := controller.Sign()
+				marshal, err := json.Marshal(tt.signMessage)
+				if err != nil {
+					return
 				}
-			}
+				req := httptest.NewRequest(http.MethodPost, "/sign", bytes.NewBuffer(marshal))
+				req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
 
-		})
+				// Assertions
+				err = signHandler(c)
+				e.HTTPErrorHandler(err, c)
+				httpError, _ := err.(*echo.HTTPError)
+				if err == nil {
+					assert.Equal(t, http.StatusOK, rec.Code)
+				} else {
+					if tt.wantErr {
+						t.Logf(err.Error())
+						assert.Equal(t, tt.statusCode, rec.Code)
+						if !strings.Contains(rec.Body.String(), httpError.Message.(string)) {
+							t.Errorf("wrong error: %v", rec.Body.String())
+						}
+					} else {
+						assert.Equal(t, http.StatusInternalServerError, rec.Code)
+					}
+				}
+
+			},
+		)
 	}
 
 }
@@ -207,7 +216,6 @@ func TestController_Message(t *testing.T) {
 	tests := []struct {
 		name      string
 		message   interface{}
-		wantErr   bool
 		appConfig func() _interface.RosenTss
 	}{
 		{
@@ -219,26 +227,9 @@ func TestController_Message(t *testing.T) {
 				ReceiverId: "",
 				Name:       "partyId",
 			},
-			wantErr: false,
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
 				app.On("MessageHandler", mock.AnythingOfType("models.Message")).Return(nil)
-				return app
-			},
-		},
-		{
-			name: "new true message, get status code 500",
-			message: models.GossipMessage{
-				Message:    "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-				SenderId:   "cahj2pgs4eqvn1eo1tp0",
-				ReceiverId: "",
-				Name:       "partyId",
-			},
-			wantErr: true,
-			appConfig: func() _interface.RosenTss {
-				app := mockedApp.NewRosenTss(t)
-				app.On("MessageHandler", mock.AnythingOfType("models.Message")).Return(fmt.Errorf("error"))
 				return app
 			},
 		},
@@ -247,29 +238,27 @@ func TestController_Message(t *testing.T) {
 	e := echo.New()
 	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := tt.appConfig()
-			controller := NewTssController(app)
-			messageHandler := controller.Message()
-			marshal, err := json.Marshal(tt.message)
-			if err != nil {
-				t.Error(err)
-			}
-			req := httptest.NewRequest(http.MethodPost, "/message", bytes.NewBuffer(marshal))
-			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			// Assertions
-			err = messageHandler(c)
-			e.HTTPErrorHandler(err, c)
-			if err != nil && tt.wantErr {
-				assert.Equal(t, http.StatusInternalServerError, rec.Code)
-			} else if err == nil && tt.wantErr {
-				t.Error("false true")
-			} else if err == nil && !tt.wantErr {
-				assert.Equal(t, http.StatusOK, rec.Code)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				app := tt.appConfig()
+				controller := NewTssController(app)
+				messageHandler := controller.Message()
+				marshal, err := json.Marshal(tt.message)
+				if err != nil {
+					t.Error(err)
+				}
+				req := httptest.NewRequest(http.MethodPost, "/message", bytes.NewBuffer(marshal))
+				req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
+				// Assertions
+				err = messageHandler(c)
+				e.HTTPErrorHandler(err, c)
+				if err != nil {
+					assert.Equal(t, http.StatusInternalServerError, rec.Code)
+				}
+			},
+		)
 	}
 
 }
@@ -350,28 +339,30 @@ func TestController_Import(t *testing.T) {
 	e := echo.New()
 	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(
+			tt.name, func(t *testing.T) {
 
-			app := mockedApp.NewRosenTss(t)
-			app.On("SetPrivate", mock.AnythingOfType("models.Private")).Return(nil)
+				app := mockedApp.NewRosenTss(t)
+				app.On("SetPrivate", mock.AnythingOfType("models.Private")).Return(nil)
 
-			controller := NewTssController(app)
-			importHandler := controller.Import()
-			marshal, err := json.Marshal(tt.data)
-			if err != nil {
-				return
-			}
-			req := httptest.NewRequest(http.MethodPost, "/import", strings.NewReader(string(marshal)))
-			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			// Assertions
-			if assert.NoError(t, importHandler(c)) {
-				assert.Equal(t, http.StatusOK, rec.Code)
-			} else {
-				assert.Equal(t, http.StatusInternalServerError, rec.Code)
-			}
-		})
+				controller := NewTssController(app)
+				importHandler := controller.Import()
+				marshal, err := json.Marshal(tt.data)
+				if err != nil {
+					return
+				}
+				req := httptest.NewRequest(http.MethodPost, "/import", strings.NewReader(string(marshal)))
+				req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
+				// Assertions
+				if assert.NoError(t, importHandler(c)) {
+					assert.Equal(t, http.StatusOK, rec.Code)
+				} else {
+					assert.Equal(t, http.StatusInternalServerError, rec.Code)
+				}
+			},
+		)
 	}
 
 }
@@ -420,7 +411,10 @@ func TestController_Keygen(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewKeygen", mock.AnythingOfType("models.KeygenMessage")).Return(fmt.Errorf(models.KeygenFileExistError))
+				app.On(
+					"StartNewKeygen",
+					mock.AnythingOfType("models.KeygenMessage"),
+				).Return(fmt.Errorf(models.KeygenFileExistError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -452,7 +446,10 @@ func TestController_Keygen(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewKeygen", mock.AnythingOfType("models.KeygenMessage")).Return(fmt.Errorf(models.DuplicatedMessageIdError))
+				app.On(
+					"StartNewKeygen",
+					mock.AnythingOfType("models.KeygenMessage"),
+				).Return(fmt.Errorf(models.DuplicatedMessageIdError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -468,11 +465,13 @@ func TestController_Keygen(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				ECDSAOperation := ecdsaSign.NewSignECDSAOperation(models.SignMessage{
-					Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-					Crypto:      "ecdsa",
-					CallBackUrl: "http://localhost:5050/callback/sign",
-				})
+				ECDSAOperation := ecdsaSign.NewSignECDSAOperation(
+					models.SignMessage{
+						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+						Crypto:      "ecdsa",
+						CallBackUrl: "http://localhost:5050/callback/sign",
+					},
+				)
 				app.On("GetOperations").Return([]_interface.Operation{ECDSAOperation})
 				return app
 			},
@@ -488,11 +487,13 @@ func TestController_Keygen(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				EDDSAOperation := eddsaSign.NewSignEDDSAOperation(models.SignMessage{
-					Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-					Crypto:      "eddsa",
-					CallBackUrl: "http://localhost:5050/callback/sign",
-				})
+				EDDSAOperation := eddsaSign.NewSignEDDSAOperation(
+					models.SignMessage{
+						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+						Crypto:      "eddsa",
+						CallBackUrl: "http://localhost:5050/callback/sign",
+					},
+				)
 				app.On("GetOperations").Return([]_interface.Operation{EDDSAOperation})
 				return app
 			},
@@ -504,37 +505,39 @@ func TestController_Keygen(t *testing.T) {
 	e := echo.New()
 	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := tt.appConfig()
-			controller := NewTssController(app)
-			keygenHandler := controller.Keygen()
-			marshal, err := json.Marshal(tt.keygenMessage)
-			if err != nil {
-				return
-			}
-			req := httptest.NewRequest(http.MethodPost, "/keygen", bytes.NewBuffer(marshal))
-			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-
-			// Assertions
-			err = keygenHandler(c)
-			e.HTTPErrorHandler(err, c)
-			httpError, _ := err.(*echo.HTTPError)
-			if err == nil {
-				assert.Equal(t, http.StatusOK, rec.Code)
-			} else {
-				if tt.wantErr {
-					t.Logf(err.Error())
-					assert.Equal(t, tt.statusCode, rec.Code)
-					if !strings.Contains(rec.Body.String(), httpError.Message.(string)) {
-						t.Errorf("wrong error: %v", rec.Body.String())
-					}
-				} else {
-					assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		t.Run(
+			tt.name, func(t *testing.T) {
+				app := tt.appConfig()
+				controller := NewTssController(app)
+				keygenHandler := controller.Keygen()
+				marshal, err := json.Marshal(tt.keygenMessage)
+				if err != nil {
+					return
 				}
-			}
-		})
+				req := httptest.NewRequest(http.MethodPost, "/keygen", bytes.NewBuffer(marshal))
+				req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
+
+				// Assertions
+				err = keygenHandler(c)
+				e.HTTPErrorHandler(err, c)
+				httpError, _ := err.(*echo.HTTPError)
+				if err == nil {
+					assert.Equal(t, http.StatusOK, rec.Code)
+				} else {
+					if tt.wantErr {
+						t.Logf(err.Error())
+						assert.Equal(t, tt.statusCode, rec.Code)
+						if !strings.Contains(rec.Body.String(), httpError.Message.(string)) {
+							t.Errorf("wrong error: %v", rec.Body.String())
+						}
+					} else {
+						assert.Equal(t, http.StatusInternalServerError, rec.Code)
+					}
+				}
+			},
+		)
 	}
 
 }
@@ -605,7 +608,10 @@ func TestController_Regroup(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewRegroup", mock.AnythingOfType("models.RegroupMessage")).Return(fmt.Errorf(models.DuplicatedMessageIdError))
+				app.On(
+					"StartNewRegroup",
+					mock.AnythingOfType("models.RegroupMessage"),
+				).Return(fmt.Errorf(models.DuplicatedMessageIdError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -623,11 +629,13 @@ func TestController_Regroup(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				EDDSAOperation := eddsaSign.NewSignEDDSAOperation(models.SignMessage{
-					Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-					Crypto:      "eddsa",
-					CallBackUrl: "http://localhost:5050/callback/sign",
-				})
+				EDDSAOperation := eddsaSign.NewSignEDDSAOperation(
+					models.SignMessage{
+						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+						Crypto:      "eddsa",
+						CallBackUrl: "http://localhost:5050/callback/sign",
+					},
+				)
 				app.On("GetOperations").Return([]_interface.Operation{EDDSAOperation})
 				return app
 			},
@@ -645,11 +653,13 @@ func TestController_Regroup(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				ECDSAOperation := ecdsaSign.NewSignECDSAOperation(models.SignMessage{
-					Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-					Crypto:      "ecdsa",
-					CallBackUrl: "http://localhost:5050/callback/sign",
-				})
+				ECDSAOperation := ecdsaSign.NewSignECDSAOperation(
+					models.SignMessage{
+						Message:     "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
+						Crypto:      "ecdsa",
+						CallBackUrl: "http://localhost:5050/callback/sign",
+					},
+				)
 				app.On("GetOperations").Return([]_interface.Operation{ECDSAOperation})
 				return app
 			},
@@ -667,7 +677,10 @@ func TestController_Regroup(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewRegroup", mock.AnythingOfType("models.RegroupMessage")).Return(fmt.Errorf(models.NoKeygenDataFoundError))
+				app.On(
+					"StartNewRegroup",
+					mock.AnythingOfType("models.RegroupMessage"),
+				).Return(fmt.Errorf(models.NoKeygenDataFoundError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 
 				return app
@@ -686,7 +699,10 @@ func TestController_Regroup(t *testing.T) {
 			},
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("StartNewRegroup", mock.AnythingOfType("models.RegroupMessage")).Return(fmt.Errorf(models.WrongCryptoProtocolError))
+				app.On(
+					"StartNewRegroup",
+					mock.AnythingOfType("models.RegroupMessage"),
+				).Return(fmt.Errorf(models.WrongCryptoProtocolError))
 				app.On("GetOperations").Return([]_interface.Operation{})
 				return app
 			},
@@ -698,37 +714,39 @@ func TestController_Regroup(t *testing.T) {
 	e := echo.New()
 	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := tt.appConfig()
-			controller := NewTssController(app)
-			regroupHandler := controller.Regroup()
-			marshal, err := json.Marshal(tt.regroupMessage)
-			if err != nil {
-				return
-			}
-			req := httptest.NewRequest(http.MethodPost, "/regroup", bytes.NewBuffer(marshal))
-			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-
-			// Assertions
-			err = regroupHandler(c)
-			e.HTTPErrorHandler(err, c)
-			httpError, _ := err.(*echo.HTTPError)
-			if err == nil {
-				assert.Equal(t, http.StatusOK, rec.Code)
-			} else {
-				if tt.wantErr {
-					t.Logf(err.Error())
-					assert.Equal(t, tt.statusCode, rec.Code)
-					if !strings.Contains(rec.Body.String(), httpError.Message.(string)) {
-						t.Errorf("wrong error: %v", rec.Body.String())
-					}
-				} else {
-					assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		t.Run(
+			tt.name, func(t *testing.T) {
+				app := tt.appConfig()
+				controller := NewTssController(app)
+				regroupHandler := controller.Regroup()
+				marshal, err := json.Marshal(tt.regroupMessage)
+				if err != nil {
+					return
 				}
-			}
-		})
+				req := httptest.NewRequest(http.MethodPost, "/regroup", bytes.NewBuffer(marshal))
+				req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
+
+				// Assertions
+				err = regroupHandler(c)
+				e.HTTPErrorHandler(err, c)
+				httpError, _ := err.(*echo.HTTPError)
+				if err == nil {
+					assert.Equal(t, http.StatusOK, rec.Code)
+				} else {
+					if tt.wantErr {
+						t.Logf(err.Error())
+						assert.Equal(t, tt.statusCode, rec.Code)
+						if !strings.Contains(rec.Body.String(), httpError.Message.(string)) {
+							t.Errorf("wrong error: %v", rec.Body.String())
+						}
+					} else {
+						assert.Equal(t, http.StatusInternalServerError, rec.Code)
+					}
+				}
+			},
+		)
 	}
 
 }
@@ -791,7 +809,10 @@ func TestController_GetPk(t *testing.T) {
 			name: "get wrong pk, error 400",
 			appConfig: func() _interface.RosenTss {
 				app := mockedApp.NewRosenTss(t)
-				app.On("GetPublicKey", mock.AnythingOfType("string")).Return("", fmt.Errorf(models.WrongCryptoProtocolError))
+				app.On("GetPublicKey", mock.AnythingOfType("string")).Return(
+					"",
+					fmt.Errorf(models.WrongCryptoProtocolError),
+				)
 				return app
 			},
 			wantErr:    true,
@@ -802,41 +823,43 @@ func TestController_GetPk(t *testing.T) {
 	e := echo.New()
 	logging, _ = mocks.InitLog("controller")
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			app := tt.appConfig()
-			controller := NewTssController(app)
-			getPkHandler := controller.GetPk()
-			marshal, err := json.Marshal(tt.signMessage)
-			if err != nil {
-				return
-			}
-			req := httptest.NewRequest(http.MethodGet, "/", bytes.NewBuffer(marshal))
-			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			rec := httptest.NewRecorder()
-			c := e.NewContext(req, rec)
-			c.SetPath("/getPk/:crypto")
-			c.SetParamNames("crypto")
-			c.SetParamValues("ecdsa")
-
-			// Assertions
-			err = getPkHandler(c)
-			e.HTTPErrorHandler(err, c)
-			httpError, _ := err.(*echo.HTTPError)
-			if err == nil {
-				assert.Equal(t, http.StatusOK, rec.Code)
-			} else {
-				if tt.wantErr {
-					t.Logf(err.Error())
-					assert.Equal(t, tt.statusCode, rec.Code)
-					if !strings.Contains(rec.Body.String(), httpError.Message.(string)) {
-						t.Errorf("wrong error: %v", rec.Body.String())
-					}
-				} else {
-					assert.Equal(t, http.StatusInternalServerError, rec.Code)
+		t.Run(
+			tt.name, func(t *testing.T) {
+				app := tt.appConfig()
+				controller := NewTssController(app)
+				getPkHandler := controller.GetPk()
+				marshal, err := json.Marshal(tt.signMessage)
+				if err != nil {
+					return
 				}
-			}
+				req := httptest.NewRequest(http.MethodGet, "/", bytes.NewBuffer(marshal))
+				req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				rec := httptest.NewRecorder()
+				c := e.NewContext(req, rec)
+				c.SetPath("/getPk/:crypto")
+				c.SetParamNames("crypto")
+				c.SetParamValues("ecdsa")
 
-		})
+				// Assertions
+				err = getPkHandler(c)
+				e.HTTPErrorHandler(err, c)
+				httpError, _ := err.(*echo.HTTPError)
+				if err == nil {
+					assert.Equal(t, http.StatusOK, rec.Code)
+				} else {
+					if tt.wantErr {
+						t.Logf(err.Error())
+						assert.Equal(t, tt.statusCode, rec.Code)
+						if !strings.Contains(rec.Body.String(), httpError.Message.(string)) {
+							t.Errorf("wrong error: %v", rec.Body.String())
+						}
+					} else {
+						assert.Equal(t, http.StatusInternalServerError, rec.Code)
+					}
+				}
+
+			},
+		)
 	}
 
 }

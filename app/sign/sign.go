@@ -530,17 +530,20 @@ func (s *OperationSign) SignStarter(rosenTss _interface.RosenTss) error {
 func (s *OperationSign) SignStarterThread(rosenTss _interface.RosenTss) {
 	ticker := time.NewTicker(time.Second * time.Duration(rosenTss.GetConfig().SignStartTimeTracker))
 	done := make(chan bool)
-
+	go func() {
+		for {
+			if s.LocalTssData.Party != nil {
+				ticker.Stop()
+				done <- true
+				return
+			}
+		}
+	}()
 	for {
 		select {
 		case <-done:
 			return
 		case <-ticker.C:
-			if s.LocalTssData.Party != nil {
-				ticker.Stop()
-				done <- true
-				break
-			}
 			if s.SetupSignMessage.Hash != "" {
 				allPeersExist := true
 				for _, peer := range s.SetupSignMessage.Peers {
@@ -725,7 +728,7 @@ func (s *OperationSign) StartSignMessageHandler(
 	signDataBytes := blake2b.Sum256(signData.Bytes())
 	hash := utils.Encoder(signDataBytes[:])
 	if startSign.Hash != hash {
-		return nil, fmt.Errorf("wrogn hash to sign, receivedHash: %s, expectedHash: %s", startSign.Hash, hash)
+		return nil, fmt.Errorf("wrong hash to sign, receivedHash: %s, expectedHash: %s", startSign.Hash, hash)
 	}
 
 	turnDuration := rosenTss.GetConfig().TurnDuration
