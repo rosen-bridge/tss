@@ -171,7 +171,6 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 func (tssController *tssController) Message() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		var data models.Message
-
 		if err := c.Bind(&data); err != nil {
 			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
 		}

@@ -71,17 +71,20 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 	}
 	req.Header.Add("content-type", "application/json")
 	resp, err := c.Client.Do(req)
+	if err != nil {
+		return err
+	}
 	type response struct {
 		Message string `json:"message"`
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("not ok response: {%d}", resp.StatusCode)
 	}
 
 	var res = response{}
 	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
 		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("not ok response: {%s}", res.Message)
 	}
 	if res.Message != "ok" {
 		return fmt.Errorf("not ok response: {%s}", res.Message)
@@ -111,7 +114,9 @@ func (c *connect) Subscribe(port string) error {
 	req.Header.Add("content-type", "application/json")
 
 	resp, err := c.Client.Do(req)
-
+	if err != nil {
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("not ok response: {%v}", resp.Body)
 	}
@@ -145,16 +150,20 @@ func (c *connect) CallBack(url string, data interface{}, status string) error {
 
 	jsonData, err := json.Marshal(response)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
 
 	resp, err := c.Client.Do(req)
-
+	if err != nil {
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("not ok response: {%v}", resp.Body)
 	}
@@ -172,7 +181,9 @@ func (c *connect) GetPeerId() (string, error) {
 	req.Header.Add("content-type", "application/json")
 
 	resp, err := c.Client.Do(req)
-
+	if err != nil {
+		return "", err
+	}
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("not ok response: {%v}", resp.Body)
 	}

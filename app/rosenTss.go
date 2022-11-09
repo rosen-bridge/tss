@@ -265,22 +265,32 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 
 	logging.Infof("callback route called. new %+v message from: %+v", gossipMsg.Name, gossipMsg.SenderId)
 
+	// handling recover in case the channel is closed but not removed from the list yet, and there is a message to send on that
+	send := func(c chan models.GossipMessage, t models.GossipMessage) {
+		defer func() {
+			if x := recover(); x != nil {
+				logging.Warnf("unable to send: %v", x)
+			}
+		}()
+		c <- t
+	}
+
 	var state bool
 	for i, start := 0, time.Now(); ; i++ {
 		if time.Since(start) > time.Second*time.Duration(r.Config.MessageTimeout) {
-			logging.Error("message timeout")
 			state = false
 			break
 		}
 		if _, ok := r.ChannelMap[gossipMsg.MessageId]; ok {
-			r.ChannelMap[gossipMsg.MessageId] <- gossipMsg
+			send(r.ChannelMap[gossipMsg.MessageId], gossipMsg)
 			state = true
 			break
 		}
 		time.Sleep(time.Millisecond * 500)
 	}
 	if !state {
-		return fmt.Errorf("channel not found: %+v", gossipMsg.MessageId)
+		logging.Warnf("message timeout, channel not found: %+v", gossipMsg.MessageId)
+		return nil
 	} else {
 		return nil
 	}
