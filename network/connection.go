@@ -63,31 +63,43 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 	}
 	jsonData, err := json.Marshal(values)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req, err := http.NewRequest(http.MethodPost, c.publishUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
 	resp, err := c.Client.Do(req)
+	if err != nil {
+		logging.Error(err)
+		return err
+	}
 	type response struct {
 		Message string `json:"message"`
+	}
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("not ok response: {%d}", resp.StatusCode)
+		logging.Error(err)
+		return err
 	}
 
 	var res = response{}
 	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("not ok response: {%s}", res.Message)
-	}
 	if res.Message != "ok" {
-		return fmt.Errorf("not ok response: {%s}", res.Message)
+		err = fmt.Errorf("not ok response: {%s}", res.Message)
+		logging.Error(err)
+		return err
 	}
 
-	logging.Infof("new {%s} message published, message: %+v", msg.Name, msg.Message)
+	logging.Infof("new {%s} message published", msg.Message)
+	logging.Debugf("message: %+v", msg.Message)
 
 	return nil
 }
@@ -101,6 +113,7 @@ func (c *connect) Subscribe(port string) error {
 	}
 	jsonData, err := json.Marshal(values)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 
@@ -111,7 +124,10 @@ func (c *connect) Subscribe(port string) error {
 	req.Header.Add("content-type", "application/json")
 
 	resp, err := c.Client.Do(req)
-
+	if err != nil {
+		logging.Error(err)
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("not ok response: {%v}", resp.Body)
 	}
@@ -122,10 +138,13 @@ func (c *connect) Subscribe(port string) error {
 	var res = response{}
 	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	if res.Message != "ok" {
-		return fmt.Errorf("not ok response: {%s}", res.Message)
+		err = fmt.Errorf("not ok response: {%s}", res.Message)
+		logging.Error(err)
+		return err
 	}
 
 	return nil
@@ -145,17 +164,24 @@ func (c *connect) CallBack(url string, data interface{}, status string) error {
 
 	jsonData, err := json.Marshal(response)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
 
 	resp, err := c.Client.Do(req)
-
+	if err != nil {
+		logging.Error(err)
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("not ok response: {%v}", resp.Body)
+		logging.Error(err)
 		return fmt.Errorf("not ok response: {%v}", resp.Body)
 	}
 	return nil
@@ -172,9 +198,14 @@ func (c *connect) GetPeerId() (string, error) {
 	req.Header.Add("content-type", "application/json")
 
 	resp, err := c.Client.Do(req)
-
+	if err != nil {
+		logging.Error(err)
+		return "", err
+	}
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("not ok response: {%v}", resp.Body)
+		err = fmt.Errorf("not ok response: {%v}", resp.Body)
+		logging.Error(err)
+		return "", err
 	}
 
 	type response struct {
@@ -184,10 +215,13 @@ func (c *connect) GetPeerId() (string, error) {
 	var res = response{}
 	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
+		logging.Error(err)
 		return "", err
 	}
 	if res.Status != "ok" {
-		return "", fmt.Errorf("not ok response: {%s}", res.Status)
+		err = fmt.Errorf("not ok response: {%s}", res.Status)
+		logging.Error(err)
+		return "", err
 	}
 	if res.PeerId == "" {
 		return "", fmt.Errorf("nil peerId")

@@ -65,7 +65,6 @@ func (s *OperationSign) Init(rosenTss _interface.RosenTss, receiverId string) er
 	)
 
 	s.Logger.Infof("local PartyId: %+v", s.LocalTssData.PartyID)
-	s.Logger.Info("broadcasting new register message")
 	err = s.NewRegister(rosenTss, "")
 	if err != nil {
 		return err
@@ -98,9 +97,12 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 			return err
 		case msg, ok := <-messageCh:
 			if !ok {
+				if s.LocalTssData.Party != nil {
+					s.Logger.Infof("party was waiting for: %+v", s.LocalTssData.Party.WaitingFor())
+				}
 				return fmt.Errorf("channel closed")
 			}
-			s.Logger.Infof("new {%s} message on communication channel", msg.Name)
+			s.Logger.Infof("new {%s} message from {%s} on communication channel", msg.Name, msg.SenderId)
 			payload := models.Payload{
 				Message:   msg.Message,
 				MessageId: msg.MessageId,
@@ -163,11 +165,12 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 						break
 					}
 				}
-				s.Logger.Infof("party: %+v", s.LocalTssData.Party)
 				err = s.PartyUpdate(partyMsg)
 				if err != nil {
 					return err
 				}
+				s.Logger.Infof("party: %+v", s.LocalTssData.Party)
+				s.Logger.Infof("party is waiting for: %+v", s.LocalTssData.Party.WaitingFor())
 			case startSignMessage:
 				if msg.Message != "" && s.LocalTssData.Party == nil {
 					keyList, _ := s.GetData()
@@ -180,6 +183,7 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 						return err
 					}
 					s.CreateParty(rosenTss, peers, errorCh)
+					s.Logger.Infof("party is waiting for: %+v", s.LocalTssData.Party.WaitingFor())
 				}
 			}
 		}
@@ -283,8 +287,6 @@ func (s *OperationSign) GossipMessageHandler(
 
 func (s *OperationSign) NewRegister(rosenTss _interface.RosenTss, receiverId string) error {
 
-	s.Logger.Info("creating register message and sending to p2p")
-
 	var noAnswer bool
 
 	if receiverId != "" {
@@ -340,7 +342,7 @@ func (s *OperationSign) RegisterMessageHandler(rosenTss _interface.RosenTss, gos
 			return err
 		}
 
-		s.Logger.Infof("new register message: %+v", registerMsg)
+		s.Logger.Debugf("new register message: %+v", registerMsg)
 
 		key, _ := new(big.Int).SetString(registerMsg.Key, 10)
 		newParty := tss.NewPartyID(registerMsg.Id, registerMsg.Moniker, key)
@@ -358,7 +360,7 @@ func (s *OperationSign) RegisterMessageHandler(rosenTss _interface.RosenTss, gos
 			)
 		}
 
-		s.Logger.Infof("localparties: %+v", s.LocalTssData.PartyIds)
+		s.Logger.Debugf("localparties: %+v", s.LocalTssData.PartyIds)
 	}
 	return nil
 }
@@ -718,7 +720,7 @@ func (s *OperationSign) StartSignMessageHandler(
 	if err != nil {
 		return nil, err
 	}
-	s.Logger.Infof("new start Sign message: %+v", startSign)
+	s.Logger.Debugf("new start Sign message: %+v", startSign)
 
 	// check to valid the sign process data hash is valid
 	// verify with data received at the start of process
@@ -812,8 +814,6 @@ func (s *OperationSign) CreateParty(rosenTss _interface.RosenTss, peers []tss.Pa
 		return
 	}
 	s.Logger.Infof("party state: %v ", s.LocalTssData.Party)
-	s.Logger.Infof("party state starting: %v", s.LocalTssData.Party.String())
-	s.Logger.Infof("party state running: %v", s.LocalTssData.Party.Running())
 
 	go func() {
 		result, err := s.GossipMessageHandler(rosenTss, outCh, endCh)

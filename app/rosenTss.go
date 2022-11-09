@@ -51,7 +51,7 @@ var logging *zap.SugaredLogger
 
 // NewRosenTss Constructor of an app
 func NewRosenTss(connection network.Connection, storage storage.Storage, config models.Config) _interface.RosenTss {
-	logging = logger.NewSugar("tss")
+	logging = logger.NewSugar("app")
 	return &rosenTss{
 		ChannelMap: make(map[string]chan models.GossipMessage),
 		metaData:   models.MetaData{},
@@ -268,7 +268,6 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 	var state bool
 	for i, start := 0, time.Now(); ; i++ {
 		if time.Since(start) > time.Second*time.Duration(r.Config.MessageTimeout) {
-			logging.Error("message timeout")
 			state = false
 			break
 		}
@@ -280,7 +279,8 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 		time.Sleep(time.Millisecond * 500)
 	}
 	if !state {
-		return fmt.Errorf("channel not found: %+v", gossipMsg.MessageId)
+		logging.Warnf("message timeout, channel not found: %+v", gossipMsg.MessageId)
+		return nil
 	} else {
 		return nil
 	}
