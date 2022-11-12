@@ -123,29 +123,32 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 			switch msg.Name {
 			case registerMessage:
 				if msg.Message != "" && s.LocalTssData.Party == nil {
-					err := s.RegisterMessageHandler(rosenTss, msg)
-					if err != nil {
-						s.Logger.Error(err)
-						continue
-					}
+					go func() {
+						err := s.RegisterMessageHandler(rosenTss, msg)
+						if err != nil {
+							s.Logger.Error(err)
+						}
+					}()
 				}
 			case setupMessage:
 				if msg.Message != "" && s.LocalTssData.Party == nil {
 					keyList, _ := s.GetData()
-					err := s.SetupMessageHandler(rosenTss, msg, keyList)
-					if err != nil {
-						s.Logger.Error(err)
-						continue
-					}
+					go func() {
+						err := s.SetupMessageHandler(rosenTss, msg, keyList)
+						if err != nil {
+							s.Logger.Error(err)
+						}
+					}()
 				}
 			case signMessage:
 				if msg.Message != "" && s.LocalTssData.Party == nil {
 					keyList, sharedId := s.GetData()
-					err := s.SignMessageHandler(rosenTss, msg, keyList, sharedId, errorCh)
-					if err != nil {
-						s.Logger.Error(err)
-						continue
-					}
+					go func() {
+						err := s.SignMessageHandler(rosenTss, msg, keyList, sharedId, errorCh)
+						if err != nil {
+							s.Logger.Error(err)
+						}
+					}()
 				}
 			case partyMessage:
 				s.Logger.Infof("received party message from: %s", msg.SenderId)
@@ -158,19 +161,21 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 				if err != nil {
 					return err
 				}
-				for {
-					if s.LocalTssData.Party == nil {
-						time.Sleep(100 * time.Millisecond)
-					} else {
-						break
+				go func() {
+					for {
+						if s.LocalTssData.Party == nil {
+							time.Sleep(100 * time.Millisecond)
+						} else {
+							break
+						}
 					}
-				}
-				err = s.PartyUpdate(partyMsg)
-				if err != nil {
-					return err
-				}
-				s.Logger.Infof("party: %+v", s.LocalTssData.Party)
-				s.Logger.Infof("party is waiting for: %+v", s.LocalTssData.Party.WaitingFor())
+					s.Logger.Infof("party: %+v", s.LocalTssData.Party)
+					err = s.PartyUpdate(partyMsg)
+					if err != nil {
+						errorCh <- err
+					}
+					s.Logger.Infof("party is waiting for: %+v", s.LocalTssData.Party.WaitingFor())
+				}()
 			case startSignMessage:
 				if msg.Message != "" && s.LocalTssData.Party == nil {
 					keyList, _ := s.GetData()

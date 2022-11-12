@@ -340,10 +340,10 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 	}
 
 	tests := []struct {
-		name       string
-		channelMap map[string]chan models.GossipMessage
-		message    models.Message
-		wantErr    bool
+		name         string
+		channelMap   map[string]chan models.GossipMessage
+		message      models.Message
+		writeSuccess bool
 	}{
 		{
 			name: "the channel with messageId is exist in the channel map, there must be no error",
@@ -351,8 +351,8 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 				Topic:   "tss",
 				Message: string(marshal),
 			},
-			channelMap: channelMap,
-			wantErr:    false,
+			channelMap:   channelMap,
+			writeSuccess: true,
 		},
 		{
 			name: "the channel with messageId is not exist in the channel map, there must be no error",
@@ -360,8 +360,17 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 				Topic:   "tss",
 				Message: string(marshal),
 			},
-			channelMap: make(map[string]chan models.GossipMessage),
-			wantErr:    true,
+			channelMap:   make(map[string]chan models.GossipMessage),
+			writeSuccess: false,
+		},
+		{
+			name: "the channel with messageId is exist in the channel map, but the channel in closed, there must be no error",
+			message: models.Message{
+				Topic:   "tss",
+				Message: string(marshal),
+			},
+			channelMap:   channelMap,
+			writeSuccess: false,
 		},
 	}
 	logging, _ = mockUtils.InitLog("tss")
@@ -371,13 +380,13 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 			tt.name, func(t *testing.T) {
 				app.ChannelMap = tt.channelMap
 
+				if _, ok := tt.channelMap[gossipMessage.MessageId]; ok && !tt.writeSuccess {
+					close(tt.channelMap[gossipMessage.MessageId])
+				}
 				err = app.MessageHandler(tt.message)
 				if err != nil {
-					if !tt.wantErr {
-						t.Errorf("MessageHandler error: %v", err)
-					}
-				} else {
-
+					t.Errorf("MessageHandler error: %v", err)
+				} else if tt.writeSuccess {
 					msg := <-app.ChannelMap[gossipMessage.MessageId]
 					marshal, err := json.Marshal(&msg)
 					if err != nil {

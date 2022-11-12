@@ -98,7 +98,7 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 		return err
 	}
 
-	logging.Infof("new {%s} message published", msg.Message)
+	logging.Infof("new {%s} message published", msg.Name)
 	logging.Debugf("message: %+v", msg.Message)
 
 	return nil
