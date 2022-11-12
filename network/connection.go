@@ -150,12 +150,10 @@ func (c *connect) CallBack(url string, data interface{}, status string) error {
 
 	jsonData, err := json.Marshal(response)
 	if err != nil {
-		logging.Error(err)
 		return err
 	}
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		logging.Error(err)
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
