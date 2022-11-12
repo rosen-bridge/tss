@@ -102,7 +102,8 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 				}
 				return fmt.Errorf("channel closed")
 			}
-			s.Logger.Infof("new {%s} message from {%s} on communication channel", msg.Name, msg.SenderId)
+			s.Logger.Infof("new {%s} message on communication channel", msg.Name)
+
 			payload := models.Payload{
 				Message:   msg.Message,
 				MessageId: msg.MessageId,
@@ -174,7 +175,6 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 					if err != nil {
 						errorCh <- err
 					}
-					s.Logger.Infof("party is waiting for: %+v", s.LocalTssData.Party.WaitingFor())
 				}()
 			case startSignMessage:
 				if msg.Message != "" && s.LocalTssData.Party == nil {
