@@ -212,7 +212,6 @@ func TestController_Sign(t *testing.T) {
 	it depends on `rosenTss.MessageHandler` function and will be handled as a mocked one.
 */
 func TestController_Message(t *testing.T) {
-
 	tests := []struct {
 		name      string
 		message   interface{}
