@@ -26,7 +26,6 @@ type connect struct {
 	publishUrl      string
 	subscriptionUrl string
 	getPeerIDUrl    string
-	subscribeId     string
 	Client          HTTPClient
 }
 
@@ -48,6 +47,7 @@ func InitConnection(publishPath string, subscriptionPath string, p2pPort string,
 
 // Publish publishes a message to p2p
 func (c *connect) Publish(msg models.GossipMessage) error {
+	logging.Infof("publishing new message on p2p")
 	marshalledMessage, _ := json.Marshal(&msg)
 
 	type message struct {
@@ -68,20 +68,20 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 	}
 	req, err := http.NewRequest(http.MethodPost, c.publishUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
-		logging.Error(err)
+		logging.Errorf("error occurred in creating request: %+v", err)
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		logging.Error(err)
+		logging.Errorf("error occurred in doing request: %+v", err)
 		return err
 	}
 	type response struct {
 		Message string `json:"message"`
 	}
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("not ok response: {%d}", resp.StatusCode)
+		err = fmt.Errorf("not ok response code: {%d}", resp.StatusCode)
 		logging.Error(err)
 		return err
 	}
@@ -93,7 +93,7 @@ func (c *connect) Publish(msg models.GossipMessage) error {
 		return err
 	}
 	if res.Message != "ok" {
-		err = fmt.Errorf("not ok response: {%s}", res.Message)
+		err = fmt.Errorf("not ok response message: {%s}", res.Message)
 		logging.Error(err)
 		return err
 	}
@@ -119,6 +119,7 @@ func (c *connect) Subscribe(port string) error {
 
 	req, err := http.NewRequest(http.MethodPost, c.subscriptionUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
@@ -129,7 +130,7 @@ func (c *connect) Subscribe(port string) error {
 		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("not ok response: {%v}", resp.Body)
+		return fmt.Errorf("not ok response code: {%v}", resp.StatusCode)
 	}
 
 	type response struct {
@@ -142,7 +143,7 @@ func (c *connect) Subscribe(port string) error {
 		return err
 	}
 	if res.Message != "ok" {
-		err = fmt.Errorf("not ok response: {%s}", res.Message)
+		err = fmt.Errorf("not ok response message: {%s}", res.Message)
 		logging.Error(err)
 		return err
 	}
@@ -180,9 +181,9 @@ func (c *connect) CallBack(url string, data interface{}, status string) error {
 		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("not ok response: {%v}", resp.Body)
+		err = fmt.Errorf("not ok response code: {%v}", resp.StatusCode)
 		logging.Error(err)
-		return fmt.Errorf("not ok response: {%v}", resp.Body)
+		return err
 	}
 	return nil
 }
@@ -203,7 +204,7 @@ func (c *connect) GetPeerId() (string, error) {
 		return "", err
 	}
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("not ok response: {%v}", resp.Body)
+		err = fmt.Errorf("not ok response: {%v}", resp.StatusCode)
 		logging.Error(err)
 		return "", err
 	}
@@ -219,13 +220,13 @@ func (c *connect) GetPeerId() (string, error) {
 		return "", err
 	}
 	if res.Status != "ok" {
-		err = fmt.Errorf("not ok response: {%s}", res.Status)
+		err = fmt.Errorf("not ok response message: {%s}", res.Status)
 		logging.Error(err)
 		return "", err
 	}
 	if res.PeerId == "" {
 		return "", fmt.Errorf("nil peerId")
 	}
-	logging.Infof("response: %+v", res)
+	logging.Infof("peerId: %+v", res.PeerId)
 	return res.PeerId, nil
 }
