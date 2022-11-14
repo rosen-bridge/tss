@@ -3,18 +3,19 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
+
 	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/pkg/errors"
 	"github.com/rs/xid"
 	"go.uber.org/zap"
-	"io/ioutil"
-	"os"
-	"path/filepath"
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
-	"strings"
 )
 
 type Storage interface {
@@ -47,7 +48,7 @@ func (f *storage) MakefilePath(peerHome string, protocol string) {
 // WriteData writing given data to file in given path
 func (f *storage) WriteData(data interface{}, peerHome string, fileFormat string, protocol string) error {
 
-	logging.Info("write data called")
+	logging.Info("writing data to the file")
 
 	f.MakefilePath(peerHome, protocol)
 	err := os.MkdirAll(f.filePath, os.ModePerm)
@@ -57,7 +58,7 @@ func (f *storage) WriteData(data interface{}, peerHome string, fileFormat string
 
 	path := filepath.Join(f.filePath, fileFormat)
 
-	logging.Infof("path: %s", path)
+	logging.Infof("file path: %s", path)
 	fd, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	defer func(fd *os.File) {
 		err := fd.Close()
@@ -71,13 +72,13 @@ func (f *storage) WriteData(data interface{}, peerHome string, fileFormat string
 	}
 	bz, err := json.MarshalIndent(&data, "", "    ")
 	if err != nil {
-		return fmt.Errorf("unable to marshal save data for File %s, err:{%v}", path, err)
+		return fmt.Errorf("unable to marshal data, err:{%v}", err)
 	}
 	_, err = fd.Write(bz)
 	if err != nil {
 		return fmt.Errorf("unable to write to File %s", path)
 	}
-	logging.Infof("Saved a File: %s", path)
+	logging.Infof("data was written successfully in a file: %s", path)
 	return nil
 }
 
@@ -100,18 +101,22 @@ func (f *storage) LoadEDDSAKeygen(peerHome string) (eddsaKeygen.LocalPartySaveDa
 		}
 	}
 	filePath := filepath.Join(f.filePath, keygenFile)
-	logging.Infof("File: %v", filePath)
+	logging.Infof("key file path: %v", filePath)
 
 	// reading file
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return eddsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(err,
-			"could not open the File for party in the expected location: %s. run keygen first.", filePath)
+		return eddsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(
+			err,
+			"could not open the file for party in the expected location: %s. run keygen first.", filePath,
+		)
 	}
 	var key eddsaKeygen.LocalPartySaveData
 	if err = json.Unmarshal(bz, &key); err != nil {
-		return eddsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(err,
-			"could not unmarshal data for party located at: %s", filePath)
+		return eddsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(
+			err,
+			"could not unmarshal data for party located at: %s", filePath,
+		)
 	}
 
 	//creating data from file
@@ -153,13 +158,17 @@ func (f *storage) LoadECDSAKeygen(peerHome string) (ecdsaKeygen.LocalPartySaveDa
 	// reading file
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(err,
-			"could not open the File for party in the expected location: %s. run keygen first.", filePath)
+		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(
+			err,
+			"could not open the File for party in the expected location: %s. run keygen first.", filePath,
+		)
 	}
 	var key ecdsaKeygen.LocalPartySaveData
 	if err = json.Unmarshal(bz, &key); err != nil {
-		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(err,
-			"could not unmarshal data for party located at: %s", filePath)
+		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.Wrapf(
+			err,
+			"could not unmarshal data for party located at: %s", filePath,
+		)
 	}
 
 	//creating data from file
@@ -207,7 +216,13 @@ func (f *storage) LoadPrivate(peerHome string, crypto string) string {
 	// reading file
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		logging.Error(fmt.Errorf("could not open the File for party in the expected location: %s. import private first. error: %v", filePath, err))
+		logging.Error(
+			fmt.Errorf(
+				"could not open the File for party in the expected location: %s. import private first. error: %v",
+				filePath,
+				err,
+			),
+		)
 		return ""
 	}
 	var key models.Private

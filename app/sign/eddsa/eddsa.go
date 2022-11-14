@@ -48,11 +48,13 @@ func (s *operationEDDSASign) GetClassName() string {
 func (h *handler) Sign(message []byte) ([]byte, error) {
 	private, _, err := edwards.PrivKeyFromScalar(h.savedData.Xi.Bytes())
 	if err != nil {
+		logging.Errorf("there was an error in recovering private key: %+v", err)
 		return nil, err
 	}
 	checksum := blake2b.Sum256(message)
 	signature, err := private.Sign(checksum[:])
 	if err != nil {
+		logging.Errorf("there was an error in signing message: %+v", err)
 		return nil, err
 	}
 	return signature.Serialize(), nil

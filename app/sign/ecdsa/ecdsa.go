@@ -53,6 +53,7 @@ func (h *handler) Sign(message []byte) ([]byte, error) {
 
 	index, err := h.savedData.OriginalIndex()
 	if err != nil {
+		logging.Errorf("there was an error in finding index: %+v", err)
 		return nil, err
 	}
 
@@ -61,7 +62,8 @@ func (h *handler) Sign(message []byte) ([]byte, error) {
 	checksum := blake2b.Sum256(message)
 	signature, err := private.Sign(rand.Reader, checksum[:], nil)
 	if err != nil {
-		panic(err)
+		logging.Errorf("there was an error in signing message: %+v", err)
+		return nil, err
 	}
 	return signature, nil
 }

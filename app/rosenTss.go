@@ -51,7 +51,7 @@ var logging *zap.SugaredLogger
 
 // NewRosenTss Constructor of an app
 func NewRosenTss(connection network.Connection, storage storage.Storage, config models.Config) _interface.RosenTss {
-	logging = logger.NewSugar("tss")
+	logging = logger.NewSugar("app")
 	return &rosenTss{
 		ChannelMap: make(map[string]chan models.GossipMessage),
 		metaData:   models.MetaData{},

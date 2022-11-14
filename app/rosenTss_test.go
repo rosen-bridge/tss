@@ -379,7 +379,6 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				app.ChannelMap = tt.channelMap
-
 				if _, ok := tt.channelMap["eddsaccd5480560cf2dec4098917"]; ok && !tt.writeSuccess {
 					close(tt.channelMap["eddsaccd5480560cf2dec4098917"])
 				}

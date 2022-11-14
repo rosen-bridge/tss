@@ -88,5 +88,9 @@ func Init(logFile string, config models.Config, dev bool) error {
 }
 
 func NewSugar(name string) *zap.SugaredLogger {
-	return globalLogger.Named(name).Sugar()
+	return globalLogger.Named("tss/" + name).Sugar()
+}
+
+func NewLogger() *zap.Logger {
+	return globalLogger
 }
