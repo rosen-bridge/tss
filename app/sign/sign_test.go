@@ -326,12 +326,12 @@ func TestSign_SetupThread(t *testing.T) {
 					Handler:      handler,
 				}
 
-				ticker := time.NewTicker(time.Second * time.Duration(1))
+				testTicker := time.NewTicker(time.Second * time.Duration(1))
 
 				go func() {
 					for {
 						select {
-						case <-ticker.C:
+						case <-testTicker.C:
 							return
 						default:
 							err := eddsaSignOp.SetupThread(app, tt.saveData.Ks, tt.saveData.ShareID, 2)
@@ -436,12 +436,9 @@ func TestSign_CreateParty(t *testing.T) {
 				}
 
 				go func() {
-					for {
-						select {
-						case err := <-errorCh:
-							if err.Error() != "party started" {
-								t.Error(err)
-							}
+					for err := range errorCh {
+						if err.Error() != "party started" {
+							t.Error(err)
 						}
 					}
 				}()
@@ -931,12 +928,9 @@ func TestSign_SignMessageHandler(t *testing.T) {
 				}
 
 				go func() {
-					for {
-						select {
-						case err := <-errorCh:
-							if err.Error() != "party started" {
-								t.Error(err)
-							}
+					for err := range errorCh {
+						if err.Error() != "party started" {
+							t.Error(err)
 						}
 					}
 				}()
@@ -1239,8 +1233,7 @@ func TestEDDSASign_RegisterMessageHandler(t *testing.T) {
 	}
 	var localTssData models.TssData
 	localTssData.PartyID = newPartyId
-	var localTssDataWith2PartyIds models.TssData
-	localTssDataWith2PartyIds = localTssData
+	localTssDataWith2PartyIds := localTssData
 	localTssDataWith2PartyIds.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId2),
 	)
@@ -2186,7 +2179,7 @@ func TestEDDSA_Init(t *testing.T) {
 		},
 	}
 
-	logger, err := mockUtils.InitLog("eddsa-sign")
+	logger, _ := mockUtils.InitLog("eddsa-sign")
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {
@@ -2245,7 +2238,7 @@ func TestEDDSA_Loop(t *testing.T) {
 	if err != nil {
 		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
 	}
-	_, Id3, err := mockUtils.LoadEDDSAKeygenFixture(0)
+	_, _, err = mockUtils.LoadEDDSAKeygenFixture(0)
 	if err != nil {
 		t.Errorf("LoadEDDSAKeygenFixture error = %v", err)
 	}
@@ -2259,9 +2252,9 @@ func TestEDDSA_Loop(t *testing.T) {
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId),
 	)
-	localTssData.PartyIds = tss.SortPartyIDs(
-		append(localTssData.PartyIds.ToUnSorted(), Id3),
-	)
+	//localTssData.PartyIds = tss.SortPartyIDs(
+	//	append(localTssData.PartyIds.ToUnSorted(), Id3),
+	//)
 	localTssData.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), localTssData.PartyID),
 	)
@@ -2380,45 +2373,6 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 		{
-			name:     "register returns error",
-			expected: "handling incoming register message from p2p, there must be no error out of err list",
-			message: models.GossipMessage{
-				Message:    utils.Encoder(marshal),
-				MessageId:  "eddsaccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-				SenderId:   newPartyId.Id,
-				ReceiverId: "",
-				Name:       registerMessage,
-				Index:      index,
-			},
-			AppConfig: func() (_interface.RosenTss, Handler) {
-				app := mockedInterface.NewRosenTss(t)
-				conn := mockedNetwork.NewConnection(t)
-				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(fmt.Errorf("close channel"))
-				app.On("GetConnection").Return(conn)
-				app.On("GetMetaData").Return(
-					models.MetaData{
-						PeersCount: 3,
-						Threshold:  2,
-					},
-				)
-				app.On("GetConfig").Return(
-					models.Config{
-						TurnDuration:              60,
-						LeastProcessRemainingTime: 50,
-						SetupBroadcastInterval:    10,
-						SignStartTimeTracker:      1,
-					},
-				)
-
-				handler := mocks.NewHandler(t)
-				handler.On("Sign", mock.Anything).Return([]byte{}, nil)
-				handler.On("GetData").Return(saveData.Ks, saveData.ShareID)
-				handler.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-
-				return app, handler
-			},
-		},
-		{
 			name:     "setup",
 			expected: "handling incoming setup message from p2p, there must be no error out of err list",
 			message: models.GossipMessage{
@@ -2445,9 +2399,12 @@ func TestEDDSA_Loop(t *testing.T) {
 						SignStartTimeTracker:      1,
 					},
 				)
-
+				conn := mockedNetwork.NewConnection(t)
+				conn.On("Publish", mock.AnythingOfType("models.GossipMessage")).Return(fmt.Errorf("message received"))
+				app.On("GetConnection").Return(conn)
 				handler := mocks.NewHandler(t)
 				handler.On("GetData").Return(saveData.Ks, saveData.ShareID)
+				handler.On("Sign", mock.Anything).Return([]byte{}, nil)
 				handler.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 				return app, handler
@@ -2542,7 +2499,7 @@ func TestEDDSA_Loop(t *testing.T) {
 					Handler:      handler,
 				}
 
-				messageCh := make(chan models.GossipMessage, 100)
+				messageCh := make(chan models.GossipMessage, 10)
 
 				payload := models.Payload{
 					Message:   tt.message.Message,
@@ -2556,15 +2513,33 @@ func TestEDDSA_Loop(t *testing.T) {
 				tt.message.Signature = signature
 
 				messageCh <- tt.message
+				//go func() {
+				//	for {
+				//		if len(messageCh) == 0 {
+				//			time.Sleep(time.Millisecond * 100)
+				//			close(messageCh)
+				//		}
+				//	}
+				//}()
+
+				testTicker := time.NewTicker(time.Millisecond * 100)
+				errorList := []string{"not enough signatures", "channel closed", "invalid wire-format"}
+
 				go func() {
-					time.Sleep(time.Millisecond * 100)
-					close(messageCh)
+					for {
+						select {
+						case <-testTicker.C:
+							return
+						default:
+							err := eddsaSignOp.Loop(app, messageCh)
+							if err != nil && !mockUtils.Contains(err.Error(), errorList) {
+								t.Error(err)
+							}
+						}
+					}
 				}()
-				errorList := []string{"invalid wire-format", "channel closed"}
-				err := eddsaSignOp.Loop(app, messageCh)
-				if err != nil && !mockUtils.Contains(err.Error(), errorList) {
-					t.Error(err)
-				}
+				time.Sleep(1 * time.Second)
+
 			},
 		)
 	}
@@ -2603,8 +2578,7 @@ func TestECDSASign_RegisterMessageHandler(t *testing.T) {
 	}
 	var localTssData models.TssData
 	localTssData.PartyID = newPartyId
-	var localTssDataWith2PartyIds models.TssData
-	localTssDataWith2PartyIds = localTssData
+	localTssDataWith2PartyIds := localTssData
 	localTssDataWith2PartyIds.PartyIds = tss.SortPartyIDs(
 		append(localTssData.PartyIds.ToUnSorted(), newPartyId2),
 	)
@@ -3550,7 +3524,7 @@ func TestECDSA_Init(t *testing.T) {
 		},
 	}
 
-	logger, err := mockUtils.InitLog("ecdsa-sign")
+	logger, _ := mockUtils.InitLog("ecdsa-sign")
 	for _, tt := range tests {
 		t.Run(
 			tt.name, func(t *testing.T) {

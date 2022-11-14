@@ -39,7 +39,7 @@ var logging *zap.SugaredLogger
 
 // NewTssController Constructor of an app controller
 func NewTssController(rosenTss _interface.RosenTss) TssController {
-	logging = logger.NewSugar("connection")
+	logging = logger.NewSugar("controller")
 	return &tssController{
 		rosenTss: rosenTss,
 	}
@@ -165,14 +165,14 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 //Message returns echo handler, receiving message from p2p and passing to related channel
 func (tssController *tssController) Message() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		data := new(models.Message)
+		var data models.Message
 		logging.Infof("message route called")
-		if err := c.Bind(data); err != nil {
+		if err := c.Bind(&data); err != nil {
 			logging.Errorf("can not bind data, err: %+v", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
-		err := tssController.rosenTss.MessageHandler(*data)
+		err := tssController.rosenTss.MessageHandler(data)
 		if err != nil {
 			logging.Error(err)
 		}

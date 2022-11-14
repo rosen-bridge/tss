@@ -325,11 +325,11 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 	}
 	messageCh := make(chan models.GossipMessage, 100)
 	channelMap := make(map[string]chan models.GossipMessage)
-	channelMap["ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1"] = messageCh
+	channelMap["eddsaccd5480560cf2dec4098917"] = messageCh
 
 	gossipMessage := models.GossipMessage{
 		Message:    "951103106cb7dce7eb3bb26c99939a8ab6311c171895c09f3a4691d36bfb0a70",
-		MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+		MessageId:  "eddsaccd5480560cf2dec4098917",
 		SenderId:   "cahj2pgs4eqvn1eo1tp0",
 		ReceiverId: "",
 		Name:       "partyId",
@@ -379,9 +379,8 @@ func TestRosenTss_MessageHandler(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				app.ChannelMap = tt.channelMap
-
-				if _, ok := tt.channelMap[gossipMessage.MessageId]; ok && !tt.writeSuccess {
-					close(tt.channelMap[gossipMessage.MessageId])
+				if _, ok := tt.channelMap["eddsaccd5480560cf2dec4098917"]; ok && !tt.writeSuccess {
+					close(tt.channelMap["eddsaccd5480560cf2dec4098917"])
 				}
 				err = app.MessageHandler(tt.message)
 				if err != nil {

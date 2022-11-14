@@ -824,8 +824,8 @@ func (s *OperationSign) CreateParty(rosenTss _interface.RosenTss, peers []tss.Pa
 		errorCh <- err
 		return
 	}
-	s.Logger.Infof("party info: %v ", s.LocalTssData.Party)
 
+	s.Logger.Infof("party info: %v ", s.LocalTssData.Party)
 	go func() {
 		result, err := s.GossipMessageHandler(rosenTss, outCh, endCh)
 		if err != nil {
