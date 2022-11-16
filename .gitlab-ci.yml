@@ -47,5 +47,5 @@ code_coverage:
     reports:
       coverage_report:
         coverage_format: cobertura
-        path: coverage/coverage.html
+        path: ./coverage.html
 
