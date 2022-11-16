@@ -44,8 +44,8 @@ code_coverage:
     - go tool cover -html=coverage.txt -o coverage.html
   coverage: '/All files[^|]*\|[^|]*\s+([\d\.]+)/'
   artifacts:
-  reports:
-    coverage_report:
-      coverage_format: cobertura
-      path: coverage/coverage.html
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage/coverage.html
 
