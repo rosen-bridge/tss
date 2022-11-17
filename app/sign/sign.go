@@ -49,7 +49,14 @@ type OperationSign struct {
 	Handler
 }
 
-// Init initializes the eddsa sign partyId and creates partyId message
+/*	Init
+	- Initializes the eddsa sign partyId and creates a broadcast register message by calling NewRegister
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- receiver_id string
+	returns:
+	error
+*/
 func (s *OperationSign) Init(rosenTss _interface.RosenTss, receiverId string) error {
 
 	s.Logger.Info("initiation signing process")
@@ -73,6 +80,16 @@ func (s *OperationSign) Init(rosenTss _interface.RosenTss, receiverId string) er
 	return nil
 }
 
+/*	Loop
+	- creates goroutine to handle SetupThread function.
+	- creates goroutine to handle SignStarterThread function.
+	- reads new gossip messages from channel and handle it by calling related function in a goroutine.
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- gossip_meesage_channel chan models.GossipMessage
+	returns:
+	error
+*/
 func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models.GossipMessage) error {
 
 	errorCh := make(chan error)
@@ -164,7 +181,7 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 				go func() {
 					for {
 						if s.LocalTssData.Party == nil {
-							time.Sleep(100 * time.Millisecond)
+							time.Sleep(time.Duration(rosenTss.GetConfig().WaitInPartyMessageHandling) * time.Millisecond)
 						} else {
 							break
 						}
@@ -197,7 +214,13 @@ func (s *OperationSign) Loop(rosenTss _interface.RosenTss, messageCh chan models
 	}
 }
 
-// PartyUpdate updates partyIds in eddsa app party based on received message
+/*	PartyUpdate
+	- Updates party on received message destination.
+	args:
+	- party_message models.PartyMessage
+	returns:
+	error
+*/
 func (s *OperationSign) PartyUpdate(partyMsg models.PartyMessage) error {
 	dest := partyMsg.To
 	if dest == nil { // broadcast!
@@ -225,7 +248,16 @@ func (s *OperationSign) PartyUpdate(partyMsg models.PartyMessage) error {
 	return nil
 }
 
-// HandleOutMessage handling party messages on out channel
+/*	HandleOutMessage
+	- handles party messages on out channel
+	- creates payload from party message
+	- send it to NewMessage function
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- party_message tss.Message
+	returns:
+	error
+*/
 func (s *OperationSign) HandleOutMessage(rosenTss _interface.RosenTss, partyMsg tss.Message) error {
 	msgBytes, _ := utils.Decoder(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
@@ -249,7 +281,15 @@ func (s *OperationSign) HandleOutMessage(rosenTss _interface.RosenTss, partyMsg 
 	return nil
 }
 
-// HandleEndMessage handling save data on end cahnnel of party
+/*	HandleEndMessage
+	- handles save data (signature) on end channel of party
+	- logs the data and send it to CallBack
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- signature_data *common.SignatureData
+	returns:
+	error
+*/
 func (s *OperationSign) HandleEndMessage(rosenTss _interface.RosenTss, signatureData *common.SignatureData) error {
 
 	signData := models.SignData{
@@ -272,7 +312,16 @@ func (s *OperationSign) HandleEndMessage(rosenTss _interface.RosenTss, signature
 
 }
 
-// GossipMessageHandler handling all party messages on outCH and endCh
+/*	GossipMessageHandler
+	- handles all party messages on outCh and endCh
+	- listens to channels and send the message to the right function
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- outCh chan tss.Message
+	- endCh chan common.SignatureData
+	returns:
+	result_of_process bool, error
+*/
 func (s *OperationSign) GossipMessageHandler(
 	rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData,
 ) (bool, error) {
@@ -293,6 +342,14 @@ func (s *OperationSign) GossipMessageHandler(
 	}
 }
 
+/*	NewRegister
+	- creates a payload for register message and sends it to NewMessage function
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- receiver_id string
+	returns:
+	error
+*/
 func (s *OperationSign) NewRegister(rosenTss _interface.RosenTss, receiverId string) error {
 
 	s.Logger.Infof("creating new register message")
@@ -337,7 +394,17 @@ func (s *OperationSign) NewRegister(rosenTss _interface.RosenTss, receiverId str
 
 }
 
-// RegisterMessageHandler handles register message, and it calls setup functions if patryIds list length was at least equal to the threshold
+/*	RegisterMessageHandler
+	- handles register message.
+	- unmarshal received message as register message.
+	- check NoAnswer parameter to send register message to receiver if needded.
+	- add the new partyId to the list if it's not exist.
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- gossip_message models.GossipMessage
+	returns:
+	error
+*/
 func (s *OperationSign) RegisterMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
 
 	if gossipMessage.SenderId != s.LocalTssData.PartyID.Id {
@@ -375,7 +442,15 @@ func (s *OperationSign) RegisterMessageHandler(rosenTss _interface.RosenTss, gos
 	return nil
 }
 
-// Setup called after if Init up was successful. it used to create party params and sign message
+/*	Setup
+	- calculates round and creates setup message.
+	- If SelfSetupSignMessage is not nil, creates new setup message from this.
+	- creates payload from new setup message and sends it to NewMessage function.
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	returns:
+	error
+*/
 func (s *OperationSign) Setup(rosenTss _interface.RosenTss) error {
 	s.Logger.Infof("starting setup process")
 	msgBytes, _ := utils.Decoder(s.SignMessage.Message)
@@ -424,6 +499,17 @@ func (s *OperationSign) Setup(rosenTss _interface.RosenTss) error {
 	return nil
 }
 
+/*	NewMessage
+	- finds the index of peer in the key list.
+	- creates a gossip message from payload.
+	- sends the gossip message to Publish function.
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- payload models.Payload
+	- receiver_id string
+	returns:
+	error
+*/
 func (s *OperationSign) NewMessage(rosenTss _interface.RosenTss, payload models.Payload, receiver string) error {
 	s.Logger.Infof("creating new gossip message")
 	keyList, sharedId := s.GetData()
@@ -457,7 +543,18 @@ func (s *OperationSign) NewMessage(rosenTss _interface.RosenTss, payload models.
 	return nil
 }
 
-// SetupMessageHandler handles setup message
+/*	SetupMessageHandler
+	- handles the received setup message
+	- calculates round of sender and checks to be it's round.
+	- checks the hash in the setup message with sign data hash.
+	- register with peers not exist in the peer list
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- gossip_message models.GossipMessage
+	- key_list []*big.Int,
+	returns:
+	error
+*/
 func (s *OperationSign) SetupMessageHandler(
 	rosenTss _interface.RosenTss, gossipMessage models.GossipMessage,
 	keyList []*big.Int,
@@ -490,7 +587,7 @@ func (s *OperationSign) SetupMessageHandler(
 		signDataBytes := blake2b.Sum256(signData.Bytes())
 		if setupSignMessage.Hash != utils.Encoder(signDataBytes[:]) {
 			return fmt.Errorf(
-				"wrogn hash to sign, received: %s, expected: %s", s.SetupSignMessage.Hash,
+				"wrong hash to sign, received: %s, expected: %s", s.SetupSignMessage.Hash,
 				utils.Encoder(signDataBytes[:]),
 			)
 		}
@@ -509,6 +606,14 @@ func (s *OperationSign) SetupMessageHandler(
 	return nil
 }
 
+/*	SignStarter
+	- signs received setup message
+	- sends the signature to the setup message sender
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	returns:
+	error
+*/
 func (s *OperationSign) SignStarter(rosenTss _interface.RosenTss) error {
 	msgBytes, _ := utils.Decoder(s.SignMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
@@ -539,6 +644,16 @@ func (s *OperationSign) SignStarter(rosenTss _interface.RosenTss) error {
 	return nil
 }
 
+/*	SignStarterThread
+	- calls in the Loop function in goroutine
+	- creates a time ticker for every SignStartTimeTracker
+	- when ticker sends message checks all setup message peers be existed in the peer list
+	- if the condition was true it calls the SignStarter function.
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	returns:
+	-
+*/
 func (s *OperationSign) SignStarterThread(rosenTss _interface.RosenTss) {
 	ticker := time.NewTicker(time.Second * time.Duration(rosenTss.GetConfig().SignStartTimeTracker))
 	done := make(chan bool)
@@ -574,6 +689,19 @@ func (s *OperationSign) SignStarterThread(rosenTss _interface.RosenTss) {
 	}
 }
 
+/*	SetupThread
+	- calculates round of party
+	- check to the round be ok, and peer list has more than threshold peer and party be nil
+	- if all conditions were ok, then calls Setup function.
+	- if conditions were not ok, goes to sleep to be it's turn
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- key_list []*big.Int
+	- shareID *big.Int
+	- threshold int,
+	returns:
+	error
+*/
 func (s *OperationSign) SetupThread(
 	rosenTss _interface.RosenTss, keyList []*big.Int, shareID *big.Int,
 	threshold int,
@@ -623,6 +751,20 @@ func (s *OperationSign) SetupThread(
 	}
 }
 
+/*	SignMessageHandler
+	- handles the received sign message
+	- validates senders signatures
+	- if the threshold of received signatures was ok, and it was its turn, sends startSign message to other peers.
+	- Creates peer party
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- gossip_message models.GossipMessage
+	- key_list []*big.Int,
+	- shareID *big.Int,
+	- errorCh chan error,
+	returns:
+	error
+*/
 func (s *OperationSign) SignMessageHandler(
 	rosenTss _interface.RosenTss,
 	gossipMessage models.GossipMessage,
@@ -715,6 +857,19 @@ func (s *OperationSign) SignMessageHandler(
 	return nil
 }
 
+/*	StartSignMessageHandler
+	- handles the received StartSign message
+	- validates the hash data in the message
+	- validates to be sender's turn
+	- validates to be part of process
+	- validates signatures to be valid and more than threshold.
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- gossip_message models.GossipMessage
+	- key_list []*big.Int,
+	returns:
+	list_of_peers_to_start_sign_process []tss.PartyID, error
+*/
 func (s *OperationSign) StartSignMessageHandler(
 	rosenTss _interface.RosenTss,
 	msg models.GossipMessage,
@@ -805,6 +960,17 @@ func (s *OperationSign) StartSignMessageHandler(
 	return startSign.Peers, nil
 }
 
+/*	CreateParty
+	- creates end and out channel for party,
+	- calls StartParty function of protocol
+	- handles end channel and out channel in a goroutine
+	args:
+	- app_interface_to_load_data _interface.RosenTss
+	- peers []tss.PartyID
+	- errorCh chan error
+	returns:
+	-
+*/
 func (s *OperationSign) CreateParty(rosenTss _interface.RosenTss, peers []tss.PartyID, errorCh chan error) {
 	s.Logger.Info("creating and starting party")
 	msgBytes, _ := utils.Decoder(s.SignMessage.Message)

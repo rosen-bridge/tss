@@ -94,17 +94,18 @@ type KeygenMessage struct {
 }
 
 type Config struct {
-	HomeAddress               string  `mapstructure:"HOME_ADDRESS"`
-	LogLevel                  string  `mapstructure:"LOG_LEVEL"`
-	LogMaxSize                int     `mapstructure:"LOG_MAX_SIZE"`
-	LogMaxBackups             int     `mapstructure:"LOG_MAX_BACKUPS"`
-	LogMaxAge                 int     `mapstructure:"LOG_MAX_AGE"`
-	OperationTimeout          int     `mapstructure:"OPERATION_TIMEOUT"`
-	MessageTimeout            int     `mapstructure:"MESSAGE_TIMEOUT"`
-	LeastProcessRemainingTime int64   `mapstructure:"LEAST_PROCESS_REMAINING_TIME"`
-	SetupBroadcastInterval    int64   `mapstructure:"SETUP_BROADCAST_INTERVAL"`
-	SignStartTimeTracker      float64 `mapstructure:"SIGN_START_TIME_TRACKER"`
-	TurnDuration              int64   `mapstructure:"TRUN_DURATION"`
+	HomeAddress                string  `mapstructure:"HOME_ADDRESS"`
+	LogLevel                   string  `mapstructure:"LOG_LEVEL"`
+	LogMaxSize                 int     `mapstructure:"LOG_MAX_SIZE"`
+	LogMaxBackups              int     `mapstructure:"LOG_MAX_BACKUPS"`
+	LogMaxAge                  int     `mapstructure:"LOG_MAX_AGE"`
+	OperationTimeout           int     `mapstructure:"OPERATION_TIMEOUT"`
+	MessageTimeout             int     `mapstructure:"MESSAGE_TIMEOUT"`
+	LeastProcessRemainingTime  int64   `mapstructure:"LEAST_PROCESS_REMAINING_TIME"`
+	SetupBroadcastInterval     int64   `mapstructure:"SETUP_BROADCAST_INTERVAL"`
+	SignStartTimeTracker       float64 `mapstructure:"SIGN_START_TIME_TRACKER"`
+	TurnDuration               int64   `mapstructure:"TRUN_DURATION"`
+	WaitInPartyMessageHandling int64   `mapstructure:"WAIT_IN_PARTY_MESSAGE_HANDLING"`
 }
 
 type Register struct {
