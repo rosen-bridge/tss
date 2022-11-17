@@ -46,6 +46,15 @@ func (s *operationECDSASign) GetClassName() string {
 	return "ecdsaSign"
 }
 
+/*	Sign
+	- creates private structure of ecdsa from save data,
+	- gets blake_2b hash from message,
+	- signs the hash
+	args:
+	message []byte
+	returns:
+	signature []byte, error
+*/
 func (h *handler) Sign(message []byte) ([]byte, error) {
 	private := new(ecdsa.PrivateKey)
 	private.PublicKey.Curve = tss.S256()
@@ -68,6 +77,15 @@ func (h *handler) Sign(message []byte) ([]byte, error) {
 	return signature, nil
 }
 
+/*	Verify
+	- creates public structure of ecdsa from save data,
+	- gets blake_2b hash from message,
+	- validate the sign of message the hash
+	args:
+	msg []byte, sign_of_message []byte, index_of_peer_in_key_list  int
+	returns:
+	error
+*/
 func (h *handler) Verify(msg []byte, sign []byte, index int) error {
 	public := new(ecdsa.PublicKey)
 	public.Curve = tss.S256()
@@ -84,6 +102,18 @@ func (h *handler) Verify(msg []byte, sign []byte, index int) error {
 	return nil
 }
 
+/*	StartParty
+	- creates tss parameters and party
+	args:
+	- local_tss_data *models.TssData,
+	- list_of_peers_should_be_in_the_party tss.SortedPartyIDs,
+	- threshold int,
+	- data_should_be_signed *big.Int,
+	- outCh chan tss.Message,
+	- endCh chan common.SignatureData,
+	returns:
+	error
+*/
 func (h *handler) StartParty(
 	localTssData *models.TssData,
 	peers tss.SortedPartyIDs,
@@ -111,6 +141,14 @@ func (h *handler) StartParty(
 	return nil
 }
 
+/*	LoadData
+	- loads saved data from file for signing
+	- creates tss party ID with p2pID
+	args:
+	app_interface_to_load_data _interface.RosenTss
+	returns:
+	party_Id *tss.PartyID, error
+*/
 func (h *handler) LoadData(rosenTss _interface.RosenTss) (*tss.PartyID, error) {
 	data, pID, err := rosenTss.GetStorage().LoadECDSAKeygen(rosenTss.GetPeerHome())
 	if err != nil {
@@ -127,6 +165,13 @@ func (h *handler) LoadData(rosenTss _interface.RosenTss) (*tss.PartyID, error) {
 	return pID, nil
 }
 
+/*	GetData
+	- returns key_list and shared_ID of peer stored in the struct
+	args:
+	-
+	returns:
+	key_list []*big.Int, shared_id *big.Int
+*/
 func (h *handler) GetData() ([]*big.Int, *big.Int) {
 	return h.savedData.Ks, h.savedData.ShareID
 }

@@ -2326,6 +2326,12 @@ func TestEDDSA_Loop(t *testing.T) {
 		t.Error(err)
 	}
 
+	signature1, err := mockUtils.EDDSASigner(saveData)(setupMessageMarshaled)
+	if err != nil {
+		t.Error(err)
+	}
+	messageId := fmt.Sprintf("%s%s", signMsg.Crypto, mockUtils.Encoder(signDataBytes[:]))
+
 	// test cases
 	tests := []struct {
 		name      string
@@ -2333,6 +2339,42 @@ func TestEDDSA_Loop(t *testing.T) {
 		message   models.GossipMessage
 		AppConfig func() (_interface.RosenTss, Handler)
 	}{
+		{
+			name:     "start sign",
+			expected: "handling incoming start sign message from p2p, there must be no error out of err list",
+			message: models.GossipMessage{
+				Message:    utils.Encoder(startSignMarshaled),
+				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
+				SenderId:   newPartyId.Id,
+				ReceiverId: "",
+				Name:       startSignMessage,
+				Index:      index,
+			},
+			AppConfig: func() (_interface.RosenTss, Handler) {
+				app := mockedInterface.NewRosenTss(t)
+
+				app.On("GetMetaData").Return(
+					models.MetaData{
+						PeersCount: 3,
+						Threshold:  2,
+					},
+				)
+				app.On("GetConfig").Return(
+					models.Config{
+						TurnDuration:              60,
+						LeastProcessRemainingTime: 50,
+						SetupBroadcastInterval:    10,
+						SignStartTimeTracker:      1,
+					},
+				)
+
+				handler := mocks.NewHandler(t)
+				handler.On("GetData").Return(saveData.Ks, saveData.ShareID)
+				handler.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+				return app, handler
+			},
+		},
 		{
 			name:     "register",
 			expected: "handling incoming register message from p2p, there must be no error out of err list",
@@ -2411,19 +2453,17 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 		{
-			name:     "partyMsg",
-			expected: "handling incoming partyMsg message from p2p, there must be no error out of err list",
+			name:     "sign",
+			expected: "handling incoming sign message from p2p, there must be no error out of err list",
 			message: models.GossipMessage{
-				Message:    utils.Encoder(partyMessageBytes),
-				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
-				SenderId:   newPartyId.Id,
-				ReceiverId: "",
-				Name:       partyMessage,
-				Index:      index,
+				Message:   utils.Encoder(signature1),
+				MessageId: messageId,
+				SenderId:  newPartyId.Id,
+				Name:      signMessage,
+				Index:     index,
 			},
 			AppConfig: func() (_interface.RosenTss, Handler) {
 				app := mockedInterface.NewRosenTss(t)
-				localTssData.Party = party
 
 				app.On("GetMetaData").Return(
 					models.MetaData{
@@ -2448,18 +2488,19 @@ func TestEDDSA_Loop(t *testing.T) {
 			},
 		},
 		{
-			name:     "start sign",
-			expected: "handling incoming sign message from p2p, there must be no error out of err list",
+			name:     "partyMsg",
+			expected: "handling incoming partyMsg message from p2p, there must be no error out of err list",
 			message: models.GossipMessage{
-				Message:    utils.Encoder(startSignMarshaled),
+				Message:    utils.Encoder(partyMessageBytes),
 				MessageId:  "ccd5480560cf2dec4098917b066264f28cd5b648358117cfdc438a7b165b3bb1",
 				SenderId:   newPartyId.Id,
 				ReceiverId: "",
-				Name:       startSignMessage,
+				Name:       partyMessage,
 				Index:      index,
 			},
 			AppConfig: func() (_interface.RosenTss, Handler) {
 				app := mockedInterface.NewRosenTss(t)
+				localTssData.Party = party
 
 				app.On("GetMetaData").Return(
 					models.MetaData{
@@ -2535,6 +2576,7 @@ func TestEDDSA_Loop(t *testing.T) {
 							if err != nil && !mockUtils.Contains(err.Error(), errorList) {
 								t.Error(err)
 							}
+							return
 						}
 					}
 				}()

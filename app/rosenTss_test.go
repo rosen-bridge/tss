@@ -666,6 +666,14 @@ func TestRosenTss_GetPrivate(t *testing.T) {
 	}
 }
 
+/*	TestRosenTss_SetP2pId
+	TestCases:
+	testing message controller, there are 2 testcase.
+	each test case runs as a subtests.
+	target and expected outPut clarified in each testCase
+	Dependencies:
+	- network connection GetPeerId function
+*/
 func TestRosenTss_SetP2pId(t *testing.T) {
 	// setting fake peer home and creating files and folders
 	peerHome := "/tmp/.rosenTss"
