@@ -36,4 +36,8 @@ type RosenTss interface {
 
 	GetOperations() []Operation
 	GetPublicKey(crypto string) (string, error)
+
+	SetP2pId() error
+	GetP2pId() string
+	GetConfig() models.Config
 }

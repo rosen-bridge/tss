@@ -2,10 +2,11 @@ package logger
 
 import (
 	"fmt"
+	"os"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	lumberjack "gopkg.in/natefinch/lumberjack.v2"
-	"os"
 	"rosen-bridge/tss/models"
 )
 
@@ -42,13 +43,15 @@ func Init(logFile string, config models.Config, dev bool) error {
 		return fmt.Errorf("unknown log level %s", config.LogLevel)
 	}
 
-	ws := zapcore.AddSync(&lumberjack.Logger{
-		Filename:   logFile,
-		MaxSize:    config.LogMaxSize, //MB
-		MaxBackups: config.LogMaxBackups,
-		MaxAge:     config.LogMaxAge, //days
-		Compress:   false,
-	})
+	ws := zapcore.AddSync(
+		&lumberjack.Logger{
+			Filename:   logFile,
+			MaxSize:    config.LogMaxSize, //MB
+			MaxBackups: config.LogMaxBackups,
+			MaxAge:     config.LogMaxAge, //days
+			Compress:   false,
+		},
+	)
 
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:        "ts",
@@ -85,5 +88,9 @@ func Init(logFile string, config models.Config, dev bool) error {
 }
 
 func NewSugar(name string) *zap.SugaredLogger {
-	return globalLogger.Named(name).Sugar()
+	return globalLogger.Named("tss/" + name).Sugar()
+}
+
+func NewLogger() *zap.Logger {
+	return globalLogger
 }

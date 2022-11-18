@@ -8,20 +8,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+
 	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	eddsaKeygen "github.com/binance-chain/tss-lib/eddsa/keygen"
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
-	"github.com/labstack/gommon/log"
 	"github.com/rs/xid"
 	"go.uber.org/zap"
-	"io/ioutil"
-	"math/big"
-	"path/filepath"
+	"golang.org/x/crypto/blake2b"
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
-	"runtime"
-	"strings"
 )
 
 // TestUtilsMessage internal struct for mocking tss.Message
@@ -104,7 +106,8 @@ func CreateNewLocalEDDSATSSData() (models.TssData, error) {
 		PartyID: newPartyId,
 	}
 	localTssData.PartyIds = tss.SortPartyIDs(
-		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
+		append(localTssData.PartyIds.ToUnSorted(), newPartyId),
+	)
 
 	return localTssData, nil
 }
@@ -117,36 +120,37 @@ func LoadEDDSAKeygenFixture(index int) (eddsaKeygen.LocalPartySaveData, *tss.Par
 	srcDirName := filepath.Dir(callerFileName)
 	rootFolder := fmt.Sprintf(testFixtureDirFormat, srcDirName)
 	files, err := ioutil.ReadDir(rootFolder)
-
-	keygenFile := files[index].Name()
-
 	if err != nil {
-		log.Error(err)
+		return eddsaKeygen.LocalPartySaveData{}, nil, err
 	}
+
 	if len(files) == 0 {
 		return eddsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
 	}
+	keygenFile := files[index].Name()
 
 	filePath := filepath.Join(rootFolder, keygenFile)
-	log.Infof("File: %v", filePath)
+	fmt.Printf("File: %v\n", filePath)
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return eddsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(
 			"could not open the File for party in the expected location: %s. run keygen first.\nerror:{%s}",
-			filePath, err.Error())
+			filePath, err.Error(),
+		)
 	}
 	var key eddsaKeygen.LocalPartySaveData
 	if err = json.Unmarshal(bz, &key); err != nil {
 		return eddsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(
-			"could not unmarshal data for party located at: %s\nerror: {%s}", filePath, err.Error())
+			"could not unmarshal data for party located at: %s\nerror: {%s}", filePath, err.Error(),
+		)
 	}
 	for _, kbxj := range key.BigXj {
 		kbxj.SetCurve(tss.Edwards())
 	}
 	key.EDDSAPub.SetCurve(tss.Edwards())
+	time.Sleep(10 * time.Millisecond)
 	id := xid.New()
-	pMoniker := fmt.Sprintf("%s", id.String())
-	partyID := tss.NewPartyID(pMoniker, "tss/tssPeer", key.ShareID)
+	partyID := tss.NewPartyID(id.String(), "tss/tssPeer", key.ShareID)
 	var parties tss.UnSortedPartyIDs
 	parties = append(parties, partyID)
 	sortedPIDs := tss.SortPartyIDs(parties)
@@ -191,7 +195,8 @@ func CreateNewLocalECDSATSSData() (models.TssData, error) {
 		PartyID: newPartyId,
 	}
 	localTssData.PartyIds = tss.SortPartyIDs(
-		append(localTssData.PartyIds.ToUnSorted(), newPartyId))
+		append(localTssData.PartyIds.ToUnSorted(), newPartyId),
+	)
 
 	return localTssData, nil
 }
@@ -204,28 +209,28 @@ func LoadECDSAKeygenFixture(index int) (ecdsaKeygen.LocalPartySaveData, *tss.Par
 	srcDirName := filepath.Dir(callerFileName)
 	rootFolder := fmt.Sprintf(testFixtureDirFormat, srcDirName)
 	files, err := ioutil.ReadDir(rootFolder)
-
-	keygenFile := files[index].Name()
-
 	if err != nil {
-		log.Error(err)
+		return ecdsaKeygen.LocalPartySaveData{}, nil, err
 	}
 	if len(files) == 0 {
 		return ecdsaKeygen.LocalPartySaveData{}, nil, errors.New("no keygen data found")
 	}
+	keygenFile := files[index].Name()
 
 	filePath := filepath.Join(rootFolder, keygenFile)
-	log.Infof("File: %v", filePath)
+	fmt.Printf("File: %v\n", filePath)
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return ecdsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(
 			"could not open the File for party in the expected location: %s. run keygen first.\nerror:{%s}",
-			filePath, err.Error())
+			filePath, err.Error(),
+		)
 	}
 	var key ecdsaKeygen.LocalPartySaveData
 	if err = json.Unmarshal(bz, &key); err != nil {
 		return ecdsaKeygen.LocalPartySaveData{}, nil, fmt.Errorf(
-			"could not unmarshal data for party located at: %s\nerror: {%s}", filePath, err.Error())
+			"could not unmarshal data for party located at: %s\nerror: {%s}", filePath, err.Error(),
+		)
 	}
 	for _, kbxj := range key.BigXj {
 		kbxj.SetCurve(tss.S256())
@@ -298,4 +303,123 @@ func GetEddsaPK() (string, error) {
 	public := GetPKFromEDDSAPub(pk.X, pk.Y)
 	hexPk := hex.EncodeToString(public)
 	return hexPk, nil
+}
+
+func EDDSASigner(savedData eddsaKeygen.LocalPartySaveData) func(message []byte) ([]byte, error) {
+	return func(message []byte) ([]byte, error) {
+		private, _, _ := edwards.PrivKeyFromScalar(savedData.Xi.Bytes())
+		checksum := blake2b.Sum256(message)
+		signature, err := private.Sign(checksum[:])
+		if err != nil {
+			return nil, err
+		}
+		return signature.Serialize(), nil
+	}
+}
+
+func ECDSASigner(savedData ecdsaKeygen.LocalPartySaveData) func(message []byte) ([]byte, error) {
+	return func(message []byte) ([]byte, error) {
+		private := new(ecdsa.PrivateKey)
+		private.PublicKey.Curve = tss.S256()
+		private.D = savedData.Xi
+
+		var index int
+		for i, k := range savedData.Ks {
+			if savedData.ShareID == k {
+				index = i
+			}
+		}
+
+		private.PublicKey.X, private.PublicKey.Y = savedData.BigXj[index].X(), savedData.BigXj[index].Y()
+
+		checksum := blake2b.Sum256(message)
+		signature, err := private.Sign(rand.Reader, checksum[:], nil)
+		if err != nil {
+			panic(err)
+		}
+		return signature, nil
+	}
+}
+
+func Decoder(message string) ([]byte, error) {
+	return hex.DecodeString(message)
+}
+
+func Encoder(message []byte) string {
+	return hex.EncodeToString(message)
+}
+
+func CreatePayload(marshalMsg []byte, senderId string, signMsg models.SignMessage, name string) models.Payload {
+
+	msgBytes, _ := Decoder(signMsg.Message)
+	signData := new(big.Int).SetBytes(msgBytes)
+	signDataBytes := blake2b.Sum256(signData.Bytes())
+	messageId := fmt.Sprintf("%s%s", signMsg.Crypto, Encoder(signDataBytes[:]))
+
+	return models.Payload{
+		Message:   Encoder(marshalMsg),
+		MessageId: messageId,
+		SenderId:  senderId,
+		Name:      name,
+	}
+}
+
+func CreateGossipMessageForEDDSA(
+	payload models.Payload,
+	recieverId string,
+	saveData eddsaKeygen.LocalPartySaveData,
+) (models.GossipMessage, error) {
+
+	index, _ := saveData.OriginalIndex()
+
+	marshal, err := json.Marshal(payload)
+	if err != nil {
+		return models.GossipMessage{}, err
+	}
+
+	signerFunction := EDDSASigner(saveData)
+	signature, err := signerFunction(marshal)
+	if err != nil {
+		return models.GossipMessage{}, err
+	}
+
+	return models.GossipMessage{
+		Message:    payload.Message,
+		MessageId:  payload.MessageId,
+		SenderId:   payload.SenderId,
+		ReceiverId: recieverId,
+		Name:       payload.Name,
+		Signature:  signature,
+		Index:      index,
+	}, nil
+}
+
+func CreateGossipMessageForECDSA(
+	payload models.Payload,
+	recieverId string,
+	saveData ecdsaKeygen.LocalPartySaveData,
+) (models.GossipMessage, error) {
+
+	index, _ := saveData.OriginalIndex()
+
+	marshal, err := json.Marshal(payload)
+	if err != nil {
+		return models.GossipMessage{}, err
+	}
+
+	signerFunction := ECDSASigner(saveData)
+	signature, err := signerFunction(marshal)
+	if err != nil {
+		return models.GossipMessage{}, err
+	}
+
+	return models.GossipMessage{
+		Message:    payload.Message,
+		MessageId:  payload.MessageId,
+		SenderId:   payload.SenderId,
+		ReceiverId: recieverId,
+		Name:       payload.Name,
+		Signature:  signature,
+		Index:      index,
+	}, nil
 }

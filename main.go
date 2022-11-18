@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+
 	"github.com/labstack/echo/v4"
 	_ "github.com/swaggo/echo-swagger/example/docs"
 	"rosen-bridge/tss/api"
@@ -19,11 +20,17 @@ func main() {
 	projectPort := flag.String("port", "4000", "project port (e.g. 4000)")
 	p2pPort := flag.String("p2pPort", "8080", "p2p port (e.g. 8080)")
 	publishPath := flag.String(
-		"publishPath", "/p2p/send", "publish path of p2p (e.g. /p2p/send)")
+		"publishPath", "/p2p/send", "publish path of p2p (e.g. /p2p/send)",
+	)
 	subscriptionPath := flag.String(
-		"subscriptionPath", "/p2p/channel/subscribe", "subscriptionPath for p2p (e.g. /p2p/channel/subscribe)")
+		"subscriptionPath", "/p2p/channel/subscribe", "subscriptionPath for p2p (e.g. /p2p/channel/subscribe)",
+	)
+	getPeerIDPath := flag.String(
+		"getP2pIDPath", "/p2p/getPeerID", "getP2pIDPath for p2p (e.g. /p2p/getPeerID)",
+	)
 	configFile := flag.String(
-		"configFile", "./conf/conf.env", "config file")
+		"configFile", "./conf/conf.env", "config file",
+	)
 	flag.Parse()
 
 	config, err := utils.InitConfig(*configFile)
@@ -50,16 +57,16 @@ func main() {
 		}
 	}()
 
+	logging.Infof("config: %+v", config)
 	// creating new instance of echo framework
 	e := echo.New()
 	// initiating and reading configs
 
 	// creating connection and storage and app instance
-	conn := network.InitConnection(*publishPath, *subscriptionPath, *p2pPort)
+	conn := network.InitConnection(*publishPath, *subscriptionPath, *p2pPort, *getPeerIDPath)
 	localStorage := storage.NewStorage()
 
 	tss := app.NewRosenTss(conn, localStorage, config)
-
 	// setting up peer home based on configs
 	err = tss.SetPeerHome(config.HomeAddress)
 	if err != nil {
@@ -69,11 +76,17 @@ func main() {
 	// subscribe to p2p
 	err = tss.GetConnection().Subscribe(*projectPort)
 	if err != nil {
-		logging.Error(err)
+		logging.Fatal(err)
 	}
 
 	// running echo framework
 	tssController := api.NewTssController(tss)
+
+	// get p2pId
+	err = tss.SetP2pId()
+	if err != nil {
+		logging.Fatal(err)
+	}
 
 	api.InitRouting(e, tssController)
 	logging.Fatal(e.Start(fmt.Sprintf(":%s", *projectPort)))

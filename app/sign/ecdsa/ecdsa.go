@@ -1,160 +1,43 @@
 package ecdsa
 
 import (
-	"encoding/hex"
-	"encoding/json"
+	"crypto/ecdsa"
+	"crypto/rand"
 	"fmt"
+	"math/big"
+
 	"github.com/binance-chain/tss-lib/common"
 	ecdsaKeygen "github.com/binance-chain/tss-lib/ecdsa/keygen"
 	ecdsaSigning "github.com/binance-chain/tss-lib/ecdsa/signing"
 	"github.com/binance-chain/tss-lib/tss"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/blake2b"
-	"math/big"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/app/sign"
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
-	"rosen-bridge/tss/utils"
-	"strings"
-	"time"
 )
 
 type operationECDSASign struct {
-	operationSign sign.OperationSign
-	savedData     ecdsaKeygen.LocalPartySaveData
+	sign.OperationSign
+}
+
+type handler struct {
+	savedData ecdsaKeygen.LocalPartySaveData
 }
 
 var logging *zap.SugaredLogger
+var ecdsaHandler handler
 
 func NewSignECDSAOperation(signMessage models.SignMessage) _interface.Operation {
 	logging = logger.NewSugar("ecdsa-sign")
 	return &operationECDSASign{
-		operationSign: sign.OperationSign{
+		OperationSign: sign.OperationSign{
 			SignMessage: signMessage,
+			Signatures:  make(map[int][]byte),
+			Logger:      logging,
+			Handler:     &ecdsaHandler,
 		},
-	}
-}
-
-// Init initializes the ecdsa sign partyId and creates partyId message
-func (s *operationECDSASign) Init(rosenTss _interface.RosenTss, receiverId string) error {
-
-	logging.Info("Init called")
-
-	if s.operationSign.LocalTssData.PartyID == nil {
-		data, pID, err := rosenTss.GetStorage().LoadECDSAKeygen(rosenTss.GetPeerHome())
-		if err != nil {
-			logging.Error(err)
-			return err
-		}
-		if pID == nil {
-			logging.Error("pIDs is nil")
-			return err
-		}
-		s.savedData = data
-		s.operationSign.LocalTssData.PartyID = pID
-	}
-	message := fmt.Sprintf("%s,%s,%d,%s", s.operationSign.LocalTssData.PartyID.Id, s.operationSign.LocalTssData.PartyID.Moniker, s.operationSign.LocalTssData.PartyID.KeyInt(), "fromSign")
-	msgBytes, _ := hex.DecodeString(s.operationSign.SignMessage.Message)
-
-	signData := new(big.Int).SetBytes(msgBytes)
-	signDataBytes := blake2b.Sum256(signData.Bytes())
-	messageId := fmt.Sprintf("%s%s", "ecdsa", hex.EncodeToString(signDataBytes[:]))
-	jsonMessage := rosenTss.NewMessage(receiverId, s.operationSign.LocalTssData.PartyID.Id, message, messageId, "partyId")
-	err := rosenTss.GetConnection().Publish(jsonMessage)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-// Loop listens to the given channel and parsing the message based on the name
-func (s *operationECDSASign) Loop(rosenTss _interface.RosenTss, messageCh chan models.GossipMessage) error {
-
-	msgBytes, _ := hex.DecodeString(s.operationSign.SignMessage.Message)
-	signData := new(big.Int).SetBytes(msgBytes)
-
-	errorCh := make(chan error)
-
-	for {
-		select {
-		case err := <-errorCh:
-			if err.Error() == "close channel" {
-				close(messageCh)
-				return nil
-			}
-			return err
-		case msg, ok := <-messageCh:
-			if !ok {
-				return fmt.Errorf("channel closed")
-			}
-			logging.Infof("msg.name: {%s}", msg.Name)
-			switch msg.Name {
-			case "partyId":
-				if msg.Message != "" {
-					err := s.partyIdMessageHandler(rosenTss, msg)
-					if err != nil {
-						return err
-					}
-				}
-			case "partyMsg":
-				logging.Info("received party message:", fmt.Sprintf("from: %s", msg.SenderId))
-				msgBytes, err := hex.DecodeString(msg.Message)
-				if err != nil {
-					return err
-				}
-				partyMsg := models.PartyMessage{}
-				err = json.Unmarshal(msgBytes, &partyMsg)
-				if err != nil {
-					return err
-				}
-				if s.operationSign.LocalTssData.Params == nil {
-					return fmt.Errorf("this peer is no longer needed. the signing process has been started with the required peers")
-				}
-				err = s.partyUpdate(partyMsg)
-				if err != nil {
-					return err
-				}
-			case "sign":
-				logging.Info("received sign message: ", fmt.Sprintf("from: %s", msg.SenderId))
-				outCh := make(chan tss.Message, len(s.operationSign.LocalTssData.PartyIds))
-				endCh := make(chan common.SignatureData, len(s.operationSign.LocalTssData.PartyIds))
-				for {
-					if s.operationSign.LocalTssData.Params == nil {
-						time.Sleep(time.Second)
-						continue
-					} else {
-						break
-					}
-				}
-
-				if s.operationSign.LocalTssData.Party == nil {
-					s.operationSign.LocalTssData.Party = ecdsaSigning.NewLocalParty(signData, s.operationSign.LocalTssData.Params, s.savedData, outCh, endCh)
-				}
-				if !s.operationSign.LocalTssData.Party.Running() {
-					go func() {
-						if err := s.operationSign.LocalTssData.Party.Start(); err != nil {
-							logging.Error(err)
-							errorCh <- err
-							return
-						}
-						logging.Info("party started")
-					}()
-					go func() {
-						result, err := s.gossipMessageHandler(rosenTss, outCh, endCh)
-						if err != nil {
-							logging.Error(err)
-							errorCh <- err
-							return
-						}
-						if result {
-							errorCh <- fmt.Errorf("close channel")
-							return
-						}
-					}()
-				}
-			}
-		}
 	}
 }
 
@@ -163,166 +46,132 @@ func (s *operationECDSASign) GetClassName() string {
 	return "ecdsaSign"
 }
 
-// HandleOutMessage handling party messages on out channel
-func (s *operationECDSASign) handleOutMessage(rosenTss _interface.RosenTss, partyMsg tss.Message) error {
-	msgBytes, _ := hex.DecodeString(s.operationSign.SignMessage.Message)
-	signData := new(big.Int).SetBytes(msgBytes)
-	msgHex, err := s.operationSign.OperationHandler.PartyMessageHandler(partyMsg)
+/*	Sign
+	- creates private structure of ecdsa from save data,
+	- gets blake_2b hash from message,
+	- signs the hash
+	args:
+	message []byte
+	returns:
+	signature []byte, error
+*/
+func (h *handler) Sign(message []byte) ([]byte, error) {
+	private := new(ecdsa.PrivateKey)
+	private.PublicKey.Curve = tss.S256()
+	private.D = h.savedData.Xi
+
+	index, err := h.savedData.OriginalIndex()
 	if err != nil {
-		return err
+		logging.Errorf("there was an error in finding index: %+v", err)
+		return nil, err
 	}
-	messageBytes := blake2b.Sum256(signData.Bytes())
-	messageId := fmt.Sprintf("%s%s", "ecdsa", hex.EncodeToString(messageBytes[:]))
-	jsonMessage := rosenTss.NewMessage("", s.operationSign.LocalTssData.PartyID.Id, msgHex, messageId, "partyMsg")
-	err = rosenTss.GetConnection().Publish(jsonMessage)
+
+	private.PublicKey.X, private.PublicKey.Y = h.savedData.BigXj[index].X(), h.savedData.BigXj[index].Y()
+
+	checksum := blake2b.Sum256(message)
+	signature, err := private.Sign(rand.Reader, checksum[:], nil)
 	if err != nil {
-		return err
+		logging.Errorf("there was an error in signing message: %+v", err)
+		return nil, err
 	}
+	return signature, nil
+}
+
+/*	Verify
+	- creates public structure of ecdsa from save data,
+	- gets blake_2b hash from message,
+	- validate the sign of message the hash
+	args:
+	msg []byte, sign_of_message []byte, index_of_peer_in_key_list  int
+	returns:
+	error
+*/
+func (h *handler) Verify(msg []byte, sign []byte, index int) error {
+	public := new(ecdsa.PublicKey)
+	public.Curve = tss.S256()
+	public.X = h.savedData.BigXj[index].X()
+	public.Y = h.savedData.BigXj[index].Y()
+
+	checksum := blake2b.Sum256(msg)
+
+	result := ecdsa.VerifyASN1(public, checksum[:], sign)
+	if !result {
+		return fmt.Errorf("can not verify the message")
+	}
+
 	return nil
 }
 
-// HandleEndMessage handling save data on end cahnnel of party
-func (s *operationECDSASign) handleEndMessage(rosenTss _interface.RosenTss, saveData *common.SignatureData) error {
-
-	signData := models.SignData{
-		Signature: hex.EncodeToString(saveData.Signature),
-		R:         hex.EncodeToString(saveData.R),
-		S:         hex.EncodeToString(saveData.S),
-		M:         hex.EncodeToString(saveData.M),
-	}
-
-	logging.Infof("sign result: R: {%s}, S: {%s}, M:{%s}\n", signData.R, signData.S, signData.M)
-	logging.Infof("signature: %v", signData.Signature)
-	logging.Info("ECDSA signing done.")
-
-	err := rosenTss.GetConnection().CallBack(s.operationSign.SignMessage.CallBackUrl, signData, "ok")
-	if err != nil {
-		return err
-	}
-
-	return nil
-
-}
-
-// GossipMessageHandler handling all party messages on outCH and endCh
-func (s *operationECDSASign) gossipMessageHandler(rosenTss _interface.RosenTss, outCh chan tss.Message, endCh chan common.SignatureData) (bool, error) {
-	for {
-		select {
-		case partyMsg := <-outCh:
-			err := s.handleOutMessage(rosenTss, partyMsg)
-			if err != nil {
-				return false, err
+/*	StartParty
+	- creates tss parameters and party
+	args:
+	- local_tss_data *models.TssData,
+	- list_of_peers_should_be_in_the_party tss.SortedPartyIDs,
+	- threshold int,
+	- data_should_be_signed *big.Int,
+	- outCh chan tss.Message,
+	- endCh chan common.SignatureData,
+	returns:
+	error
+*/
+func (h *handler) StartParty(
+	localTssData *models.TssData,
+	peers tss.SortedPartyIDs,
+	threshold int,
+	signData *big.Int,
+	outCh chan tss.Message,
+	endCh chan common.SignatureData,
+) error {
+	if localTssData.Party == nil {
+		ctx := tss.NewPeerContext(peers)
+		logging.Info("creating party parameters")
+		var localPartyId *tss.PartyID
+		for _, peer := range peers {
+			if peer.Id == localTssData.PartyID.Id {
+				localPartyId = peer
 			}
-		case save := <-endCh:
-			err := s.handleEndMessage(rosenTss, &save)
-			if err != nil {
-				return false, err
-			}
-			return true, nil
 		}
-	}
-}
-
-// PartyIdMessageHandler handles partyId message and if cals setup functions if patryIds list length was at least equal to the threshold
-func (s *operationECDSASign) partyIdMessageHandler(rosenTss _interface.RosenTss, gossipMessage models.GossipMessage) error {
-
-	if gossipMessage.SenderId != s.operationSign.LocalTssData.PartyID.Id &&
-		(gossipMessage.ReceiverId == "" || gossipMessage.ReceiverId == s.operationSign.LocalTssData.PartyID.Id) {
-
-		logging.Info("received partyId message ", fmt.Sprintf("from: %s", gossipMessage.SenderId))
-		partyIdParams := strings.Split(gossipMessage.Message, ",")
-		key, _ := new(big.Int).SetString(partyIdParams[2], 10)
-		newParty := tss.NewPartyID(partyIdParams[0], partyIdParams[1], key)
-
-		meta := rosenTss.GetMetaData()
-
-		switch partyIdParams[3] {
-
-		case "fromSign":
-			if !utils.IsPartyExist(newParty, s.operationSign.LocalTssData.PartyIds) {
-				s.operationSign.LocalTssData.PartyIds = tss.SortPartyIDs(
-					append(s.operationSign.LocalTssData.PartyIds.ToUnSorted(), newParty))
-			}
-			if s.operationSign.LocalTssData.Params == nil {
-				if len(s.operationSign.LocalTssData.PartyIds) >= meta.Threshold {
-					err := s.setup(rosenTss)
-					if err != nil {
-						return err
-					}
-				} else {
-					err := s.Init(rosenTss, "")
-					if err != nil {
-						return err
-					}
-				}
-			}
-		default:
-			return fmt.Errorf("wrong message")
-		}
-	}
-	return nil
-}
-
-// PartyUpdate updates partyIds in ecdsa app party based on received message
-func (s *operationECDSASign) partyUpdate(partyMsg models.PartyMessage) error {
-	dest := partyMsg.To
-	if dest == nil { // broadcast!
-
-		if s.operationSign.LocalTssData.Party.PartyID().Index == partyMsg.GetFrom.Index {
-			return nil
-		}
-		logging.Infof("updating party state")
-		err := s.operationSign.OperationHandler.SharedPartyUpdater(s.operationSign.LocalTssData.Party, partyMsg)
-		if err != nil {
+		localTssData.Params = tss.NewParameters(tss.S256(), ctx, localPartyId, len(peers), threshold)
+		localTssData.Party = ecdsaSigning.NewLocalParty(signData, localTssData.Params, h.savedData, outCh, endCh)
+		if err := localTssData.Party.Start(); err != nil {
 			return err
 		}
-
-	} else { // point-to-point!
-		if dest[0].Index == partyMsg.GetFrom.Index {
-			err := fmt.Errorf("party %d tried to send a message to itself (%d)", dest[0].Index, partyMsg.GetFrom.Index)
-			return err
-		}
-		if s.operationSign.LocalTssData.PartyID.Index == dest[0].Index {
-
-			logging.Infof("updating party state p2p")
-			err := s.operationSign.OperationHandler.SharedPartyUpdater(s.operationSign.LocalTssData.Party, partyMsg)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
+		logging.Info("party started")
 	}
 	return nil
 }
 
-// Setup called after if Init up was successful. it used to create party params and sign message
-func (s *operationECDSASign) setup(rosenTss _interface.RosenTss) error {
-	logging.Info("setup called")
-
-	msgBytes, _ := hex.DecodeString(s.operationSign.SignMessage.Message)
-	signData := new(big.Int).SetBytes(msgBytes)
-
-	meta := rosenTss.GetMetaData()
-	logging.Infof("meta %+v", meta)
-
-	s.operationSign.LocalTssData.PartyIds = tss.SortPartyIDs(
-		append(s.operationSign.LocalTssData.PartyIds.ToUnSorted(), s.operationSign.LocalTssData.PartyID))
-
-	logging.Infof("partyIds {%+v}, local partyId index {%d}", s.operationSign.LocalTssData.PartyIds, s.operationSign.LocalTssData.PartyID.Index)
-
-	ctx := tss.NewPeerContext(s.operationSign.LocalTssData.PartyIds)
-
-	logging.Info("creating params")
-	s.operationSign.LocalTssData.Params = tss.NewParameters(
-		tss.S256(), ctx, s.operationSign.LocalTssData.PartyID, len(s.operationSign.LocalTssData.PartyIds), meta.Threshold)
-
-	messageBytes := blake2b.Sum256(signData.Bytes())
-	messageId := fmt.Sprintf("%s%s", "ecdsa", hex.EncodeToString(messageBytes[:]))
-	jsonMessage := rosenTss.NewMessage("", s.operationSign.LocalTssData.PartyID.Id, "start sign", messageId, "sign")
-
-	err := rosenTss.GetConnection().Publish(jsonMessage)
+/*	LoadData
+	- loads saved data from file for signing
+	- creates tss party ID with p2pID
+	args:
+	app_interface_to_load_data _interface.RosenTss
+	returns:
+	party_Id *tss.PartyID, error
+*/
+func (h *handler) LoadData(rosenTss _interface.RosenTss) (*tss.PartyID, error) {
+	data, pID, err := rosenTss.GetStorage().LoadECDSAKeygen(rosenTss.GetPeerHome())
 	if err != nil {
-		return err
+		logging.Error(err)
+		return nil, err
 	}
-	return nil
+	if pID == nil {
+		logging.Error("pIDs is nil")
+		return nil, err
+	}
+	h.savedData = data
+	pID.Moniker = fmt.Sprintf("tssPeer/%s", rosenTss.GetP2pId())
+	pID.Id = rosenTss.GetP2pId()
+	return pID, nil
+}
+
+/*	GetData
+	- returns key_list and shared_ID of peer stored in the struct
+	args:
+	-
+	returns:
+	key_list []*big.Int, shared_id *big.Int
+*/
+func (h *handler) GetData() ([]*big.Int, *big.Int) {
+	return h.savedData.Ks, h.savedData.ShareID
 }

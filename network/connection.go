@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"go.uber.org/zap"
 	"net/http"
+
+	"go.uber.org/zap"
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
 )
@@ -14,6 +15,7 @@ type Connection interface {
 	Publish(message models.GossipMessage) error
 	Subscribe(port string) error
 	CallBack(string, interface{}, string) error
+	GetPeerId() (string, error)
 }
 
 type HTTPClient interface {
@@ -23,19 +25,21 @@ type HTTPClient interface {
 type connect struct {
 	publishUrl      string
 	subscriptionUrl string
-	subscribeId     string
+	getPeerIDUrl    string
 	Client          HTTPClient
 }
 
 var logging *zap.SugaredLogger
 
-func InitConnection(publishPath string, subscriptionPath string, p2pPort string) Connection {
+func InitConnection(publishPath string, subscriptionPath string, p2pPort string, getPeerIDPath string) Connection {
 	publishUrl := fmt.Sprintf("http://localhost:%s%s", p2pPort, publishPath)
 	subscriptionUrl := fmt.Sprintf("http://localhost:%s%s", p2pPort, subscriptionPath)
+	getPeerIDUrl := fmt.Sprintf("http://localhost:%s%s", p2pPort, getPeerIDPath)
 	logging = logger.NewSugar("connection")
 	return &connect{
 		publishUrl:      publishUrl,
 		subscriptionUrl: subscriptionUrl,
+		getPeerIDUrl:    getPeerIDUrl,
 		Client:          &http.Client{},
 	}
 
@@ -43,43 +47,59 @@ func InitConnection(publishPath string, subscriptionPath string, p2pPort string)
 
 // Publish publishes a message to p2p
 func (c *connect) Publish(msg models.GossipMessage) error {
-	logging.Infof("message published: {%+v}", msg.Name)
+	logging.Infof("publishing new message on p2p")
 	marshalledMessage, _ := json.Marshal(&msg)
 
 	type message struct {
-		Message string `json:"message"`
-		Channel string `json:"channel"`
+		Message  string `json:"message"`
+		Channel  string `json:"channel"`
+		Receiver string `json:"receiver"`
 	}
 
 	values := message{
-		Message: string(marshalledMessage),
-		Channel: "tss",
+		Message:  string(marshalledMessage),
+		Channel:  "tss",
+		Receiver: msg.ReceiverId,
 	}
 	jsonData, err := json.Marshal(values)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req, err := http.NewRequest(http.MethodPost, c.publishUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
+		logging.Errorf("error occurred in creating request: %+v", err)
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
 	resp, err := c.Client.Do(req)
+	if err != nil {
+		logging.Errorf("error occurred in doing request: %+v", err)
+		return err
+	}
 	type response struct {
 		Message string `json:"message"`
+	}
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("not ok response code: {%d}", resp.StatusCode)
+		logging.Error(err)
+		return err
 	}
 
 	var res = response{}
 	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("not ok response: {%s}", res.Message)
-	}
 	if res.Message != "ok" {
-		return fmt.Errorf("not ok response: {%s}", res.Message)
+		err = fmt.Errorf("not ok response message: {%s}", res.Message)
+		logging.Error(err)
+		return err
 	}
+
+	logging.Infof("new {%s} message published", msg.Name)
+	logging.Debugf("message: %+v", msg.Message)
 
 	return nil
 }
@@ -93,19 +113,24 @@ func (c *connect) Subscribe(port string) error {
 	}
 	jsonData, err := json.Marshal(values)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 
 	req, err := http.NewRequest(http.MethodPost, c.subscriptionUrl, bytes.NewBuffer(jsonData))
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
 
 	resp, err := c.Client.Do(req)
-
+	if err != nil {
+		logging.Error(err)
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("not ok response: {%v}", resp.Body)
+		return fmt.Errorf("not ok response code: {%v}", resp.StatusCode)
 	}
 
 	type response struct {
@@ -114,10 +139,13 @@ func (c *connect) Subscribe(port string) error {
 	var res = response{}
 	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	if res.Message != "ok" {
-		return fmt.Errorf("not ok response: {%s}", res.Message)
+		err = fmt.Errorf("not ok response message: {%s}", res.Message)
+		logging.Error(err)
+		return err
 	}
 
 	return nil
@@ -137,18 +165,68 @@ func (c *connect) CallBack(url string, data interface{}, status string) error {
 
 	jsonData, err := json.Marshal(response)
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
+		logging.Error(err)
 		return err
 	}
 	req.Header.Add("content-type", "application/json")
 
 	resp, err := c.Client.Do(req)
-
+	if err != nil {
+		logging.Error(err)
+		return err
+	}
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("not ok response: {%v}", resp.Body)
+		err = fmt.Errorf("not ok response code: {%v}", resp.StatusCode)
+		logging.Error(err)
+		return err
 	}
 	return nil
+}
+
+// GetPeerId to get p2pId
+func (c *connect) GetPeerId() (string, error) {
+	logging.Infof("Getting PeerId")
+
+	req, err := http.NewRequest(http.MethodGet, c.getPeerIDUrl, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("content-type", "application/json")
+
+	resp, err := c.Client.Do(req)
+	if err != nil {
+		logging.Error(err)
+		return "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("not ok response: {%v}", resp.StatusCode)
+		logging.Error(err)
+		return "", err
+	}
+
+	type response struct {
+		Status string `json:"status"`
+		PeerId string `json:"message"`
+	}
+	var res = response{}
+	err = json.NewDecoder(resp.Body).Decode(&res)
+	if err != nil {
+		logging.Error(err)
+		return "", err
+	}
+	if res.Status != "ok" {
+		err = fmt.Errorf("not ok response message: {%s}", res.Status)
+		logging.Error(err)
+		return "", err
+	}
+	if res.PeerId == "" {
+		return "", fmt.Errorf("nil peerId")
+	}
+	logging.Infof("peerId: %+v", res.PeerId)
+	return res.PeerId, nil
 }

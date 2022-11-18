@@ -4,12 +4,13 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
-	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 	"rosen-bridge/tss/app/interface"
 	"rosen-bridge/tss/logger"
 	"rosen-bridge/tss/models"
@@ -44,11 +45,6 @@ func NewTssController(rosenTss _interface.RosenTss) TssController {
 	}
 }
 
-func (tssController *tssController) errorHandler(code int, err string) *echo.HTTPError {
-	logging.Error(err)
-	return echo.NewHTTPError(code, err)
-}
-
 // checkOperation check if there is any common between forbidden list of requested operation and running operations
 func (tssController *tssController) checkOperation(forbiddenOperations []string) error {
 	operations := tssController.rosenTss.GetOperations()
@@ -68,29 +64,31 @@ func (tssController *tssController) Keygen() echo.HandlerFunc {
 		data := models.KeygenMessage{}
 
 		if err := c.Bind(&data); err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 		logging.Infof("keygen data: %+v ", data)
 
 		forbiddenOperations := []string{data.Crypto + "Sign"}
 		err := tssController.checkOperation(forbiddenOperations)
 		if err != nil {
-			return tssController.errorHandler(http.StatusConflict, err.Error())
+			return echo.NewHTTPError(http.StatusConflict, err.Error())
 		}
 		err = tssController.rosenTss.StartNewKeygen(data)
 		if err != nil {
 			switch err.Error() {
 			case models.DuplicatedMessageIdError:
-				return tssController.errorHandler(http.StatusConflict, err.Error())
+				return echo.NewHTTPError(http.StatusConflict, err.Error())
 			case models.KeygenFileExistError, models.WrongCryptoProtocolError:
-				return tssController.errorHandler(http.StatusBadRequest, err.Error())
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 			default:
-				return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
 		}
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
@@ -100,30 +98,32 @@ func (tssController *tssController) Sign() echo.HandlerFunc {
 		data := models.SignMessage{}
 
 		if err := c.Bind(&data); err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 		logging.Infof("sign data: %+v ", data)
 
 		forbiddenOperations := []string{data.Crypto + "Keygen", data.Crypto + "Regroup"}
 		err := tssController.checkOperation(forbiddenOperations)
 		if err != nil {
-			return tssController.errorHandler(http.StatusConflict, err.Error())
+			return echo.NewHTTPError(http.StatusConflict, err.Error())
 		}
 		err = tssController.rosenTss.StartNewSign(data)
 		if err != nil {
 			switch err.Error() {
 			case models.DuplicatedMessageIdError:
-				return tssController.errorHandler(http.StatusConflict, err.Error())
+				return echo.NewHTTPError(http.StatusConflict, err.Error())
 			case models.NoKeygenDataFoundError, models.WrongCryptoProtocolError:
-				return tssController.errorHandler(http.StatusBadRequest, err.Error())
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 			default:
-				return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
 		}
 
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
@@ -133,53 +133,54 @@ func (tssController *tssController) Regroup() echo.HandlerFunc {
 		data := models.RegroupMessage{}
 
 		if err := c.Bind(&data); err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 		logging.Infof("regroup data: %+v ", data)
 
 		forbiddenOperations := []string{data.Crypto + "Sign"}
 		err := tssController.checkOperation(forbiddenOperations)
 		if err != nil {
-			return tssController.errorHandler(http.StatusConflict, err.Error())
+			return echo.NewHTTPError(http.StatusConflict, err.Error())
 		}
 		err = tssController.rosenTss.StartNewRegroup(data)
 		if err != nil {
 			switch err.Error() {
 			case models.DuplicatedMessageIdError:
-				return tssController.errorHandler(http.StatusConflict, err.Error())
+				return echo.NewHTTPError(http.StatusConflict, err.Error())
 			case models.NoKeygenDataFoundError, models.WrongCryptoProtocolError:
-				return tssController.errorHandler(http.StatusBadRequest, err.Error())
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 			default:
-				return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
 		}
 
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
 //Message returns echo handler, receiving message from p2p and passing to related channel
 func (tssController *tssController) Message() echo.HandlerFunc {
 	return func(c echo.Context) error {
-		logging.Info("message called")
-
 		var data models.Message
-
+		logging.Infof("message route called")
 		if err := c.Bind(&data); err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			logging.Errorf("can not bind data, err: %+v", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
-		logging.Infof("message data: %+v ", data)
 
 		err := tssController.rosenTss.MessageHandler(data)
 		if err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			logging.Error(err)
 		}
-
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
@@ -188,16 +189,18 @@ func (tssController *tssController) Import() echo.HandlerFunc {
 	return func(c echo.Context) error {
 		data := models.Private{}
 		if err := c.Bind(&data); err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 		logging.Info("importing data")
 		err := tssController.rosenTss.SetPrivate(data)
 		if err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
-		return c.JSON(http.StatusOK, response{
-			Message: "ok",
-		})
+		return c.JSON(
+			http.StatusOK, response{
+				Message: "ok",
+			},
+		)
 	}
 }
 
@@ -213,37 +216,39 @@ func (tssController *tssController) Export() echo.HandlerFunc {
 		zipWriter := zip.NewWriter(buf)
 
 		var files []string
-		err := filepath.Walk(peerHome, func(path string, info os.FileInfo, err error) error {
-			if info.IsDir() {
+		err := filepath.Walk(
+			peerHome, func(path string, info os.FileInfo, err error) error {
+				if info.IsDir() {
+					return nil
+				}
+				files = append(files, path)
 				return nil
-			}
-			files = append(files, path)
-			return nil
-		})
+			},
+		)
 		if err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 		// Add some files to the archive.
 
 		for _, file := range files {
 			zipFile, err := zipWriter.Create(file)
 			if err != nil {
-				return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
 			content, err := ioutil.ReadFile(file)
 			if err != nil {
-				return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
 			_, err = zipFile.Write(content)
 			if err != nil {
-				return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
 		}
 
 		// Make sure to check the error on Close.
 		err = zipWriter.Close()
 		if err != nil {
-			return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
 
 		logging.Info("zipping file was successful.")
@@ -263,9 +268,9 @@ func (tssController *tssController) GetPk() echo.HandlerFunc {
 		if err != nil {
 			switch err.Error() {
 			case models.NoKeygenDataFoundError, models.WrongCryptoProtocolError:
-				return tssController.errorHandler(http.StatusBadRequest, err.Error())
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 			default:
-				return tssController.errorHandler(http.StatusInternalServerError, err.Error())
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
 		}
 

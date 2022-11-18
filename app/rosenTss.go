@@ -2,19 +2,21 @@ package app
 
 import (
 	"crypto/ecdsa"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/binance-chain/tss-lib/tss"
 	"github.com/decred/dcrd/dcrec/edwards/v2"
 	"github.com/labstack/gommon/log"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/blake2b"
-	"io/ioutil"
-	"math/big"
-	"os"
-	"path/filepath"
 	"rosen-bridge/tss/app/interface"
 	ecdsaKeygen "rosen-bridge/tss/app/keygen/ecdsa"
 	eddsaKeygen "rosen-bridge/tss/app/keygen/eddsa"
@@ -27,8 +29,6 @@ import (
 	"rosen-bridge/tss/network"
 	"rosen-bridge/tss/storage"
 	"rosen-bridge/tss/utils"
-	"strings"
-	"time"
 )
 
 const (
@@ -36,60 +36,58 @@ const (
 )
 
 type rosenTss struct {
-	ChannelMap        map[string]chan models.GossipMessage
-	metaData          models.MetaData
-	storage           storage.Storage
-	connection        network.Connection
-	Private           models.Private
-	peerHome          string
-	operations        []_interface.Operation
-	operationsTimeout int
-	messageTimeout    int
+	ChannelMap map[string]chan models.GossipMessage
+	metaData   models.MetaData
+	storage    storage.Storage
+	connection network.Connection
+	Private    models.Private
+	Config     models.Config
+	peerHome   string
+	operations []_interface.Operation
+	P2pId      string
 }
 
 var logging *zap.SugaredLogger
 
 // NewRosenTss Constructor of an app
 func NewRosenTss(connection network.Connection, storage storage.Storage, config models.Config) _interface.RosenTss {
-	logging = logger.NewSugar("tss")
+	logging = logger.NewSugar("app")
 	return &rosenTss{
-		ChannelMap:        make(map[string]chan models.GossipMessage),
-		metaData:          models.MetaData{},
-		storage:           storage,
-		connection:        connection,
-		Private:           models.Private{},
-		peerHome:          config.HomeAddress,
-		operationsTimeout: config.OperationTimeout,
-		messageTimeout:    config.MessageTimeout,
+		ChannelMap: make(map[string]chan models.GossipMessage),
+		metaData:   models.MetaData{},
+		storage:    storage,
+		connection: connection,
+		Private:    models.Private{},
+		Config:     config,
 	}
 }
 
 // StartNewSign starts sign scenario for app based on given protocol.
 func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
-
-	log.Printf("Starting New Sign process")
+	logging.Info("Starting New Sign process")
 	err := r.SetMetaData(signMessage.Crypto)
 	if err != nil {
 		return err
 	}
 
-	msgBytes, _ := hex.DecodeString(signMessage.Message)
+	msgBytes, _ := utils.Decoder(signMessage.Message)
 	signData := new(big.Int).SetBytes(msgBytes)
 	signDataBytes := blake2b.Sum256(signData.Bytes())
-	signDataHash := hex.EncodeToString(signDataBytes[:])
-	log.Printf("signDtaHash: %v", signDataHash)
+	signDataHash := utils.Encoder(signDataBytes[:])
+	logging.Infof("encoded sign data: %v", signDataHash)
 
 	messageId := fmt.Sprintf("%s%s", signMessage.Crypto, signDataHash)
 	_, ok := r.ChannelMap[messageId]
 	if !ok {
 		messageCh := make(chan models.GossipMessage, 100)
 		r.ChannelMap[messageId] = messageCh
-		logging.Infof("creating new channel in StartNewSign: %v", messageId)
+		logging.Infof("new communication channel for signning process: %v", messageId)
 	} else {
 		return fmt.Errorf(models.DuplicatedMessageIdError)
 	}
 
 	var operation _interface.Operation
+	println(signMessage.Crypto)
 	switch signMessage.Crypto {
 	case "ecdsa":
 		operation = ecdsaSign.NewSignECDSAOperation(signMessage)
@@ -102,7 +100,7 @@ func (r *rosenTss) StartNewSign(signMessage models.SignMessage) error {
 	operationState := true
 
 	go func() {
-		timeout := time.After(time.Second * time.Duration(r.operationsTimeout))
+		timeout := time.After(time.Second * time.Duration(r.Config.OperationTimeout))
 		for {
 			select {
 			case <-timeout:
@@ -265,29 +263,34 @@ func (r *rosenTss) MessageHandler(message models.Message) error {
 		return err
 	}
 
-	logging.Infof("new message: %+v", gossipMsg.Name)
+	logging.Infof("callback route called. new %+v message from: %+v", gossipMsg.Name, gossipMsg.SenderId)
 
-	timeout := time.After(time.Second * time.Duration(r.messageTimeout))
-	var state bool
-
-timoutLoop:
-	for {
-		select {
-		case <-timeout:
-			logging.Error("timeout")
-			state = false
-			break timoutLoop
-		default:
-			if _, ok := r.ChannelMap[gossipMsg.MessageId]; ok {
-				r.ChannelMap[gossipMsg.MessageId] <- gossipMsg
-				state = true
-				break timoutLoop
+	// handling recover in case the channel is closed but not removed from the list yet, and there is a message to send on that
+	send := func(c chan models.GossipMessage, t models.GossipMessage) {
+		defer func() {
+			if x := recover(); x != nil {
+				logging.Warnf("unable to send: %v", x)
 			}
-		}
+		}()
+		c <- t
 	}
 
+	var state bool
+	for i, start := 0, time.Now(); ; i++ {
+		if time.Since(start) > time.Second*time.Duration(r.Config.MessageTimeout) {
+			state = false
+			break
+		}
+		if _, ok := r.ChannelMap[gossipMsg.MessageId]; ok {
+			send(r.ChannelMap[gossipMsg.MessageId], gossipMsg)
+			state = true
+			break
+		}
+		time.Sleep(time.Millisecond * 500)
+	}
 	if !state {
-		return fmt.Errorf("channel not found: %+v", gossipMsg.MessageId)
+		logging.Warnf("message timeout, channel not found: %+v", gossipMsg.MessageId)
+		return nil
 	} else {
 		return nil
 	}
@@ -348,12 +351,14 @@ func (r *rosenTss) SetMetaData(crypto string) error {
 	bz, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf(
-			"{%#v}\n could not open the File for party in the expected location: %s. run keygen first.", err, filePath)
+			"{%#v}\n could not open the File for party in the expected location: %s. run keygen first.",
+			err,
+			filePath,
+		)
 	}
 	var meta models.MetaData
 	if err = json.Unmarshal(bz, &meta); err != nil {
-		return fmt.Errorf(
-			"{%#v}\n could not unmarshal data for party located at: %s", err, filePath)
+		return fmt.Errorf("{%#v}\n could not unmarshal data for party located at: %s", err, filePath)
 	}
 
 	r.metaData = meta
@@ -366,7 +371,13 @@ func (r *rosenTss) GetMetaData() models.MetaData {
 }
 
 // NewMessage creates gossip messages before publish
-func (r *rosenTss) NewMessage(receiverId string, senderId string, message string, messageId string, name string) models.GossipMessage {
+func (r *rosenTss) NewMessage(
+	receiverId string,
+	senderId string,
+	message string,
+	messageId string,
+	name string,
+) models.GossipMessage {
 
 	m := models.GossipMessage{
 		Message:    message,
@@ -425,7 +436,7 @@ func (r *rosenTss) GetPublicKey(crypto string) (string, error) {
 		}
 
 		public := utils.GetPKFromECDSAPub(pk.X, pk.Y)
-		hexPk := hex.EncodeToString(public)
+		hexPk := utils.Encoder(public)
 		return hexPk, nil
 	case "eddsa":
 		saveData, _, err := r.GetStorage().LoadEDDSAKeygen(r.peerHome)
@@ -440,9 +451,29 @@ func (r *rosenTss) GetPublicKey(crypto string) (string, error) {
 		}
 
 		public := utils.GetPKFromEDDSAPub(pk.X, pk.Y)
-		hexPk := hex.EncodeToString(public)
+		hexPk := utils.Encoder(public)
 		return hexPk, nil
 	default:
 		return "", fmt.Errorf(models.WrongCryptoProtocolError)
 	}
+}
+
+// SetP2pId set p2p to the variable
+func (r *rosenTss) SetP2pId() error {
+	p2pId, err := r.GetConnection().GetPeerId()
+	if err != nil {
+		return err
+	}
+	r.P2pId = p2pId
+	return nil
+}
+
+// GetP2pId get p2pId
+func (r *rosenTss) GetP2pId() string {
+	return r.P2pId
+}
+
+// GetConfig get Config
+func (r *rosenTss) GetConfig() models.Config {
+	return r.Config
 }

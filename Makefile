@@ -31,7 +31,7 @@ list:
 	go list -mod=mod all
 
 build:
-	go build -o bin/rosenTss
+	go build -trimpath -o bin/rosenTss
 
 version:
 	go version

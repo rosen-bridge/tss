@@ -10,6 +10,7 @@ const (
 	OperationIsRunningError  = "operation is running"
 	NoKeygenDataFoundError   = "no keygen data found"
 	WrongCryptoProtocolError = "wrong crypto protocol"
+	NotPartOfSigningProcess  = "this party is not part of signing process"
 )
 
 type SignMessage struct {
@@ -32,11 +33,13 @@ type Message struct {
 }
 
 type GossipMessage struct {
-	MessageId  string `json:"messageId"` // keygen or sign or regroup
+	MessageId  string `json:"messageId"`
 	Name       string `json:"name"`
 	Message    string `json:"message"`
 	SenderId   string `json:"senderId"`
 	ReceiverId string `json:"receiverId"`
+	Signature  []byte `json:"signature"`
+	Index      int    `json:"index"`
 }
 
 type MetaData struct {
@@ -91,11 +94,46 @@ type KeygenMessage struct {
 }
 
 type Config struct {
-	HomeAddress      string `mapstructure:"HOME_ADDRESS"`
-	LogLevel         string `mapstructure:"LOG_LEVEL"`
-	LogMaxSize       int    `mapstructure:"LOG_MAX_SIZE"`
-	LogMaxBackups    int    `mapstructure:"LOG_MAX_BACKUPS"`
-	LogMaxAge        int    `mapstructure:"LOG_MAX_AGE"`
-	OperationTimeout int    `mapstructure:"OPERATION_TIMEOUT"`
-	MessageTimeout   int    `mapstructure:"MESSAGE_TIMEOUT"`
+	HomeAddress                string  `mapstructure:"HOME_ADDRESS"`
+	LogLevel                   string  `mapstructure:"LOG_LEVEL"`
+	LogMaxSize                 int     `mapstructure:"LOG_MAX_SIZE"`
+	LogMaxBackups              int     `mapstructure:"LOG_MAX_BACKUPS"`
+	LogMaxAge                  int     `mapstructure:"LOG_MAX_AGE"`
+	OperationTimeout           int     `mapstructure:"OPERATION_TIMEOUT"`
+	MessageTimeout             int     `mapstructure:"MESSAGE_TIMEOUT"`
+	LeastProcessRemainingTime  int64   `mapstructure:"LEAST_PROCESS_REMAINING_TIME"`
+	SetupBroadcastInterval     int64   `mapstructure:"SETUP_BROADCAST_INTERVAL"`
+	SignStartTimeTracker       float64 `mapstructure:"SIGN_START_TIME_TRACKER"`
+	TurnDuration               int64   `mapstructure:"TRUN_DURATION"`
+	WaitInPartyMessageHandling int64   `mapstructure:"WAIT_IN_PARTY_MESSAGE_HANDLING"`
+}
+
+type Register struct {
+	Id        string `json:"id"`
+	Moniker   string `json:"moniker"`
+	Key       string `json:"key"`
+	Timestamp int64  `json:"timestamp"`
+	NoAnswer  bool   `json:"noAnswer"`
+}
+
+type Payload struct {
+	MessageId string `json:"messageId"`
+	Name      string `json:"name"`
+	Message   string `json:"message"`
+	SenderId  string `json:"senderId"`
+}
+
+type SetupSign struct {
+	Hash      string        `json:"hash"`
+	Peers     []tss.PartyID `json:"peers"`
+	Timestamp int64         `json:"timestamp"`
+	StarterId string        `json:"starterId"`
+}
+
+type StartSign struct {
+	Hash       string         `json:"hash"`
+	Signatures map[int][]byte `json:"signatures"`
+	StarterId  string         `json:"starterId"`
+	Peers      []tss.PartyID  `json:"peers"`
+	Timestamp  int64          `json:"timestamp"`
 }
