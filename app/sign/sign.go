@@ -999,10 +999,12 @@ func (s *OperationSign) CreateParty(rosenTss _interface.RosenTss, peers []tss.Pa
 			errorCh <- err
 			return
 		}
-		if result {
+		if !result {
 			err = fmt.Errorf("close channel")
 			s.Logger.Error(err)
 			errorCh <- err
+			return
+		} else {
 			return
 		}
 	}()
