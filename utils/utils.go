@@ -126,3 +126,17 @@ func Decoder(message string) ([]byte, error) {
 func Encoder(message []byte) string {
 	return hex.EncodeToString(message)
 }
+
+func RemoveIndex[T any](arr []T, pos int) []T {
+	newArr := make([]T, len(arr)-1)
+	k := 0
+	for i := 0; i < (len(arr) - 1); {
+		if k != pos {
+			newArr[i] = arr[k]
+			i++
+		}
+		k++
+	}
+
+	return newArr
+}
