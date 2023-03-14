@@ -414,7 +414,7 @@ func (r *rosenTss) GetOperations() []_interface.Operation {
 func (r *rosenTss) deleteInstance(channelId string, operationName string) {
 	for i, operation := range r.operations {
 		if operation.GetClassName() == operationName {
-			r.operations = append(r.operations[:i], r.operations[i+1:]...)
+			r.operations = utils.RemoveIndex[_interface.Operation](r.operations, i)
 		}
 	}
 	delete(r.ChannelMap, channelId)
