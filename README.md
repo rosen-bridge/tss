@@ -1,3 +1,5 @@
+## NOTE: this project permanently is not usable and moved to new repository with new structure: [tss-api](https://github.com/rosen-bridge/tss-api)
+
 # rosen tss project
 
 This project is used for keygen, sign and regroup operations on eddsa and ecdsa protocols in threshold signature.
